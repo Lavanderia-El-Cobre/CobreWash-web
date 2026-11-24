@@ -92,6 +92,23 @@ it("un ingreso sin correo verificado queda en espera y, al verificarlo, pide com
   expect((screen.getByRole("button", { name: "Crear mi cuenta" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
+it("si el envío del correo no se confirma, lo avisa sin mostrarlo como error", async () => {
+  m.registrar.mockResolvedValue({ email: "ana@example.com", correoEnviado: false });
+  await abrir("/?login=1&registro=1");
+  escribir("Juan", "Ana"); escribir("Pérez", "Pérez"); escribir("12.345.678-9", "12.345.678-5");
+  escribir("correo@ejemplo.com", "ana@example.com");
+  for (const campo of screen.getAllByPlaceholderText("••••••••")) fireEvent.change(campo, { target: { value: "clave123" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tipo de cliente" }));
+  fireEvent.click(screen.getByRole("button", { name: "Particular" }));
+  const [terminos, datos] = screen.getAllByRole("checkbox") as HTMLInputElement[];
+  await waitFor(() => expect(terminos.disabled).toBe(false));
+  fireEvent.click(terminos); fireEvent.click(datos);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Registrarse" })); });
+  expect(screen.getByText("Verifica tu correo")).toBeTruthy();
+  expect((await screen.findByRole("status", {}, { timeout: 3000 })).textContent).toContain("No pudimos confirmar el envío");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 it("una cuenta con perfil entra directo a su vista", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   m.ingresar.mockResolvedValue({ tipo: "landing", ruta: "/intranet" });

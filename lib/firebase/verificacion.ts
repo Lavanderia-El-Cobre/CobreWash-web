@@ -36,11 +36,20 @@ async function conRetorno(enviar: (ajustes?: ActionCodeSettings) => Promise<void
   try {
     await enviar({ url });
   } catch (error) {
-    const code = (error as { code?: string } | null)?.code;
+    const code = codigo(error);
     if (!code || !CODIGOS_RETORNO.has(code)) throw error;
-    await enviar();
+    try {
+      await enviar();
+    } catch (reintento) {
+      // Firebase acepta un solo envío por minuto: si el reintento choca con ese
+      // límite, el correo ya salió en el primer intento y no es un fallo.
+      if (codigo(reintento) === "auth/too-many-requests") return;
+      throw reintento;
+    }
   }
 }
+
+const codigo = (error: unknown) => (error as { code?: string } | null)?.code;
 
 export function enviarVerificacion(user: User) {
   return conRetorno((ajustes) => sendEmailVerification(user, ajustes ?? null));

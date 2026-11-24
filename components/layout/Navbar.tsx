@@ -224,10 +224,13 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       await enviarVerificacion(auth.currentUser);
       setAuthInfo(`Te enviamos un nuevo enlace a ${correoPendiente}.`);
     } catch (err) {
-      // Firebase limita los reenvíos seguidos: el enlace anterior sigue sirviendo.
-      setAuthError((err as { code?: string } | null)?.code === "auth/too-many-requests"
-        ? "Ya enviamos varios enlaces hace poco. Revisa tu bandeja de entrada y spam, o espera unos minutos antes de pedir otro."
-        : mapAuthError(err));
+      // Firebase limita los reenvíos seguidos: el enlace anterior sigue sirviendo,
+      // así que no se muestra como error.
+      if ((err as { code?: string } | null)?.code === "auth/too-many-requests") {
+        setAuthInfo("Ya te enviamos un enlace hace poco y sigue sirviendo. Revisa tu bandeja de entrada y spam; podrás pedir otro en unos minutos.");
+      } else {
+        setAuthError(mapAuthError(err));
+      }
     }
   };
 
@@ -311,7 +314,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         setAuthConfirmPass("");
         setCorreoPendiente(email);
         setAuthView("verificar");
-        if (!correoEnviado) setAuthError("Tu cuenta quedó pendiente, pero no pudimos enviar el correo. Usa \"Reenviar correo\".");
+        // A veces el envío no se confirma aunque el correo sí sale: no se trata como error.
+        if (!correoEnviado) setAuthInfo("No pudimos confirmar el envío del correo. Revisa tu bandeja de entrada y spam; si en unos minutos no llega, usa \"Reenviar correo\".");
       } catch (err) {
         setAuthLoading(false);
         setAuthError(mapAuthError(err));

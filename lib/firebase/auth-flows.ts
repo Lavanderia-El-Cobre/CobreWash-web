@@ -30,6 +30,7 @@ import { createSecondaryFirebaseContext } from "@/lib/firebase/secondary";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 import { CorreoNoVerificadoError, enviarVerificacion, requiereVerificacion } from "@/lib/firebase/verificacion";
 import { borrarRegistroPendiente, guardarRegistroPendiente } from "@/lib/registro-pendiente";
+import { registrarError } from "@/lib/registro-seguro";
 
 interface FirebaseContext {
   auth: Auth;
@@ -159,7 +160,11 @@ export async function registerPublicClient(
     nombre: input.nombre.trim(), apellido: input.apellido.trim(), rut: input.rut, telefono: input.telefono.trim(),
     direccion: input.direccion.trim(), tipoCliente: input.tipoCliente,
   });
-  const correoEnviado = await enviarVerificacion(credential.user).then(() => true, () => false);
+  const correoEnviado = await enviarVerificacion(credential.user).then(() => true, (error) => {
+    // El código queda en la consola para diagnosticar envíos rechazados.
+    registrarError("No se pudo enviar el correo de verificación", error);
+    return false;
+  });
   return { email, correoEnviado };
 }
 
