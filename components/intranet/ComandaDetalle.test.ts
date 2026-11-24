@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); window.dispatchEvent(new Event("afterprint")); vi.u
 
 describe("comprobante con QR persistido", () => {
   it("detalle y ticket comparten URL; el ticket está fuera del contenedor de intranet", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
     const imprimir = vi.spyOn(window, "print").mockImplementation(() => {});
     const { container } = render(createElement(ComandaDetalle, { comanda, onClose: () => {} }));
     const enlace = screen.getByRole("link", { name: "Ver seguimiento público" }).getAttribute("href");
@@ -43,7 +43,7 @@ describe("comprobante con QR persistido", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/dominio/);
   });
   it("no reemplaza un UUID ausente por el número de comanda", () => {
-    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
     render(createElement(ComandaDetalle, { comanda: { ...comanda, codigoQr: undefined }, onClose: () => {} }));
     expect((screen.getByRole("button", { name: "Generar comprobante" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("alert").textContent).toMatch(/código QR/);
@@ -51,7 +51,7 @@ describe("comprobante con QR persistido", () => {
   it("incluye fecha de generación dentro del ticket en hora de Chile y la conserva al reimprimir", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-04T18:00:00Z"));
-    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
     const { rerender } = render(createElement(ComprobanteModal, { comanda, onClose: () => {} }));
     const fecha = screen.getByText(/^Generado el /);
     expect(fecha.closest(".comprobante-ticket")).not.toBeNull();

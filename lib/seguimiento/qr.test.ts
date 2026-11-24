@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { crearUrlSeguimiento, normalizarNumeroComanda, obtenerEnlaceSeguimiento } from "./qr";
 
 const uuid = "12345678-1234-4234-8234-123456789abc";
-const dominio = "https://lavanderia-elcobre.vercel.app";
+const dominio = "https://www.lavanderiaelcobrespa.com";
 afterEach(() => vi.unstubAllEnvs());
 
 describe("contrato QR", () => {

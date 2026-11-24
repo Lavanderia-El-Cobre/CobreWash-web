@@ -7,7 +7,7 @@ import QrCode from "./QrCode";
 import { crearUrlSeguimiento } from "@/lib/seguimiento/qr";
 
 it("un lector independiente decodifica el SVG usado en detalle e impresión", async () => {
-  const url = crearUrlSeguimiento("12345678-1234-4234-8234-123456789abc", "https://lavanderia-elcobre.vercel.app");
+  const url = crearUrlSeguimiento("12345678-1234-4234-8234-123456789abc", "https://www.lavanderiaelcobrespa.com");
   const markup = renderToStaticMarkup(createElement(QrCode, { value: url, size: 160 }));
   const svg = markup.match(/<svg[\s\S]*?<\/svg>/)?.[0];
   expect(svg).toBeDefined();

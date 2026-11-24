@@ -12,7 +12,7 @@ vi.mock("@/lib/portal/consultar", () => ({ TAMANO_PAGINA: 10, vincularPedido: mo
 import CuentaPage from "./page";
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
   mocks.perfil.mockReturnValue({ loading: false, usuario: { id: "cliente", nombre: "Ana", email: "ana@example.test", activo: true, rol: { nombre: "cliente" }, clientes_on_usuario: [{ tipoCliente: "HOTEL" }] } });
   mocks.pedidos.mockReturnValue({ pedidos: [], total: 0, cargando: false, error: "", actualizar: mocks.actualizar });
   mocks.vincular.mockResolvedValue(undefined);

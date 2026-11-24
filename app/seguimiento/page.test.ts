@@ -21,7 +21,7 @@ const pedido = {
 const estado = (extra = {}) => ({ pedido: null, error: "", buscando: false, consultado: false, consulta: null, ejecutar: m.ejecutar, actualizar: m.actualizar, ...extra });
 beforeEach(() => {
   vi.clearAllMocks(); m.params = new URLSearchParams();
-  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ publicada: false }) }));
   m.hook.mockReturnValue(estado());
 });

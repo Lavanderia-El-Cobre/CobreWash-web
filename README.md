@@ -71,7 +71,7 @@ verificable: Vercel aporta su encabezado de plataforma; otros hosts usan un prox
 firmado. Consulta [Origen de los formularios](#origen-de-los-formularios).
 
 Para emitir QR reales configura `NEXT_PUBLIC_SEGUIMIENTO_BASE_URL` como origen
-HTTPS estable (actualmente `https://lavanderia-elcobre.vercel.app`). También debe
+HTTPS estable (actualmente `https://www.lavanderiaelcobrespa.com`). También debe
 estar configurado en Vercel antes del build. No se usa el dominio de previews
 como alternativa; una configuración ausente bloquea el comprobante QR.
 El QR contiene `/seguimiento?qr=<UUID persistido>`, no el número corto de comanda.
