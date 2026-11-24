@@ -48,3 +48,9 @@ it("también reintenta sin enlace de retorno si el dominio no está autorizado",
   await enviarVerificacion(user);
   expect(m.verificar).toHaveBeenLastCalledWith(user, null);
 });
+
+it("si el reintento sin enlace choca con el límite de Firebase, el correo ya salió y no es un fallo", async () => {
+  m.verificar.mockRejectedValueOnce({ code: "auth/unauthorized-continue-uri" }).mockRejectedValueOnce({ code: "auth/too-many-requests" });
+  await expect(enviarVerificacion({} as User)).resolves.toBeUndefined();
+  expect(m.verificar).toHaveBeenCalledTimes(2);
+});
