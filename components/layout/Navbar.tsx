@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { signOut } from "firebase/auth";
-import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, Phone, MapPin, AlertCircle, Search, MailCheck, RefreshCw } from "lucide-react";
+import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, MapPin, AlertCircle, Search, MailCheck, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { auth, dataConnect } from "@/lib/firebase/client";
@@ -25,6 +25,7 @@ import {
   validatePublicClientRegistration,
 } from "@/lib/auth-validation";
 import GlassSelect from "@/components/ui/GlassSelect";
+import TelefonoInput from "@/components/ui/TelefonoInput";
 import AutorizacionDatos, { useAvisoPublicado } from "@/components/privacidad/AutorizacionDatos";
 import AceptacionTerminos from "@/components/privacidad/AceptacionTerminos";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
@@ -742,17 +743,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Teléfono</label>
-                            <div className="relative">
-                              <input
-                                type="tel"
-                                placeholder="+56 9 1234 5678"
-                                value={authTelefono}
-                                onChange={(e) => setAuthTelefono(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 bg-stone-50/50 text-stone-850 placeholder-stone-400 focus:outline-none focus:border-brand-500 focus:bg-white transition-all text-sm font-medium"
-                              />
-                              <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                            </div>
+                            <label htmlFor="registro-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Teléfono (opcional)</label>
+                            <TelefonoInput id="registro-telefono" variante="claro" value={authTelefono} onChange={setAuthTelefono} />
                           </div>
 
                           <div className="space-y-1.5">

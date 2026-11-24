@@ -38,7 +38,9 @@ import { getMiComandaGuardada } from "@/src/dataconnect-generated";
 import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
 import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
 import { dataConnect } from "@/lib/firebase/client";
-import { formatChileanPhone, formatRut, getChileanPhoneType, isValidChileanPhone, isValidRut } from "@/lib/validators";
+import { formatRut, isValidRut } from "@/lib/validators";
+import { normalizarTelefono, validarTelefono } from "@/lib/telefonos";
+import TelefonoInput from "@/components/ui/TelefonoInput";
 import { executeQuery, queryRef } from "firebase/data-connect";
 import { 
   TipoCliente, 
@@ -399,8 +401,9 @@ export default function ComandasPage() {
       setFormError("Ingresa un RUT chileno válido para el cliente.");
       return;
     }
-    if (nuevoCliente && formData.telefono.trim() && !isValidChileanPhone(formData.telefono)) {
-      setFormError("Ingresa un celular o teléfono fijo chileno válido.");
+    const errorTelefono = nuevoCliente ? validarTelefono(formData.telefono) : null;
+    if (errorTelefono) {
+      setFormError(errorTelefono);
       return;
     }
     if (nuevoCliente && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
@@ -491,7 +494,7 @@ export default function ComandasPage() {
             nombre: formData.cliente.trim(),
             tipoCliente: formData.tipoCliente,
             rut: formatRut(formData.rut),
-            telefono: formData.telefono.trim() ? formatChileanPhone(formData.telefono) : undefined,
+            telefono: normalizarTelefono(formData.telefono) || undefined,
             email,
             direccion: formData.direccion.trim() || undefined,
           });
@@ -961,7 +964,10 @@ export default function ComandasPage() {
                   <FieldInput label="Proyecto" value={formData.proyecto} onChange={(v) => setFormData({ ...formData, proyecto: v })} placeholder="Proyecto, faena u orden" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <FieldInput label="Teléfono" value={formData.telefono} onChange={(v) => setFormData({ ...formData, telefono: formatChileanPhone(v) })} placeholder="+56 9 1234 5678" hint={nuevoCliente && formData.telefono ? (getChileanPhoneType(formData.telefono) || "Número chileno incompleto") : undefined} valid={nuevoCliente && formData.telefono ? isValidChileanPhone(formData.telefono) : undefined} />
+                  <div className="space-y-1.5">
+                    <label htmlFor="comanda-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
+                    <TelefonoInput id="comanda-telefono" value={formData.telefono} onChange={(telefono) => setFormData((actual) => ({ ...actual, telefono }))} />
+                  </div>
                   <FieldInput label={nuevoCliente ? "Correo (obligatorio)" : "Correo"} value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
                 </div>
                 <FieldInput label="Dirección" value={formData.direccion} onChange={(v) => setFormData({ ...formData, direccion: v })} placeholder="Dirección de retiro / entrega" />
