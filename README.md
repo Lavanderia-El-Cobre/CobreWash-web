@@ -182,9 +182,23 @@ el stock**: solo el conteo físico lo reemplaza.
 
 ## Adecuación de privacidad
 
-La matriz verificable está en `docs/cumplimiento-21719.json`. Faltan razón social,
-RUT, domicilio y representante legal. Completar `LEGAL_*` y aprobar expresamente
-la versión propuesta `2026-11-01` antes de habilitar nuevas autorizaciones.
+La matriz verificable está en `docs/cumplimiento-21719.json`. La identidad legal se
+configura con las variables `LEGAL_*`. La versión vigente del aviso y de los
+Términos y Condiciones es `2026-11-24` (`VERSION_PRIVACIDAD` y `VERSION_TERMINOS`):
+`LEGAL_AVISO_APROBADO_VERSION` debe aprobarla expresamente para habilitar el
+registro de cuentas y el formulario de cotizaciones.
+
+Cuentas:
+- El registro público crea la identidad, envía la verificación del correo y solo
+  crea el perfil (`RegistrarseComoCliente`, que exige `email_verified`) después de
+  verificarlo, registrando por separado la aceptación de términos y la
+  autorización de datos.
+- Recepción registra clientes con correo obligatorio y cuenta asociada
+  (`CrearClienteConCuenta`); el cliente recibe un enlace para definir su
+  contraseña y acepta términos y aviso al ingresar (`AceptarCondicionesVigentes`).
+- Las cuentas creadas desde el 24-11-2026 deben verificar su correo para ingresar.
+- Agregar el dominio público en Firebase Authentication > Configuración >
+  Dominios autorizados para que los enlaces de los correos vuelvan al sitio.
 No se declara cumplimiento integral por completar variables o pasar pruebas:
 también se deben implantar y verificar los controles operativos del registro.
 
