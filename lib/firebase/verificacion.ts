@@ -23,7 +23,7 @@ export function requiereVerificacion(user: UsuarioAuth | null | undefined): bool
   return !Number.isFinite(creada) || creada >= INICIO_VERIFICACION_OBLIGATORIA;
 }
 
-const CODIGOS_RETORNO = new Set(["auth/unauthorized-continue-uri", "auth/invalid-continue-uri", "auth/missing-continue-uri"]);
+const CODIGOS_RETORNO = new Set(["auth/unauthorized-continue-uri", "auth/invalid-continue-uri", "auth/missing-continue-uri", "auth/unauthorized-domain"]);
 
 /**
  * Envía el correo con un enlace que vuelve al inicio de sesión del sitio. Si el

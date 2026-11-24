@@ -236,6 +236,8 @@ query GetComandas(
     codigoQr
     estado
     valorTotal
+    modalidadCobro
+    precioKg
     empresa
     proyecto
     fechaRecepcion
@@ -255,6 +257,7 @@ query GetComandas(
       detalle
       pesoKg
       precioUnitario
+      subtotal
       tipoPrenda { nombre }
       tipoServicio { nombre }
     }
@@ -305,6 +308,8 @@ query GetComandasPaginadas(
     codigoQr
     estado
     valorTotal
+    modalidadCobro
+    precioKg
     empresa
     proyecto
     fechaRecepcion
@@ -332,6 +337,7 @@ query GetComandasPaginadas(
       detalle
       pesoKg
       precioUnitario
+      subtotal
       tipoPrenda { nombre }
       tipoServicio { nombre }
     }
@@ -373,6 +379,8 @@ query GetComandaDetalle($id: UUID!) @auth(level: USER) {
     numeroComanda
     estado
     valorTotal
+    modalidadCobro
+    precioKg
     empresa
     proyecto
     observaciones
@@ -438,9 +446,10 @@ query GetCatalogosComanda @auth(level: USER) {
     id
     nombre
     precioBase
+    precioKg
     unidadCobro
   }
-  tipoPrendas(where: { activo: { eq: true } }) {
+  tipoPrendas(where: { activo: { eq: true } }, orderBy: [{ nombre: ASC }]) {
     id
     nombre
   }

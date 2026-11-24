@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Search } from "lucide-react";
+import { ChevronDown, Check, Plus, Search } from "lucide-react";
 
 export interface GlassSelectOption {
   value: string;
@@ -26,6 +26,8 @@ export default function GlassSelect({
   ariaLabel,
   searchable = false,
   searchPlaceholder = "Buscar…",
+  nuevaOpcion,
+  id,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -37,9 +39,19 @@ export default function GlassSelect({
   ariaLabel?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  /**
+   * Muestra un campo para escribir un valor que no está en la lista. El texto
+   * pasa por `normalizar` y, si equivale a una opción existente, se elige esa.
+   */
+  nuevaOpcion?: { placeholder: string; normalizar?: (texto: string) => string };
+  /** id del botón, para asociarlo a un <label htmlFor>. */
+  id?: string;
 }) {
   const [open, setOpen] = useState(false);
+  /** Abre hacia arriba cuando no cabe bajo el botón (pie de un modal, celular). */
+  const [haciaArriba, setHaciaArriba] = useState(false);
   const [search, setSearch] = useState("");
+  const [nuevo, setNuevo] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
   const normalizedSearch = search
@@ -47,6 +59,15 @@ export default function GlassSelect({
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLocaleLowerCase("es-CL");
+  const clave = (texto: string) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLocaleLowerCase("es-CL");
+  const agregarNuevo = () => {
+    const texto = (nuevaOpcion?.normalizar ?? ((t: string) => t.trim()))(nuevo);
+    if (!texto) return;
+    const existente = options.find((o) => clave(o.label) === clave(texto) || clave(o.value) === clave(texto));
+    onChange(existente ? existente.value : texto);
+    setNuevo("");
+    setOpen(false);
+  };
   const filteredOptions = normalizedSearch
     ? options.filter((option) => option.label
       .normalize("NFD")
@@ -79,9 +100,16 @@ export default function GlassSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        id={id}
         onClick={() => {
           if (disabled) return;
           setSearch("");
+          setNuevo("");
+          const caja = ref.current?.getBoundingClientRect();
+          if (caja && typeof window !== "undefined") {
+            const abajo = window.innerHeight - caja.bottom;
+            setHaciaArriba(abajo < 260 && caja.top > abajo);
+          }
           setOpen((o) => !o);
         }}
         className={`w-full flex items-center ${Icon ? "pl-10" : "pl-4"} pr-10 py-3 rounded-xl border bg-stone-50 dark:bg-stone-800 text-sm font-medium text-left transition-colors focus:outline-none ${
@@ -105,11 +133,11 @@ export default function GlassSelect({
         {open && (
           <motion.ul
             role="listbox"
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: haciaArriba ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: haciaArriba ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute z-[70] mt-2 w-full max-h-56 overflow-y-auto rounded-2xl border border-white/60 dark:border-white/10 bg-white/85 dark:bg-stone-900/90 backdrop-blur-xl p-1.5 shadow-premium"
+            className={`absolute z-[70] w-full ${haciaArriba ? "bottom-full mb-2 origin-bottom" : "mt-2 origin-top"} max-h-[min(14rem,45dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-white/60 dark:border-white/10 bg-white/95 dark:bg-stone-900/95 backdrop-blur-xl p-1.5 shadow-premium`}
             style={{ WebkitBackdropFilter: "blur(20px)" }}
           >
             {searchable && (
@@ -121,12 +149,39 @@ export default function GlassSelect({
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    onKeyDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }}
                     placeholder={searchPlaceholder}
                     aria-label={searchPlaceholder}
                     className="w-full rounded-lg border border-stone-200 bg-stone-50 py-2 pl-8 pr-3 text-sm text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-200"
                   />
                 </div>
+              </li>
+            )}
+            {nuevaOpcion && (
+              <li className="sticky top-0 z-10 mb-1 bg-white/95 p-1 dark:bg-stone-900/95">
+                <form
+                  className="flex gap-1.5"
+                  onSubmit={(event) => { event.preventDefault(); agregarNuevo(); }}
+                >
+                  <input
+                    autoFocus={!searchable}
+                    value={nuevo}
+                    maxLength={60}
+                    onChange={(event) => setNuevo(event.target.value)}
+                    onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }}
+                    placeholder={nuevaOpcion.placeholder}
+                    aria-label={nuevaOpcion.placeholder}
+                    className="min-w-0 flex-1 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm uppercase text-stone-800 outline-none placeholder:normal-case focus:border-brand-500 dark:border-white/15 dark:bg-stone-800 dark:text-stone-200"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!nuevo.trim()}
+                    aria-label="Agregar a la lista"
+                    className="grid w-9 shrink-0 place-items-center rounded-lg bg-brand-500 text-white transition-opacity disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </form>
               </li>
             )}
             {filteredOptions.map((opt) => {

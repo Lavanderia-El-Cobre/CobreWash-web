@@ -732,13 +732,19 @@ mutation AnularComanda(
   })
 }
 
+# Cierra la entrega. El repartidor puede dejar un detalle opcional (quién recibió,
+# dónde se dejó); queda en el historial junto al autor y la hora.
 mutation EntregarComanda(
   $id: UUID!
+  $detalle: String = null
 ) @auth(level: USER) @transaction {
-  query @redact {
+  query @redact @check(
+    expr: "vars.detalle == null || (vars.detalle.size() <= 280 && vars.detalle.matches('[^[:space:]]'))"
+    message: "El detalle de la entrega no puede superar los 280 caracteres"
+  ) {
     usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
-      rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para entregar comandas") }
+      rol { nombre @check(expr: "this in ['admin', 'recepcionista', 'repartidor', 'conductor']", message: "No autorizado para entregar comandas") }
     }
     comanda(id: $id)
       @check(expr: "this != null", message: "Comanda no encontrada") {
@@ -763,13 +769,59 @@ mutation EntregarComanda(
   comandaHistorialEstado_insert(data: {
     comanda: { id: $id }
     usuarioId_expr: "auth.uid"
+    estadoAnterior: FINALIZADA
     estadoNuevo: ENTREGADA
-    motivo: "Entrega a cliente"
+    motivo_expr: "vars.detalle == null ? 'Entrega a cliente' : 'Entrega a cliente: ' + vars.detalle"
   })
+  # Los problemas de entrega pendientes quedan resueltos con la entrega efectiva.
+  problemasResueltos: incidenciaComanda_updateMany(
+    where: { comandaId: { eq: $id }, motivo: { startsWith: "Entrega: " }, estado: { ne: RESUELTA } }
+    data: { estado: RESUELTA, actualizadaEn_expr: "request.time" }
+  )
   comandaNotificacion_insert(data: {
     comanda: { id: $id }
     destinatario_expr: "response.query.comanda.cliente.email"
     mensaje: "Su comanda fue entregada correctamente"
+  })
+}
+
+# Registra un intento de entrega fallido sin cerrar la comanda: crea una
+# incidencia (visible en Incidencias) y deja la traza en el historial.
+mutation ReportarProblemaEntrega(
+  $comandaId: UUID!
+  $motivo: String!
+  $detalle: String = null
+) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.motivo in ['Cliente ausente', 'Dirección errónea', 'Dirección inaccesible', 'Cliente rechaza la entrega', 'Pedido incompleto o dañado', 'Otro'] && (vars.detalle == null || (vars.detalle.size() <= 250 && vars.detalle.matches('[^[:space:]]'))) && (vars.motivo != 'Otro' || vars.detalle != null)"
+    message: "Motivo o detalle del problema de entrega inválidos"
+  ) {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this in ['admin', 'repartidor', 'conductor']", message: "No autorizado para reportar problemas de entrega") }
+    }
+    comanda(id: $comandaId) @check(expr: "this != null", message: "Comanda no encontrada") {
+      estado @check(expr: "this == 'FINALIZADA'", message: "Solo se pueden reportar problemas de comandas listas para entregar")
+    }
+  }
+  # Bloquea la comanda: si otra sesión la entregó o anuló entre medio, se revierte.
+  bloqueo: comanda_update(
+    first: { where: { id: { eq: $comandaId }, estado: { eq: FINALIZADA } } }
+    data: { actualizadoEn_expr: "request.time" }
+  ) @check(expr: "this != null", message: "Solo se pueden reportar problemas de comandas listas para entregar")
+  incidenciaComanda_insert(data: {
+    comanda: { id: $comandaId }
+    reportadaPorId_expr: "auth.uid"
+    motivo_expr: "'Entrega: ' + vars.motivo"
+    descripcion: $detalle
+    estado: ABIERTA
+  })
+  comandaHistorialEstado_insert(data: {
+    comanda: { id: $comandaId }
+    usuarioId_expr: "auth.uid"
+    estadoAnterior: FINALIZADA
+    estadoNuevo: FINALIZADA
+    motivo_expr: "vars.detalle == null ? 'Problema de entrega: ' + vars.motivo : 'Problema de entrega: ' + vars.motivo + ' — ' + vars.detalle"
   })
 }
 
@@ -819,14 +871,15 @@ mutation EliminarDetallesComanda(
   comandaDetalle_deleteMany(where: { comandaId: { eq: $comandaId } })
 }
 
+# Las prendas escritas a mano quedan en mayúsculas, igual que el catálogo base.
 mutation CrearTipoPrenda($nombre: String!) @auth(level: USER) @transaction {
-  query @redact {
+  query @redact @check(expr: "vars.nombre.size() >= 2 && vars.nombre.size() <= 60", message: "El nombre de la prenda debe tener entre 2 y 60 caracteres") {
     usuario(id_expr: "auth.uid") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para crear prendas") }
     }
   }
-  tipoPrenda_insert(data: { nombre: $nombre, activo: true })
+  tipoPrenda_insert(data: { nombre_expr: "vars.nombre.upperAscii()", activo: true })
 }
 
 mutation CrearTipoServicio($nombre: String!, $precioBase: Float!) @auth(level: USER) @transaction {

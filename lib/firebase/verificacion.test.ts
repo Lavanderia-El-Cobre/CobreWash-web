@@ -41,3 +41,10 @@ it("genera contraseñas temporales distintas y robustas", () => {
   expect(a.length).toBeGreaterThanOrEqual(24);
   expect(a).toMatch(/[A-Z]/); expect(a).toMatch(/[a-z]/); expect(a).toMatch(/\d/);
 });
+
+it("también reintenta sin enlace de retorno si el dominio no está autorizado", async () => {
+  m.verificar.mockRejectedValueOnce({ code: "auth/unauthorized-domain" }).mockResolvedValueOnce(undefined);
+  const user = {} as User;
+  await enviarVerificacion(user);
+  expect(m.verificar).toHaveBeenLastCalledWith(user, null);
+});

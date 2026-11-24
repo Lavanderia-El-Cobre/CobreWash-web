@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BrainCircuit, Database, FlaskConical, Gauge, History, Loader2, Table2 } from "lucide-react";
+import { Database, FlaskConical, Gauge, History, Loader2, Table2 } from "lucide-react";
 import { QueryFetchPolicy } from "firebase/data-connect";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import DatosIa from "@/components/intranet/ia/DatosIa";
@@ -10,6 +10,7 @@ import ResumenIa from "@/components/intranet/ia/ResumenIa";
 import SimulacionIa from "@/components/intranet/ia/SimulacionIa";
 import TasasIa from "@/components/intranet/ia/TasasIa";
 import { AvisoFlotante, type Aviso } from "@/components/intranet/ia/ui";
+import EncabezadoSeccion from "@/components/intranet/EncabezadoSeccion";
 import { dataConnect } from "@/lib/firebase/client";
 import { registrarError } from "@/lib/registro-seguro";
 import { getPanelIa, type GetPanelIaData } from "@/src/dataconnect-generated";
@@ -69,11 +70,11 @@ export default function ModuloIaPage() {
   return (
     <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
       <AvisoFlotante aviso={aviso} />
-      <div>
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400"><BrainCircuit className="h-3 w-3" />Predicción de insumos</div>
-        <h1 className="font-display text-2xl font-extrabold dark:text-white">Módulo IA</h1>
-        <p className="mt-1 text-sm text-stone-500">Estima el consumo de insumos por comanda y aprende de cada conteo físico. Nunca modifica el stock.</p>
-      </div>
+      <EncabezadoSeccion
+        antetitulo="Inteligencia · Predicción de insumos"
+        titulo="Módulo IA"
+        descripcion="Estima el consumo de insumos por comanda y aprende de cada conteo físico. Nunca modifica el stock."
+      />
 
       <div role="tablist" aria-label="Secciones del módulo IA" className="flex gap-2 overflow-x-auto">
         {PESTANAS.map((p, i) => (

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createElement } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ conteos: vi.fn(), aprobar: vi.fn(), rechazar: vi.fn(), historial: vi.fn() }));
 vi.mock("@/lib/firebase/client", () => ({ dataConnect: {} }));
@@ -51,7 +51,8 @@ it("pagina y envía los filtros al servidor, volviendo a la primera página al c
   await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" }).hasAttribute("disabled")).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
   await waitFor(() => expect(api.historial).toHaveBeenLastCalledWith({}, expect.objectContaining({ offset: 20 }), { fetchPolicy: "SERVER_ONLY" }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Tipo" }), { target: { value: "SALIDA" } });
+  fireEvent.click(screen.getByRole("button", { name: "Tipo" }));
+  fireEvent.click(within(screen.getByRole("option", { name: "Salidas" })).getByRole("button"));
   await waitFor(() => expect(api.historial).toHaveBeenLastCalledWith({}, expect.objectContaining({ offset: 0, tipo: "SALIDA" }), { fetchPolicy: "SERVER_ONLY" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" }).hasAttribute("disabled")).toBe(true));
 });

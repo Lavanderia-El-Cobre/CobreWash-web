@@ -11,14 +11,17 @@ import {
   Contact,
   ShieldAlert,
   BrainCircuit,
+  PackageCheck,
   type LucideIcon,
 } from "lucide-react";
 
 /**
  * Roles del sistema (coinciden con Rol.nombre en la base de datos / Data Connect).
  * No existe un rol "Supervisor": sus funciones las cumple el Administrador.
+ * "conductor" es el nombre anterior del rol de reparto y se trata igual que
+ * "repartidor".
  */
-export type Rol = "admin" | "recepcionista" | "operario" | "cliente";
+export type Rol = "admin" | "recepcionista" | "operario" | "repartidor" | "conductor" | "cliente";
 
 export interface NavItem {
   href: string;
@@ -34,6 +37,13 @@ export interface NavItem {
  * Operario reutiliza rutas del admin (/seguimiento, /comunicacion) pero con
  * contenido y etiquetas propias — el contenido se adapta según el rol.
  */
+const NAV_REPARTO: NavItem[] = [
+  { href: "/intranet/reparto", label: "Mi vehículo", icon: Truck },
+  { href: "/intranet/entregas", label: "Entregas", icon: PackageCheck },
+  { href: "/intranet/comunicacion", label: "Avisos", icon: Megaphone },
+  { href: "/intranet/configuracion", label: "Configuración", icon: Settings },
+];
+
 export const NAV_POR_ROL: Record<Exclude<Rol, "cliente">, NavItem[]> = {
   admin: [
     { href: "/intranet", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -64,6 +74,8 @@ export const NAV_POR_ROL: Record<Exclude<Rol, "cliente">, NavItem[]> = {
     { href: "/intranet/comunicacion", label: "Avisos", icon: Megaphone },
     { href: "/intranet/configuracion", label: "Configuración", icon: Settings },
   ],
+  repartidor: NAV_REPARTO,
+  conductor: NAV_REPARTO,
 };
 
 /**
@@ -80,11 +92,13 @@ export const ACCESO_POR_RUTA: Record<string, Rol[]> = {
   "/intranet/incidencias": ["admin", "recepcionista"],
   "/intranet/inventario": ["admin"],
   "/intranet/vehiculos": ["admin"],
+  "/intranet/reparto": ["repartidor", "conductor"],
+  "/intranet/entregas": ["admin", "repartidor", "conductor"],
   "/intranet/reportes": ["admin"],
   "/intranet/ia": ["admin"],
-  "/intranet/comunicacion": ["admin", "operario", "recepcionista"],
+  "/intranet/comunicacion": ["admin", "operario", "recepcionista", "repartidor", "conductor"],
   "/intranet/usuarios": ["admin"],
-  "/intranet/configuracion": ["admin", "recepcionista", "operario"],
+  "/intranet/configuracion": ["admin", "recepcionista", "operario", "repartidor", "conductor"],
 };
 
 /** Vista a la que se redirige a cada rol tras iniciar sesión. */
@@ -92,11 +106,13 @@ export const LANDING_POR_ROL: Record<Rol, string> = {
   admin: "/intranet",
   recepcionista: "/intranet/comandas",
   operario: "/intranet/seguimiento",
+  repartidor: "/intranet/reparto",
+  conductor: "/intranet/reparto",
   cliente: "/cuenta",
 };
 
 /** Roles que usan el shell interno (sidebar oscuro) de la intranet. */
-export const ROLES_INTERNOS: Rol[] = ["admin", "recepcionista", "operario"];
+export const ROLES_INTERNOS: Rol[] = ["admin", "recepcionista", "operario", "repartidor", "conductor"];
 
 export function esRolInterno(rol: string | undefined): boolean {
   return !!rol && ROLES_INTERNOS.includes(rol as Rol);

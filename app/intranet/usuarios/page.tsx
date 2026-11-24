@@ -8,7 +8,6 @@ import {
   Pencil,
   Mail,
   Phone,
-  X,
   IdCard,
   Lock,
   UserCog,
@@ -44,6 +43,9 @@ import {
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion, { BOTON_ENCABEZADO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO } from "@/components/intranet/ModalIntranet";
+import TelefonoInput from "@/components/ui/TelefonoInput";
 import Link from "next/link";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
@@ -197,7 +199,7 @@ export default function UsuariosPage() {
 
   const handleEditar = async () => {
     if (modal?.mode !== "editar") return;
-    const validationError = validateManagedUserUpdate(form.rolId, form.nombre);
+    const validationError = validateManagedUserUpdate(form.rolId, form.nombre, form.telefono);
     if (validationError) {
       setFormError(validationError);
       return;
@@ -244,33 +246,23 @@ export default function UsuariosPage() {
 
   return (
     <div className="min-h-screen text-stone-900 dark:text-stone-100 p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      <EncabezadoSeccion
+        antetitulo="Administración · Cuentas y roles"
+        titulo="Gestión de Usuarios"
+        descripcion={`${usuarios.length} cuentas registradas · ${activeCount} activas`}
+        acciones={
+          <button onClick={openCrear} className={BOTON_ENCABEZADO}>
+            <Plus className="w-4 h-4" />
+            Nuevo Usuario
+          </button>
+        }
       >
-        <div>
-          <h1 className="text-2xl font-display font-extrabold text-stone-900 dark:text-white">
-            Gestión de Usuarios
-          </h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">
-            {usuarios.length} cuentas registradas · {activeCount} activas
-          </p>
-        </div>
         {aviso && (
-          <p role="status" className="flex-1 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs font-semibold text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">
+          <p role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs font-semibold text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">
             {aviso} <button type="button" onClick={() => setAviso("")} className="ml-2 underline">Cerrar</button>
           </p>
         )}
-        <button
-          onClick={openCrear}
-          className="flex items-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Usuario
-        </button>
-      </motion.div>
+      </EncabezadoSeccion>
 
       {loading ? (
         <div className="flex items-center justify-center py-24">
@@ -448,44 +440,38 @@ export default function UsuariosPage() {
       {/* Crear / Editar Modal */}
       <AnimatePresence>
         {modal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel rounded-3xl p-6 sm:p-8 w-full max-w-lg relative z-10 max-h-[90vh] overflow-y-auto"
-            >
+          <ModalIntranet
+            onCerrar={closeModal}
+            bloqueado={saving}
+            icono={UserCog}
+            etiqueta="Administración de cuentas"
+            titulo={modal.mode === "crear" ? "Nuevo Usuario" : "Editar Usuario"}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (modal.mode === "crear") {
+                handleCrear();
+              } else {
+                handleEditar();
+              }
+            }}
+            noValidate
+            claseCuerpo="space-y-4"
+            pie={
               <button
-                onClick={closeModal}
-                className="absolute top-4 right-4 p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+                type="submit"
+                disabled={saving || (modal.mode === "crear" && form.informado !== true)}
+                className={`${BOTON_MODAL_PRIMARIO} sm:min-w-44`}
               >
-                <X className="w-5 h-5" />
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : modal.mode === "crear" ? (
+                  "Crear Usuario"
+                ) : (
+                  "Guardar Cambios"
+                )}
               </button>
-
-              <h3 className="text-xl font-extrabold text-stone-900 dark:text-white font-display mb-6">
-                {modal.mode === "crear" ? "Nuevo Usuario" : "Editar Usuario"}
-              </h3>
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (modal.mode === "crear") {
-                    handleCrear();
-                  } else {
-                    handleEditar();
-                  }
-                }}
-                className="space-y-4"
-                noValidate
-              >
+            }
+          >
                 {formError && (
                   <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold rounded-xl">
                     {formError}
@@ -526,7 +512,7 @@ export default function UsuariosPage() {
                   </Field>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Nombre">
                     <input
                       type="text"
@@ -577,13 +563,8 @@ export default function UsuariosPage() {
                   )}
                 </Field>
 
-                <Field label="Teléfono">
-                  <input
-                    type="tel"
-                    value={form.telefono}
-                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-brand-500 transition-all text-sm font-medium"
-                  />
+                <Field label="Teléfono" htmlFor="usuario-telefono">
+                  <TelefonoInput id="usuario-telefono" value={form.telefono} onChange={(telefono) => setForm((actual) => ({ ...actual, telefono }))} />
                 </Field>
 
                 {selectedRole?.nombre === "cliente" && modal.mode === "crear" && (
@@ -656,32 +637,17 @@ export default function UsuariosPage() {
                   </label>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={saving || (modal.mode === "crear" && form.informado !== true)}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg disabled:opacity-50 transition-all duration-200 cursor-pointer"
-                >
-                  {saving ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : modal.mode === "crear" ? (
-                    "Crear Usuario"
-                  ) : (
-                    "Guardar Cambios"
-                  )}
-                </button>
-              </form>
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">{label}</label>
+      <label htmlFor={htmlFor} className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">{label}</label>
       {children}
     </div>
   );

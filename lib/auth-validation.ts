@@ -1,6 +1,7 @@
 import { TipoCliente } from "@/src/dataconnect-generated";
 import { isValidRut, validatePassword } from "@/lib/validators";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
+import { validarTelefono } from "@/lib/telefonos";
 
 export interface ClientRegistrationInput {
   nombre: string;
@@ -60,6 +61,8 @@ export function validateClientCompletion(input: ClientCompletionInput): string |
   if (!input.nombre.trim() || !input.apellido.trim() || !input.rut.trim()) return "Completa tu nombre, apellido y RUT.";
   if (!isPublicClientType(input.tipoCliente)) return "Selecciona el tipo de cliente.";
   if (!isValidRut(input.rut)) return "El RUT ingresado no es válido.";
+  const telefono = validarTelefono(input.telefono);
+  if (telefono) return telefono;
   return validateAceptacion(input);
 }
 
@@ -78,6 +81,8 @@ export function validatePublicClientRegistration(
   }
   if (!isPublicClientType(input.tipoCliente)) return "Selecciona el tipo de cliente.";
   if (!isValidRut(input.rut)) return "El RUT ingresado no es válido.";
+  const telefono = validarTelefono(input.telefono);
+  if (telefono) return telefono;
 
   const passwordCheck = validatePassword(input.password);
   if (!passwordCheck.valid) return passwordCheck.message;
@@ -101,6 +106,8 @@ export function validateManagedUserRegistration(
     return "Todos los campos son obligatorios.";
   }
   if (!isValidRut(input.rut)) return "El RUT ingresado no es válido.";
+  const telefono = validarTelefono(input.telefono);
+  if (telefono) return telefono;
 
   const passwordCheck = validatePassword(input.password);
   if (!passwordCheck.valid) return passwordCheck.message;
@@ -110,7 +117,7 @@ export function validateManagedUserRegistration(
   return null;
 }
 
-export function validateManagedUserUpdate(roleId: string, name: string): string | null {
+export function validateManagedUserUpdate(roleId: string, name: string, telefono = ""): string | null {
   if (!roleId || !name.trim()) return "El rol y el nombre son obligatorios.";
-  return null;
+  return validarTelefono(telefono);
 }

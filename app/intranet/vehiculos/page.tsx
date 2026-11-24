@@ -23,7 +23,6 @@ import {
   Pencil,
   Plus,
   Power,
-  Radio,
   RotateCcw,
   Search,
   SlidersHorizontal,
@@ -35,13 +34,14 @@ import {
 import { consultarFlotaCompleta } from "@/lib/vehiculos/consultar";
 import AdjuntarEvidencia from "@/components/intranet/AdjuntarEvidencia";
 import FotoEvidencia from "@/components/intranet/FotoEvidencia";
-import { subirEvidencia } from "@/lib/vehiculos/evidencias";
-import { normalizarCodigoQr } from "@/lib/seguimiento/qr";
+import { confirmarMovimientoFlota, MENSAJE_FOTOS_PENDIENTES, subirEvidenciasInspeccion } from "@/lib/vehiculos/movimientos";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
+import EncabezadoSeccion, { BOTON_ENCABEZADO, BOTON_ENCABEZADO_SECUNDARIO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
+import GlassSelect from "@/components/ui/GlassSelect";
 import { dataConnect } from "@/lib/firebase/client";
 import {
-  getMovimientoFlotaPorInspeccion,
   editarVehiculoFlota,
   EstadoVehiculo,
   registrarRetornoFlota,
@@ -257,21 +257,6 @@ export default function VehiculosPage() {
     const timer = window.setTimeout(() => setNotice(null), 5000);
     return () => window.clearTimeout(timer);
   }, [notice]);
-
-  useEffect(() => {
-    if (!formVehiculo && !formSalida && !formRetorno && !salidaDetalle) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !saving) {
-        setFormVehiculo(null);
-        setFormSalida(null);
-        setFormRetorno(null);
-        setSalidaDetalle(null);
-        setFormError("");
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [formVehiculo, formSalida, formRetorno, salidaDetalle, saving]);
 
   const { resumen, kpis } = useMemo(
     () => construirResumenFlota(vehiculos, salidas),
@@ -601,8 +586,7 @@ export default function VehiculosPage() {
     setFormError("");
     let movimientoGuardado = salidaConfirmada;
     try {
-      const previa = await getMovimientoFlotaPorInspeccion(dataConnect, { id: operacionSalida.current.inspeccionId }, { fetchPolicy: "SERVER_ONLY" });
-      const resultado = previa.data.inspeccionVehiculo ? { data: { inspeccion: { id: previa.data.inspeccionVehiculo.id } } } : await registrarSalidaFlota(dataConnect, {
+      const inspeccionId = await confirmarMovimientoFlota(operacionSalida.current.inspeccionId, () => registrarSalidaFlota(dataConnect, {
         ...operacionSalida.current,
         vehiculoId: formSalida.vehiculoId,
         repartidorId: formSalida.repartidorId,
@@ -611,16 +595,13 @@ export default function VehiculosPage() {
         observaciones: formSalida.observaciones.trim() || null,
         observacionesInspeccion:
           formSalida.observacionesInspeccion.trim() || null,
-      });
+      }));
 
       movimientoGuardado = true;
       setSalidaConfirmada(true);
-      const inspeccionId = normalizarCodigoQr(resultado.data.inspeccion.id);
-      for (let i = 0; i < formSalida.fotos.length; i++) {
-        const foto = formSalida.fotos[i];
-        const rutaFinal = await subirEvidencia(inspeccionId, foto, i + 1);
+      await subirEvidenciasInspeccion(inspeccionId, formSalida.fotos, (foto, rutaFinal) => {
         if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      }
+      });
 
       const patente = itemVehiculo?.vehiculo.patente ?? "Vehículo";
       setNotice({
@@ -630,7 +611,7 @@ export default function VehiculosPage() {
       setFormSalida(null);
       await cargarFlota(true);
     } catch (error) {
-      setFormError(movimientoGuardado ? "El movimiento ya se guardó. Solo quedan fotografías pendientes: reintenta aquí o adjúntalas desde el historial. " + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
+      setFormError(movimientoGuardado ? MENSAJE_FOTOS_PENDIENTES + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
     } finally {
       setSaving(false);
     }
@@ -657,8 +638,7 @@ export default function VehiculosPage() {
     setFormError("");
     let movimientoGuardado = retornoConfirmado;
     try {
-      const previa = await getMovimientoFlotaPorInspeccion(dataConnect, { id: operacionRetorno.current.inspeccionId }, { fetchPolicy: "SERVER_ONLY" });
-      const resultado = previa.data.inspeccionVehiculo ? { data: { inspeccion: { id: previa.data.inspeccionVehiculo.id } } } : await registrarRetornoFlota(dataConnect, {
+      const inspeccionId = await confirmarMovimientoFlota(operacionRetorno.current.inspeccionId, () => registrarRetornoFlota(dataConnect, {
         ...operacionRetorno.current,
         salidaId: formRetorno.salidaId,
         kilometraje: kmNum,
@@ -666,16 +646,13 @@ export default function VehiculosPage() {
         observacionesRetorno: formRetorno.observacionesRetorno.trim() || null,
         observacionesInspeccion:
           formRetorno.observacionesInspeccion.trim() || null,
-      });
+      }));
 
       movimientoGuardado = true;
       setRetornoConfirmado(true);
-      const inspeccionId = normalizarCodigoQr(resultado.data.inspeccion.id);
-      for (let i = 0; i < formRetorno.fotos.length; i++) {
-        const foto = formRetorno.fotos[i];
-        const rutaFinal = await subirEvidencia(inspeccionId, foto, i + 1);
+      await subirEvidenciasInspeccion(inspeccionId, formRetorno.fotos, (foto, rutaFinal) => {
         if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      }
+      });
 
       const recorridos = Math.max(
         0,
@@ -688,7 +665,7 @@ export default function VehiculosPage() {
       setFormRetorno(null);
       await cargarFlota(true);
     } catch (error) {
-      setFormError(movimientoGuardado ? "El movimiento ya se guardó. Solo quedan fotografías pendientes: reintenta aquí o adjúntalas desde el historial. " + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
+      setFormError(movimientoGuardado ? MENSAJE_FOTOS_PENDIENTES + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
     } finally {
       setSaving(false);
     }
@@ -764,59 +741,30 @@ export default function VehiculosPage() {
       </AnimatePresence>
 
       {/* Encabezado principal */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"
-      >
-        <div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
-            <Radio className="h-3 w-3 animate-pulse" />
-            Flota y Reparto Conectado
-          </div>
-          <h1 className="font-display text-2xl font-extrabold text-stone-900 dark:text-white">
-            Control de Vehículos
-          </h1>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            Gestión de unidades de transporte, despacho a terreno, monitoreo en vivo y auditoría de inspecciones.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void cargarFlota(false)}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-xl border border-stone-200/80 bg-white/80 px-3.5 py-2.5 text-sm font-bold text-stone-700 transition hover:bg-stone-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-stone-200 dark:hover:bg-white/10 cursor-pointer"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-brand-500" />
-            ) : (
-              <RotateCcw className="h-4 w-4" />
-            )}
+      <EncabezadoSeccion
+        antetitulo="Flota y reparto · Conectado"
+        titulo="Control de Vehículos"
+        descripcion="Gestión de unidades de transporte, despacho a terreno, monitoreo en vivo y auditoría de inspecciones."
+        acciones={<>
+          <button type="button" onClick={() => void cargarFlota(false)} disabled={loading} className={BOTON_ENCABEZADO_SECUNDARIO}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> : <RotateCcw className="h-4 w-4" />}
             Actualizar
           </button>
-
           <button
             type="button"
             disabled={vehiculosDisponibles.length === 0}
             onClick={() => abrirModalSalida()}
-            className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300 cursor-pointer"
+            className="flex cursor-pointer items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300"
           >
             <ArrowUpRight className="h-4 w-4" />
             Registrar salida
           </button>
-
-          <button
-            type="button"
-            onClick={abrirNuevoVehiculo}
-            className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:scale-[1.02] hover:shadow-lg cursor-pointer"
-          >
+          <button type="button" onClick={abrirNuevoVehiculo} className={BOTON_ENCABEZADO}>
             <Plus className="h-4 w-4" />
             Registrar vehículo
           </button>
-        </div>
-      </motion.div>
+        </>}
+      />
 
       {/* Tarjetas de KPIs de Flota con glass-panel y bordes definidos */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1350,24 +1298,14 @@ export default function VehiculosPage() {
                   >
                     Vehículo
                   </label>
-                  <select
+                  <div className="mt-1"><GlassSelect
                     id="hist-vehiculo"
+                    searchable
+                    searchPlaceholder="Buscar patente…"
                     value={filtrosHistorial.vehiculoId}
-                    onChange={(e) =>
-                      setFiltrosHistorial({
-                        ...filtrosHistorial,
-                        vehiculoId: e.target.value,
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border border-stone-200/80 bg-stone-50/70 px-2.5 py-2 text-xs font-medium text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-100"
-                  >
-                    <option value="">Todas las patentes</option>
-                    {vehiculos.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.patente} — {v.marca} {v.modelo}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(vehiculoId) => setFiltrosHistorial({ ...filtrosHistorial, vehiculoId })}
+                    options={[{ value: "", label: "Todas las patentes" }, ...vehiculos.map((v) => ({ value: v.id, label: `${v.patente} — ${v.marca} ${v.modelo}` }))]}
+                  /></div>
                 </div>
 
                 <div>
@@ -1377,24 +1315,12 @@ export default function VehiculosPage() {
                   >
                     Conductor
                   </label>
-                  <select
+                  <div className="mt-1"><GlassSelect
                     id="hist-conductor"
                     value={filtrosHistorial.repartidorId}
-                    onChange={(e) =>
-                      setFiltrosHistorial({
-                        ...filtrosHistorial,
-                        repartidorId: e.target.value,
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border border-stone-200/80 bg-stone-50/70 px-2.5 py-2 text-xs font-medium text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-100"
-                  >
-                    <option value="">Todos los conductores</option>
-                    {conductoresHabilitados.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} {c.apellido ?? ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(repartidorId) => setFiltrosHistorial({ ...filtrosHistorial, repartidorId })}
+                    options={[{ value: "", label: "Todos los conductores" }, ...conductoresHabilitados.map((c) => ({ value: c.id, label: `${c.nombre} ${c.apellido ?? ""}`.trim() }))]}
+                  /></div>
                 </div>
 
                 <div>
@@ -1404,26 +1330,16 @@ export default function VehiculosPage() {
                   >
                     Estado del viaje
                   </label>
-                  <select
+                  <div className="mt-1"><GlassSelect
                     id="hist-estado"
                     value={filtrosHistorial.estado}
-                    onChange={(e) =>
-                      setFiltrosHistorial({
-                        ...filtrosHistorial,
-                        estado: e.target
-                          .value as FiltrosHistorialVehiculo["estado"],
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border border-stone-200/80 bg-stone-50/70 px-2.5 py-2 text-xs font-medium text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-100"
-                  >
-                    <option value="TODOS">Todos</option>
-                    <option value={SalidaVehiculoEstado.EN_SERVICIO}>
-                      En ruta
-                    </option>
-                    <option value={SalidaVehiculoEstado.FINALIZADA}>
-                      Finalizados
-                    </option>
-                  </select>
+                    onChange={(estado) => setFiltrosHistorial({ ...filtrosHistorial, estado: estado as FiltrosHistorialVehiculo["estado"] })}
+                    options={[
+                      { value: "TODOS", label: "Todos" },
+                      { value: SalidaVehiculoEstado.EN_SERVICIO, label: "En ruta" },
+                      { value: SalidaVehiculoEstado.FINALIZADA, label: "Finalizados" },
+                    ]}
+                  /></div>
                 </div>
 
                 <div>
@@ -1598,58 +1514,39 @@ export default function VehiculosPage() {
       {/* Modal de Registro / Edición de Vehículo (RF-VE01) — Estilo glass-panel unificado */}
       <AnimatePresence>
         {formVehiculo && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-vehiculo-titulo"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !saving && setFormVehiculo(null)}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.form
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={guardarVehiculo}
-              className="glass-panel relative z-10 max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-3xl border border-stone-200/80 p-6 shadow-2xl sm:p-7 dark:border-white/10"
-            >
-              <button
-                type="button"
-                onClick={() => setFormVehiculo(null)}
-                disabled={saving}
-                aria-label="Cerrar modal"
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="mb-2 flex items-start gap-3.5 pr-8">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                  <Truck className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
-                    Catálogo de flota
-                  </p>
-                  <h2
-                    id="modal-vehiculo-titulo"
-                    className="font-display text-xl font-extrabold text-stone-900 dark:text-white"
-                  >
-                    {formVehiculo.id
+          <ModalIntranet
+            onCerrar={() => setFormVehiculo(null)}
+            bloqueado={saving}
+            onSubmit={guardarVehiculo}
+            tamano="md"
+            tono="marca"
+            icono={Truck}
+            etiqueta="Catálogo de flota"
+            titulo={formVehiculo.id
                       ? "Editar vehículo de la flota"
                       : "Registrar nuevo vehículo"}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                    Ingresa los datos identificatorios de la unidad de reparto.
-                  </p>
-                </div>
-              </div>
+            subtitulo={<>Ingresa los datos identificatorios de la unidad de reparto.</>}
+            idTitulo="modal-vehiculo-titulo"
+            claseCuerpo="space-y-5"
+            pie={<>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setFormVehiculo(null)}
+                  className={BOTON_MODAL_SECUNDARIO}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={BOTON_MODAL_PRIMARIO}
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {formVehiculo.id ? "Guardar cambios" : "Registrar vehículo"}
+                </button>
+</>}
+          >
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -1785,149 +1682,86 @@ export default function VehiculosPage() {
                 </p>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setFormVehiculo(null)}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 transition-colors hover:bg-stone-100 dark:hover:bg-white/5 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50 cursor-pointer"
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {formVehiculo.id ? "Guardar cambios" : "Registrar vehículo"}
-                </button>
-              </div>
-            </motion.form>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       {/* Modal de Registro de Salida (RF-VE02) — Estilo glass-panel + subida real de fotos */}
       <AnimatePresence>
         {formSalida && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-salida-titulo"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          <ModalIntranet
+            onCerrar={() => setFormSalida(null)}
+            bloqueado={saving}
+            onSubmit={confirmarSalidaVehiculo}
+            tamano="lg"
+            tono="marca"
+            icono={ArrowUpRight}
+            etiqueta="Despacho a terreno"
+            titulo={"Registrar salida de vehículo"}
+            subtitulo={<>Inspección previa, kilometraje inicial y conductor o repartidor responsable.</>}
+            idTitulo="modal-salida-titulo"
+            claseCuerpo="space-y-5"
+            pie={<>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setFormSalida(null)}
+                  className={BOTON_MODAL_SECUNDARIO}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={BOTON_MODAL_PRIMARIO}
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Confirmar salida
+                </button>
+</>}
           >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !saving && setFormSalida(null)}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.form
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={confirmarSalidaVehiculo}
-              className="glass-panel relative z-10 max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto rounded-3xl border border-stone-200/80 p-6 shadow-2xl sm:p-7 dark:border-white/10"
-            >
-              <button
-                type="button"
-                onClick={() => setFormSalida(null)}
-                disabled={saving}
-                aria-label="Cerrar modal"
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="mb-2 flex items-start gap-3.5 pr-8">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                  <ArrowUpRight className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
-                    Despacho a terreno
-                  </p>
-                  <h2
-                    id="modal-salida-titulo"
-                    className="font-display text-xl font-extrabold text-stone-900 dark:text-white"
-                  >
-                    Registrar salida de vehículo
-                  </h2>
-                  <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                    Inspección previa, kilometraje inicial y conductor o repartidor responsable.
-                  </p>
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <label htmlFor="salida-vehiculo" className={LABEL_CLASS}>
                     Vehículo *
                   </label>
-                  <select
-                    id="salida-vehiculo" disabled={saving || salidaConfirmada}
+                  <GlassSelect
+                    id="salida-vehiculo"
+                    disabled={saving || salidaConfirmada}
                     value={formSalida.vehiculoId}
-                    onChange={(e) => {
-                      const sel = resumen.find(
-                        (r) => r.vehiculo.id === e.target.value,
-                      );
+                    onChange={(vehiculoId) => {
+                      const sel = resumen.find((r) => r.vehiculo.id === vehiculoId);
                       setFormSalida({
                         ...formSalida,
-                        vehiculoId: e.target.value,
-                        kilometraje: sel
-                          ? String(sel.kilometrajeActual)
-                          : formSalida.kilometraje,
+                        vehiculoId,
+                        kilometraje: sel ? String(sel.kilometrajeActual) : formSalida.kilometraje,
                       });
                     }}
-                    className={INPUT_CLASS}
-                  >
-                    {vehiculosDisponibles.map((item) => (
-                      <option
-                        key={item.vehiculo.id}
-                        value={item.vehiculo.id}
-                        className="dark:bg-stone-900"
-                      >
-                        {item.vehiculo.patente} — {item.vehiculo.marca}{" "}
-                        {item.vehiculo.modelo}
-                      </option>
-                    ))}
-                  </select>
+                    options={vehiculosDisponibles.map((item) => ({
+                      value: item.vehiculo.id,
+                      label: `${item.vehiculo.patente} — ${item.vehiculo.marca} ${item.vehiculo.modelo}`,
+                    }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label htmlFor="salida-conductor" className={LABEL_CLASS}>
                     Conductor / Repartidor asignado *
                   </label>
-                  <select
-                    id="salida-conductor" disabled={saving || salidaConfirmada}
+                  <GlassSelect
+                    id="salida-conductor"
+                    disabled={saving || salidaConfirmada || conductoresHabilitados.length === 0}
                     value={formSalida.repartidorId}
-                    onChange={(e) =>
-                      setFormSalida({
-                        ...formSalida,
-                        repartidorId: e.target.value,
-                      })
-                    }
-                    className={INPUT_CLASS}
-                  >
-                    {conductoresHabilitados.length === 0 ? (
-                      <option value="">
-                        Sin usuarios con rol conductor o repartidor
-                      </option>
-                    ) : (
-                      conductoresHabilitados.map((c) => (
-                        <option
-                          key={c.id}
-                          value={c.id}
-                          className="dark:bg-stone-900"
-                        >
-                          {c.nombre} {c.apellido ?? ""} ({c.rol.nombre})
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    onChange={(repartidorId) => setFormSalida({ ...formSalida, repartidorId })}
+                    placeholder="Sin usuarios con rol conductor o repartidor"
+                    searchable={conductoresHabilitados.length > 6}
+                    searchPlaceholder="Buscar conductor…"
+                    options={conductoresHabilitados.map((c) => ({
+                      value: c.id,
+                      label: `${c.nombre} ${c.apellido ?? ""} (${c.rol.nombre})`.replace(/\s+/g, " "),
+                    }))}
+                  />
                 </div>
               </div>
 
@@ -1959,27 +1793,13 @@ export default function VehiculosPage() {
                   >
                     Estado de inspección inicial *
                   </label>
-                  <select
-                    id="salida-estado-vehiculo" disabled={saving || salidaConfirmada}
+                  <GlassSelect
+                    id="salida-estado-vehiculo"
+                    disabled={saving || salidaConfirmada}
                     value={formSalida.estadoVehiculo}
-                    onChange={(e) =>
-                      setFormSalida({
-                        ...formSalida,
-                        estadoVehiculo: e.target.value as EstadoVehiculo,
-                      })
-                    }
-                    className={INPUT_CLASS}
-                  >
-                    {Object.values(EstadoVehiculo).map((est) => (
-                      <option
-                        key={est}
-                        value={est}
-                        className="dark:bg-stone-900"
-                      >
-                        {estadoTecnicoLabels[est]}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(estado) => setFormSalida({ ...formSalida, estadoVehiculo: estado as EstadoVehiculo })}
+                    options={Object.values(EstadoVehiculo).map((est) => ({ value: est, label: estadoTecnicoLabels[est] }))}
+                  />
                 </div>
               </div>
 
@@ -2133,85 +1953,47 @@ export default function VehiculosPage() {
                 </p>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setFormSalida(null)}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 transition-colors hover:bg-stone-100 dark:hover:bg-white/5 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50 cursor-pointer"
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Confirmar salida
-                </button>
-              </div>
-            </motion.form>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       {/* Modal de Registro de Regreso (RF-VE03) — Estilo glass-panel + subida real de fotos */}
       <AnimatePresence>
         {formRetorno && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-retorno-titulo"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !saving && setFormRetorno(null)}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.form
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={confirmarRetornoVehiculo}
-              className="glass-panel relative z-10 max-h-[90vh] w-full max-w-xl space-y-5 overflow-y-auto rounded-3xl border border-stone-200/80 p-6 shadow-2xl sm:p-7 dark:border-white/10"
-            >
-              <button
-                type="button"
-                onClick={() => setFormRetorno(null)}
-                disabled={saving}
-                aria-label="Cerrar modal"
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="mb-2 flex items-start gap-3.5 pr-8">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                  <ArrowDownLeft className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">
-                    Cierre de recorrido
-                  </p>
-                  <h2
-                    id="modal-retorno-titulo"
-                    className="font-display text-xl font-extrabold text-stone-900 dark:text-white"
-                  >
-                    Registrar regreso de {formRetorno.vehiculoPatente}
-                  </h2>
-                  <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                    Odómetro de salida registrado:{" "}
+          <ModalIntranet
+            onCerrar={() => setFormRetorno(null)}
+            bloqueado={saving}
+            onSubmit={confirmarRetornoVehiculo}
+            tamano="lg"
+            tono="aviso"
+            icono={ArrowDownLeft}
+            etiqueta="Cierre de recorrido"
+            titulo={<>Registrar regreso de {formRetorno.vehiculoPatente}</>}
+            subtitulo={<>Odómetro de salida registrado:{" "}
                     <strong>
                       {formRetorno.kilometrajeSalida.toLocaleString("es-CL")} km
-                    </strong>
-                  </p>
-                </div>
-              </div>
+                    </strong></>}
+            idTitulo="modal-retorno-titulo"
+            claseCuerpo="space-y-5"
+            pie={<>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setFormRetorno(null)}
+                  className={BOTON_MODAL_SECUNDARIO}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={BOTON_MODAL_PRIMARIO}
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Confirmar regreso
+                </button>
+</>}
+          >
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -2242,36 +2024,17 @@ export default function VehiculosPage() {
                   >
                     Estado al retornar *
                   </label>
-                  <select
-                    id="retorno-estado-vehiculo" disabled={saving || retornoConfirmado}
+                  <GlassSelect
+                    id="retorno-estado-vehiculo"
+                    disabled={saving || retornoConfirmado}
                     value={formRetorno.estadoVehiculo}
-                    onChange={(e) =>
-                      setFormRetorno({
-                        ...formRetorno,
-                        estadoVehiculo: e.target.value as EstadoVehiculo,
-                      })
-                    }
-                    className={INPUT_CLASS}
-                  >
-                    <option
-                      value={EstadoVehiculo.APTO}
-                      className="dark:bg-stone-900"
-                    >
-                      Sin novedades (Apto)
-                    </option>
-                    <option
-                      value={EstadoVehiculo.CON_OBSERVACIONES}
-                      className="dark:bg-stone-900"
-                    >
-                      Con observaciones
-                    </option>
-                    <option
-                      value={EstadoVehiculo.NO_APTO}
-                      className="dark:bg-stone-900"
-                    >
-                      Con daño / Requiere taller (No apto)
-                    </option>
-                  </select>
+                    onChange={(estado) => setFormRetorno({ ...formRetorno, estadoVehiculo: estado as EstadoVehiculo })}
+                    options={[
+                      { value: EstadoVehiculo.APTO, label: "Sin novedades (Apto)" },
+                      { value: EstadoVehiculo.CON_OBSERVACIONES, label: "Con observaciones" },
+                      { value: EstadoVehiculo.NO_APTO, label: "Con daño / Requiere taller (No apto)" },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -2408,59 +2171,30 @@ export default function VehiculosPage() {
                 </p>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setFormRetorno(null)}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 transition-colors hover:bg-stone-100 dark:hover:bg-white/5 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50 cursor-pointer"
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Confirmar regreso
-                </button>
-              </div>
-            </motion.form>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       {/* Modal de Detalle y Auditoría Comparativa de Inspección (RF-VE04) */}
       <AnimatePresence>
         {salidaDetalle && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-auditoria-titulo"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          <ModalIntranet
+            onCerrar={() => setSalidaDetalle(null)}
+            tamano="xl"
+            icono={FileText}
+            etiqueta="Ficha de Auditoría de Viaje"
+            titulo={`${salidaDetalle.vehiculo.patente} — ${salidaDetalle.vehiculo.marca} ${salidaDetalle.vehiculo.modelo}`}
+            subtitulo={`Conductor: ${salidaDetalle.repartidor.nombre} ${salidaDetalle.repartidor.apellido ?? ""}${calcularKilometrosRecorridos(salidaDetalle) !== null ? ` · Distancia recorrida: ${calcularKilometrosRecorridos(salidaDetalle)?.toLocaleString("es-CL")} km` : ""}`}
+            idTitulo="modal-auditoria-titulo"
+            etiquetaCerrar="Cerrar auditoría"
+            claseCuerpo="space-y-5"
           >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSalidaDetalle(null)}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel relative z-10 max-h-[90vh] w-full max-w-3xl space-y-5 overflow-y-auto rounded-3xl border border-stone-200/80 p-6 shadow-2xl sm:p-7 dark:border-white/10"
-            >
               {(() => {
                 const antes = obtenerInspeccionMomento(salidaDetalle, "ANTES");
                 const despues = obtenerInspeccionMomento(
                   salidaDetalle,
                   "DESPUES",
                 );
-                const recorridos = calcularKilometrosRecorridos(salidaDetalle);
                 const resolverPreview = (ruta: string) => {
                   if (ruta.startsWith("vehiculos/inspecciones/")) return null;
                   if (previewsLocales[ruta]) return previewsLocales[ruta];
@@ -2477,41 +2211,6 @@ export default function VehiculosPage() {
 
                 return (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => setSalidaDetalle(null)}
-                      aria-label="Cerrar auditoría"
-                      className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 cursor-pointer"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-
-                    <div className="flex items-start gap-3.5 pr-8">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                        <FileText className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
-                          Ficha de Auditoría de Viaje
-                        </p>
-                        <h2
-                          id="modal-auditoria-titulo"
-                          className="font-display text-xl font-extrabold text-stone-900 dark:text-white"
-                        >
-                          {salidaDetalle.vehiculo.patente} —{" "}
-                          {salidaDetalle.vehiculo.marca}{" "}
-                          {salidaDetalle.vehiculo.modelo}
-                        </h2>
-                        <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                          Conductor: {salidaDetalle.repartidor.nombre}{" "}
-                          {salidaDetalle.repartidor.apellido ?? ""}
-                          {recorridos !== null
-                            ? ` · Distancia recorrida: ${recorridos.toLocaleString("es-CL")} km`
-                            : ""}
-                        </p>
-                      </div>
-                    </div>
-
                     {salidaDetalle.observaciones && (
                       <div className="rounded-2xl border border-stone-200/70 bg-stone-50/80 px-4 py-3 text-xs text-stone-700 dark:border-white/5 dark:bg-white/5 dark:text-stone-300">
                         <span className="font-bold">
@@ -2701,8 +2400,7 @@ export default function VehiculosPage() {
                   </>
                 );
               })()}
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
     </div>

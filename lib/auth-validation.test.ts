@@ -67,6 +67,11 @@ describe("validación del registro público de clientes", () => {
   it("acepta un registro válido y deja teléfono/dirección como opcionales", () => {
     expect(validatePublicClientRegistration(validRegistration)).toBeNull();
   });
+  it("valida el teléfono opcional de Chile u otro país de Latinoamérica", () => {
+    expect(validatePublicClientRegistration({ ...validRegistration, telefono: "+56 9 1234 5678" })).toBeNull();
+    expect(validatePublicClientRegistration({ ...validRegistration, telefono: "+51 912 345 678" })).toBeNull();
+    expect(validatePublicClientRegistration({ ...validRegistration, telefono: "+56 9 1234" })).toBe("El celular chileno debe tener 8 dígitos después de +56 9.");
+  });
   it("requiere autorización específica de la versión vigente", () => {
     expect(validatePublicClientRegistration({ ...validRegistration, autorizaDatos: false })).toContain("autoriza");
     expect(validatePublicClientRegistration({ ...validRegistration, versionPrivacidad: "anterior" })).toContain("vigente");
@@ -85,6 +90,7 @@ describe("validación del registro público de clientes", () => {
     expect(validateClientCompletion({ ...completar, rut: "12.345.678-9" })).toBe("El RUT ingresado no es válido.");
     expect(validateClientCompletion({ ...completar, aceptaTerminos: false })).toContain("Términos y Condiciones");
     expect(validateClientCompletion({ ...completar, nombre: " " })).toBe("Completa tu nombre, apellido y RUT.");
+    expect(validateClientCompletion({ ...completar, telefono: "+54 11 2345" })).toContain("Argentina");
   });
 
   it.each(["admin", "recepcionista", "operario", "conductor", "repartidor"])(
@@ -114,6 +120,13 @@ describe("validación de usuarios creados por administración", () => {
       "Selecciona el tipo de cliente.",
     );
     expect(validateManagedUserRegistration({ ...validManagedUser, tipoCliente: "" }, "operario")).toBeNull();
+  });
+
+  it("valida el teléfono al crear y al editar una cuenta", () => {
+    expect(validateManagedUserRegistration({ ...validManagedUser, telefono: "+591 7123 4567" }, "operario")).toBeNull();
+    expect(validateManagedUserRegistration({ ...validManagedUser, telefono: "+56 88 123 4567" }, "operario")).toContain("fijo chileno");
+    expect(validateManagedUserUpdate("rol-cliente", "Ana", "+57 300 123 4567")).toBeNull();
+    expect(validateManagedUserUpdate("rol-cliente", "Ana", "+57 300")).toContain("Colombia");
   });
 
   it("exige rol y nombre al editar una cuenta", () => {

@@ -22,6 +22,8 @@ export interface PrendaLinea {
   detalle?: string;
   /** Parte del peso total de la comanda asignada a la línea (kg). */
   pesoKg?: number | null;
+  /** Subtotal guardado; en comandas por kg es la parte del peso × $/kg. */
+  subtotal?: number;
 }
 
 export interface Comanda {
@@ -40,6 +42,9 @@ export interface Comanda {
   detalle: PrendaLinea[];
   /** Total persistido de la comanda; los mocks antiguos pueden recalcularlo. */
   valorTotal?: number;
+  /** KILO: se cobra el peso total por precioKg. Ausente = por prendas. */
+  modalidadCobro?: "PRENDA" | "KILO";
+  precioKg?: number;
   fechaRecepcion: string;
   fechaEntregaEstimada?: string;
   /** Índice 0-4 de la etapa en curso; 5 = entregado; null = pendiente/anulado. */
@@ -55,6 +60,13 @@ export interface Comanda {
 
 export const prendasTotales = (c: Comanda) =>
   c.detalle.reduce((s, d) => s + d.cantidad, 0);
+
+/** Peso total registrado en las líneas (kg, 2 decimales). */
+export const pesoTotal = (c: Comanda) =>
+  Math.round(c.detalle.reduce((s, d) => s + (d.pesoKg ?? 0), 0) * 100) / 100;
+
+/** Subtotal de una línea: el guardado o, en datos antiguos, cantidad × precio. */
+export const subtotalLinea = (d: PrendaLinea) => d.subtotal ?? d.cantidad * d.precioUnitario;
 
 export const valorTotal = (c: Comanda) =>
   c.valorTotal ?? c.detalle.reduce((s, d) => s + d.cantidad * d.precioUnitario, 0);

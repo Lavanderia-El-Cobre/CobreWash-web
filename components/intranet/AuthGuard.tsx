@@ -22,7 +22,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       router.push("/?login=1");
       return;
     }
-    // Solo los roles internos (admin, recepcionista, operario) usan el shell
+    // Solo los roles internos (admin, recepcionista, operario, reparto) usan el shell
     // de la intranet. El cliente tiene su propio dashboard en /cuenta.
     if (!esRolInterno(usuario.rol.nombre)) {
       router.push("/cuenta");

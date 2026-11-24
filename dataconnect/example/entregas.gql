@@ -1,0 +1,70 @@
+# Sección de entregas del repartidor: comandas listas para entregar (FINALIZADA,
+# con la etapa de entrega pendiente) y las entregas que registró la misma cuenta.
+# Solo expone los datos de contacto que se necesitan en terreno.
+query GetComandasParaEntrega($limit: Int = 50, $offset: Int = 0) @auth(level: USER) {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
+    activo @check(expr: "this == true", message: "La cuenta está inactiva")
+    rol {
+      nombre @check(
+        expr: "this in ['admin', 'repartidor', 'conductor']"
+        message: "Sección reservada a reparto y administración"
+      )
+    }
+  }
+  comandas(
+    where: { estado: { eq: FINALIZADA } }
+    orderBy: [{ fechaEntregaEstimada: ASC }, { actualizadoEn: ASC }, { id: ASC }]
+    limit: $limit
+    offset: $offset
+  ) {
+    id
+    numeroComanda
+    empresa
+    proyecto
+    observaciones
+    fechaEntregaEstimada
+    cliente {
+      nombre
+      tipoCliente
+      telefono
+      direccion
+    }
+    prendas: comandaDetalles_on_comanda(limit: 100) {
+      cantidad
+      tipoPrenda {
+        nombre
+      }
+    }
+    problemas: incidenciaComandas_on_comanda(
+      where: { motivo: { startsWith: "Entrega: " } }
+      orderBy: [{ fecha: DESC }]
+      limit: 5
+    ) {
+      id
+      motivo
+      descripcion
+      estado
+      fecha
+      reportadaPor {
+        nombre
+        apellido
+      }
+    }
+  }
+  misEntregas: comandaHistorialEstados(
+    where: { usuarioId: { eq_expr: "auth.uid" }, estadoNuevo: { eq: ENTREGADA } }
+    orderBy: [{ fecha: DESC }, { id: DESC }]
+    limit: 20
+  ) {
+    id
+    fecha
+    motivo
+    comanda {
+      id
+      numeroComanda
+      cliente {
+        nombre
+      }
+    }
+  }
+}

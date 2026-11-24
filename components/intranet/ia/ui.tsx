@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import ModalIntranet from "@/components/intranet/ModalIntranet";
 
 export type Aviso = { texto: string; tipo: "success" | "warning" | "error" };
 export type Avisar = (texto: string, tipo?: Aviso["tipo"]) => void;
@@ -63,35 +64,13 @@ export function Tarjeta({ icono: Icono, titulo, descripcion, children, accion }:
   );
 }
 
-export function Modal({ abierto, alCerrar, titulo, subtitulo, icono: Icono, bloqueado, children }: {
+export function Modal({ abierto, alCerrar, titulo, subtitulo, icono, bloqueado, children }: {
   abierto: boolean; alCerrar: () => void; titulo: string; subtitulo?: string; icono: React.ElementType; bloqueado?: boolean; children: React.ReactNode;
 }) {
   return (
-    <AnimatePresence>
-      {abierto && (
-        <div role="dialog" aria-modal="true" aria-labelledby="titulo-modal-ia" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !bloqueado && alCerrar()} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 16 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-panel relative z-10 max-h-[90vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-3xl border border-stone-200/80 p-6 shadow-2xl sm:p-7 dark:border-white/10"
-          >
-            <button type="button" onClick={alCerrar} disabled={bloqueado} aria-label="Cerrar" className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10">
-              <X className="h-4 w-4" />
-            </button>
-            <div className="flex items-start gap-3.5 pr-8">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><Icono className="h-6 w-6" /></div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Módulo IA</p>
-                <h2 id="titulo-modal-ia" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">{titulo}</h2>
-                {subtitulo && <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">{subtitulo}</p>}
-              </div>
-            </div>
-            {children}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    <ModalIntranet abierto={abierto} onCerrar={alCerrar} titulo={titulo} subtitulo={subtitulo} icono={icono} bloqueado={bloqueado} etiqueta="Módulo IA" idTitulo="titulo-modal-ia">
+      <div className="space-y-5">{children}</div>
+    </ModalIntranet>
   );
 }
 

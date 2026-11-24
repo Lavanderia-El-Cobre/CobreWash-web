@@ -111,6 +111,20 @@ await check("una publicación nueva se recupera en otra consulta del equipo corr
   assert(!(await listarEquipo("operario", "test-operario")).avisos.some(a => a.contenido === contenido));
 });
 
+await check("el equipo de reparto recibe los avisos generales y los dirigidos a reparto", async () => {
+  const contenido = "Ruta nueva " + randomUUID();
+  await crear({ titulo: "Para reparto", contenido, rolDestinatarioId: "00000000-0000-4000-8000-000000000005" });
+  const reparto = await listarEquipo("repartidor", "test-repartidor");
+  assert(reparto.avisos.some(a => a.contenido === contenido));
+  assert(reparto.avisos.every(a => !a.rolDestinatario || a.rolDestinatario.nombre === "repartidor"));
+  assert(!(await listarEquipo("operario", "test-operario")).avisos.some(a => a.contenido === contenido));
+  const conductor = await listarEquipo("conductor", "test-conductor");
+  assert(conductor.avisos.every(a => !a.rolDestinatario));
+  for (const [rol, user] of [["operario", "test-repartidor"], ["repartidor", "test-conductor"], ["repartidor", "test-operario"]]) {
+    await assert.rejects(listarEquipo(rol, user), undefined, `Acceso indebido: ${rol}/${user}`);
+  }
+});
+
 await check("excluye los avisos inactivos de listas y conteos", async () => {
   const data = await listarAdmin();
   const aviso = data.avisos.find(a => a.rolDestinatario?.nombre === "recepcionista");

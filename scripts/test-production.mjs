@@ -12,6 +12,7 @@ const queries = await readFile("dataconnect/example/produccion-queries.gql", "ut
 const commandQueries = await readFile("dataconnect/example/queries.gql", "utf8");
 const trackingQueries = await readFile("dataconnect/example/seguimiento-queries.gql", "utf8");
 const legacy = await readFile("dataconnect/example/mutations.gql", "utf8");
+const deliveries = await readFile("dataconnect/example/entregas.gql", "utf8");
 let count = 0;
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user, firebase: { sign_in_provider: "password" } } } : undefined;
@@ -31,7 +32,7 @@ const etapaIds = [
 ];
 const detail = { tipoPrendaId: "00000000-0000-4000-8000-000000000011", tipoServicioId: "00000000-0000-4000-8000-000000000012", cantidad: 2, precioUnitario: 1000, subtotal: 2000 };
 function variables() { const id = randomUUID(); return { id, numeroComanda: "TEST-" + id.slice(0, 8), clienteId, detalles: [{ ...detail }] }; }
-const read = (id) => execute(`query Inspect($id:UUID!) { comanda(id:$id) { id codigoQr estado valorTotal recepcionistaId fechaEntregaReal actualizadoEn empresa proyecto observaciones
+const read = (id) => execute(`query Inspect($id:UUID!) { comanda(id:$id) { id codigoQr estado valorTotal modalidadCobro precioKg recepcionistaId fechaEntregaReal actualizadoEn empresa proyecto observaciones
   comandaDetalles_on_comanda { cantidad subtotal }
   comandaEtapas_on_comanda(orderBy:[{ordenEtapa:ASC}]) { etapaId estado nombreEtapa ordenEtapa descripcionEtapa tiempoEstimadoMin fechaInicio fechaCompletado operarioId }
   comandaHistorialEstados_on_comanda { estadoNuevo usuarioId }
@@ -121,6 +122,33 @@ for (const [name, detalles] of [
   ["prenda inexistente", [{ ...detail, tipoPrendaId: randomUUID() }]],
 ]) await check("rollback: " + name, async () => {
   const v = { ...variables(), detalles }; await assert.rejects(execute(mutation, "CrearComandaConFlujo", v, "test-admin")); assert.equal(await read(v.id), null);
+});
+const lineaKg = { ...detail, cantidad: 2, pesoKg: 3.33, precioUnitario: 2500, subtotal: 8325 };
+const variablesKg = (extra = {}) => ({ ...variables(), modalidadCobro: "KILO", precioKg: 2500, detalles: [{ ...lineaKg }], ...extra });
+await check("comanda por kg: cobra el peso por el precio por kg y lo guarda", async () => {
+  const v = variablesKg();
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  const c = await read(v.id);
+  assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.precioKg, 2500); assert.equal(c.valorTotal, 8325);
+  assert.equal(c.comandaEtapas_on_comanda.length, 5);
+  // Por prendas sigue siendo la modalidad por omisión.
+  assert.equal((await read(good.id)).modalidadCobro, "PRENDA");
+});
+for (const [name, extra] of [
+  ["por kg sin precio por kg", { precioKg: undefined }],
+  ["por kg con precio 0", { precioKg: 0 }],
+  ["por kg con línea sin peso", { detalles: [{ ...lineaKg, pesoKg: undefined }] }],
+  ["por kg con precio de línea distinto", { detalles: [{ ...lineaKg, precioUnitario: 2000 }] }],
+  ["por kg con subtotal adulterado", { detalles: [{ ...lineaKg, subtotal: 5000 }] }],
+  ["por prendas con subtotal calculado por kg", { modalidadCobro: "PRENDA" }],
+]) await check("rollback: " + name, async () => {
+  const v = variablesKg(extra); await assert.rejects(execute(mutation, "CrearComandaConFlujo", v, "test-admin")); assert.equal(await read(v.id), null);
+});
+await check("una prenda escrita a mano se guarda en mayúsculas", async () => {
+  const id = (await execute(legacy, "CrearTipoPrenda", { nombre: "overol termico" }, "test-recepcion")).tipoPrenda_insert.id;
+  const prenda = (await execute(`query P($id: UUID!) { tipoPrenda(id: $id) { nombre } }`, "P", { id })).tipoPrenda;
+  assert.equal(prenda.nombre, "OVEROL TERMICO");
+  await assert.rejects(execute(legacy, "CrearTipoPrenda", { nombre: "x" }, "test-recepcion"));
 });
 await check("configuración solo admin y snapshot estable", async () => {
   const config = { id:"00000000-0000-4000-8000-000000000021", nombre:"Lavado industrial", descripcion:"Nueva descripción", tiempoEstimadoMin:45 };
@@ -257,6 +285,14 @@ await check("edición atómica preserva prendas y monto si falla una clave forá
   await assert.rejects(execute(mutation, "EditarComandaConDetalles", { ...cambios, version: iniciada.actualizadoEn }, "test-recepcion"));
   assert.deepEqual(await read(v.id), iniciada);
 });
+await check("editar una comanda la puede pasar a cobro por kg y recalcula el total", async () => {
+  const v = variables();
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  const anterior = await read(v.id);
+  await execute(mutation, "EditarComandaConDetalles", { id: v.id, version: anterior.actualizadoEn, modalidadCobro: "KILO", precioKg: 2500, detalles: [{ ...lineaKg, comandaId: v.id }] }, "test-recepcion");
+  const c = await read(v.id);
+  assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.precioKg, 2500); assert.equal(c.valorTotal, 8325);
+});
 await check("dos editores simultáneos no mezclan las prendas ni pierden cambios confirmados", async () => {
   const v = variables();
   await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
@@ -359,6 +395,112 @@ for (const estado of ["EN_PROCESO","FINALIZADA","ENTREGADA","ANULADA"]) await ch
   const c=await read(v.id); assert.equal(c.estado,estado); assert.equal(c.comandaEtapas_on_comanda.length,0);
   const publico = (await execute(trackingQueries, "GetSeguimientoPublicoPorNumero", { numeroComanda: v.numeroComanda }, null)).comanda;
   assert.equal(publico.estado, estado); assert.equal(publico.comandaEtapas_on_comanda.length, 0);
+});
+const listaParaEntregar = async (v) => {
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  for (let orden = 1; orden <= 4; orden++) await execute(production, "CompletarEtapaComanda", {
+    comandaId: v.id, etapaId: etapaIds[orden - 1], orden, estadoComanda: orden === 4 ? "FINALIZADA" : "EN_PROCESO",
+  }, "test-operario");
+};
+const historialDe = (id) => execute(`query H($id:UUID!) { comanda(id:$id) { comandaHistorialEstados_on_comanda(orderBy:[{fecha:ASC},{id:ASC}]) { estadoAnterior estadoNuevo motivo usuarioId }
+  incidenciaComandas_on_comanda(orderBy:[{fecha:ASC}]) { motivo descripcion estado reportadaPorId } } }`, "H", { id }).then((r) => r.comanda);
+const sinGuiones = (id) => id.replaceAll("-", "");
+await check("el repartidor ve solo comandas listas para entregar y sus datos de contacto", async () => {
+  const lista = variables();
+  const pendiente = variables();
+  await listaParaEntregar(lista);
+  await execute(mutation, "CrearComandaConFlujo", pendiente, "test-recepcion");
+  for (const user of ["test-repartidor", "test-conductor", "test-admin"]) {
+    const data = await execute(deliveries, "GetComandasParaEntrega", { limit: 500 }, user);
+    const ids = data.comandas.map((c) => sinGuiones(c.id));
+    assert(ids.includes(sinGuiones(lista.id)));
+    assert(!ids.includes(sinGuiones(pendiente.id)));
+    const comanda = data.comandas.find((c) => sinGuiones(c.id) === sinGuiones(lista.id));
+    assert.deepEqual(Object.keys(comanda.cliente).sort(), ["direccion", "nombre", "telefono", "tipoCliente"]);
+    assert.equal(comanda.prendas[0].cantidad, 2);
+  }
+  for (const user of [null, "test-recepcion", "test-operario", "test-cliente", "test-inactivo", "sin-perfil"]) {
+    await assert.rejects(execute(deliveries, "GetComandasParaEntrega", {}, user), undefined, `Acceso indebido: ${user}`);
+  }
+  for (const user of ["test-repartidor", "test-admin"]) {
+    await assert.rejects(execute(legacy, "EntregarComanda", { id: pendiente.id }, user), /finalizada/);
+    await assert.rejects(execute(legacy, "ReportarProblemaEntrega", { comandaId: pendiente.id, motivo: "Cliente ausente" }, user), /listas para entregar/);
+  }
+});
+await check("un problema de entrega queda en incidencias e historial sin cerrar la comanda", async () => {
+  const v = variables();
+  await listaParaEntregar(v);
+  const invalidos = [
+    [{ motivo: "Me dio flojera" }, "test-repartidor"],
+    [{ motivo: "Otro" }, "test-repartidor"],
+    [{ motivo: "Otro", detalle: "   " }, "test-repartidor"],
+    [{ motivo: "Cliente ausente", detalle: "x".repeat(251) }, "test-repartidor"],
+    [{ motivo: "Cliente ausente" }, "test-operario"],
+    [{ motivo: "Cliente ausente" }, "test-recepcion"],
+    [{ motivo: "Cliente ausente" }, "test-cliente"],
+    [{ motivo: "Cliente ausente" }, "test-inactivo"],
+    [{ motivo: "Cliente ausente" }, null],
+  ];
+  for (const [vars, user] of invalidos) {
+    await assert.rejects(execute(legacy, "ReportarProblemaEntrega", { comandaId: v.id, ...vars }, user), undefined, `Aceptó ${JSON.stringify(vars)} de ${user}`);
+  }
+  const antes = await read(v.id);
+  await execute(legacy, "ReportarProblemaEntrega", { comandaId: v.id, motivo: "Cliente ausente", detalle: "Nadie responde, se llamó dos veces" }, "test-repartidor");
+  await execute(legacy, "ReportarProblemaEntrega", { comandaId: v.id, motivo: "Dirección errónea" }, "test-conductor");
+  const c = await read(v.id);
+  assert.equal(c.estado, "FINALIZADA");
+  assert.deepEqual(c.comandaEtapas_on_comanda.map((e) => e.estado), antes.comandaEtapas_on_comanda.map((e) => e.estado));
+  assert.equal(c.comandaEtapas_on_comanda[4].estado, "EN_PROCESO");
+  assert.equal(c.fechaEntregaReal, null);
+  const h = await historialDe(v.id);
+  assert.deepEqual(h.comandaHistorialEstados_on_comanda.slice(-2), [
+    { estadoAnterior: "FINALIZADA", estadoNuevo: "FINALIZADA", motivo: "Problema de entrega: Cliente ausente — Nadie responde, se llamó dos veces", usuarioId: "test-repartidor" },
+    { estadoAnterior: "FINALIZADA", estadoNuevo: "FINALIZADA", motivo: "Problema de entrega: Dirección errónea", usuarioId: "test-conductor" },
+  ]);
+  assert.deepEqual(h.incidenciaComandas_on_comanda, [
+    { motivo: "Entrega: Cliente ausente", descripcion: "Nadie responde, se llamó dos veces", estado: "ABIERTA", reportadaPorId: "test-repartidor" },
+    { motivo: "Entrega: Dirección errónea", descripcion: null, estado: "ABIERTA", reportadaPorId: "test-conductor" },
+  ]);
+  const panel = (await execute(deliveries, "GetComandasParaEntrega", { limit: 500 }, "test-repartidor")).comandas.find((x) => sinGuiones(x.id) === sinGuiones(v.id));
+  assert.deepEqual(panel.problemas.map((p) => p.motivo), ["Entrega: Dirección errónea", "Entrega: Cliente ausente"]);
+  const admin = (await execute(queries, "GetIncidencias", {}, "test-admin")).incidenciaComandas.filter((i) => i.comanda.numeroComanda === v.numeroComanda);
+  assert.equal(admin.length, 2);
+});
+await check("el repartidor marca la entrega con detalle opcional, autor, hora e historial", async () => {
+  const v = variables();
+  await listaParaEntregar(v);
+  await execute(production, "RegistrarIncidenciaComanda", { comandaId: v.id, motivo: "Mancha persistente" }, "test-operario");
+  await execute(legacy, "ReportarProblemaEntrega", { comandaId: v.id, motivo: "Cliente ausente" }, "test-repartidor");
+  for (const detalle of ["x".repeat(281), "  "]) {
+    await assert.rejects(execute(legacy, "EntregarComanda", { id: v.id, detalle }, "test-repartidor"), /detalle/);
+  }
+  for (const user of [null, "test-operario", "test-cliente", "test-inactivo", "sin-perfil"]) {
+    await assert.rejects(execute(legacy, "EntregarComanda", { id: v.id, detalle: "Intento indebido" }, user));
+  }
+  await execute(legacy, "EntregarComanda", { id: v.id, detalle: "Recibió María en recepción" }, "test-repartidor");
+  const c = await read(v.id);
+  assert.equal(c.estado, "ENTREGADA");
+  assert.equal(c.comandaEtapas_on_comanda[4].estado, "COMPLETADA");
+  assert.equal(c.comandaEtapas_on_comanda[4].operarioId, "test-repartidor");
+  assert.equal(c.comandaEtapas_on_comanda[4].fechaCompletado, c.fechaEntregaReal);
+  assert.equal(c.comandaNotificacions_on_comanda.length, 1);
+  const h = await historialDe(v.id);
+  assert.deepEqual(h.comandaHistorialEstados_on_comanda.at(-1), { estadoAnterior: "FINALIZADA", estadoNuevo: "ENTREGADA", motivo: "Entrega a cliente: Recibió María en recepción", usuarioId: "test-repartidor" });
+  // La entrega resuelve los problemas de entrega, no las incidencias de producción.
+  assert.deepEqual(h.incidenciaComandas_on_comanda.map((i) => [i.motivo, i.estado]), [["Mancha persistente", "ABIERTA"], ["Entrega: Cliente ausente", "RESUELTA"]]);
+  await assert.rejects(execute(legacy, "EntregarComanda", { id: v.id }, "test-repartidor"));
+  await assert.rejects(execute(legacy, "ReportarProblemaEntrega", { comandaId: v.id, motivo: "Cliente ausente" }, "test-repartidor"), /listas para entregar/);
+  const propias = await execute(deliveries, "GetComandasParaEntrega", { limit: 500 }, "test-repartidor");
+  assert(!propias.comandas.some((x) => sinGuiones(x.id) === sinGuiones(v.id)));
+  const entrega = propias.misEntregas.find((x) => x.comanda.numeroComanda === v.numeroComanda);
+  assert.equal(entrega.motivo, "Entrega a cliente: Recibió María en recepción");
+  const ajenas = await execute(deliveries, "GetComandasParaEntrega", { limit: 500 }, "test-conductor");
+  assert(!ajenas.misEntregas.some((x) => x.comanda.numeroComanda === v.numeroComanda));
+  // Sin detalle conserva el motivo histórico.
+  const sinDetalle = variables();
+  await listaParaEntregar(sinDetalle);
+  await execute(legacy, "EntregarComanda", { id: sinDetalle.id }, "test-conductor");
+  assert.equal((await historialDe(sinDetalle.id)).comandaHistorialEstados_on_comanda.at(-1).motivo, "Entrega a cliente");
 });
 await check("incidencias se persisten y solo los roles autorizados las gestionan", async () => {
   const v = variables();

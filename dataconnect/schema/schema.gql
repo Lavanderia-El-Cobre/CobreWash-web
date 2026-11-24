@@ -129,6 +129,8 @@ type TipoServicio @table(name: "tipo_servicio") {
   nombre: String! @unique @col(dataType: "varchar(60)")
   descripcion: String @col(dataType: "varchar(200)")
   precioBase: Float! @col(dataType: "numeric(10,2)") @default(value: 0)
+  # Precio sugerido por kilo cuando la comanda se cobra por peso.
+  precioKg: Float! @col(dataType: "numeric(10,2)") @default(value: 0)
   unidadCobro: UnidadCobro! @default(value: PRENDA)
   activo: Boolean! @default(value: true)
 }
@@ -174,6 +176,10 @@ type Comanda @table(name: "comanda") {
   recepcionista: Usuario
   estado: ComandaEstado! @default(value: PENDIENTE)
   valorTotal: Float! @col(dataType: "numeric(12,2)") @default(value: 0)
+  # PRENDA: cada línea se cobra por cantidad. KILO: se cobra el peso total por
+  # precioKg y cada línea lleva su parte del peso (precioUnitario = $/kg).
+  modalidadCobro: UnidadCobro! @default(value: PRENDA)
+  precioKg: Float @col(dataType: "numeric(10,2)")
   observaciones: String @col(dataType: "varchar(300)")
   motivoAnulacion: String @col(dataType: "varchar(300)")
   fechaRecepcion: Timestamp! @default(expr: "request.time")
