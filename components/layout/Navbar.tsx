@@ -222,7 +222,12 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       if (!auth.currentUser) throw new Error("Sin sesión");
       await enviarVerificacion(auth.currentUser);
       setAuthInfo(`Te enviamos un nuevo enlace a ${correoPendiente}.`);
-    } catch (err) { setAuthError(mapAuthError(err)); }
+    } catch (err) {
+      // Firebase limita los reenvíos seguidos: el enlace anterior sigue sirviendo.
+      setAuthError((err as { code?: string } | null)?.code === "auth/too-many-requests"
+        ? "Ya enviamos varios enlaces hace poco. Revisa tu bandeja de entrada y spam, o espera unos minutos antes de pedir otro."
+        : mapAuthError(err));
+    }
   };
 
   const usarOtraCuenta = async () => {
