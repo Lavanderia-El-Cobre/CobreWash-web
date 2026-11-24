@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Send, CheckCircle2, Clock, ShieldCheck, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlassSelect from "@/components/ui/GlassSelect";
+import TelefonoInput from "@/components/ui/TelefonoInput";
+import { validarTelefono } from "@/lib/telefonos";
 import AutorizacionDatos, { useAvisoPublicado } from "@/components/privacidad/AutorizacionDatos";
 import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
 
@@ -39,6 +41,8 @@ export default function ContactForm() {
       setError("Por favor, completa todos los campos del formulario.");
       return;
     }
+    const errorTelefono = validarTelefono(formData.telefono);
+    if (errorTelefono) { setError(errorTelefono); return; }
 
     enviando.current = true;
     setIsSubmitting(true);
@@ -192,14 +196,11 @@ export default function ContactForm() {
                         <label htmlFor="telefono" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                           Teléfono de Contacto (opcional)
                         </label>
-                        <input
-                          type="tel"
+                        <TelefonoInput
                           id="telefono"
-                          name="telefono"
+                          variante="claro"
                           value={formData.telefono}
-                          onChange={handleChange}
-                          placeholder="+56 9 1234 5678"
-                          className="w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-50/50 text-stone-850 font-medium placeholder-stone-400 focus:outline-none focus:border-brand-500 focus:bg-white transition-all text-sm"
+                          onChange={(telefono) => { setFormData((actual) => ({ ...actual, telefono })); if (error) setError(""); }}
                         />
                       </div>
                     </div>

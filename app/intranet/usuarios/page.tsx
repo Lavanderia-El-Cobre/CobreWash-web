@@ -44,6 +44,7 @@ import {
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import GlassSelect from "@/components/ui/GlassSelect";
+import TelefonoInput from "@/components/ui/TelefonoInput";
 import Link from "next/link";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
@@ -197,7 +198,7 @@ export default function UsuariosPage() {
 
   const handleEditar = async () => {
     if (modal?.mode !== "editar") return;
-    const validationError = validateManagedUserUpdate(form.rolId, form.nombre);
+    const validationError = validateManagedUserUpdate(form.rolId, form.nombre, form.telefono);
     if (validationError) {
       setFormError(validationError);
       return;
@@ -577,13 +578,8 @@ export default function UsuariosPage() {
                   )}
                 </Field>
 
-                <Field label="Teléfono">
-                  <input
-                    type="tel"
-                    value={form.telefono}
-                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-brand-500 transition-all text-sm font-medium"
-                  />
+                <Field label="Teléfono" htmlFor="usuario-telefono">
+                  <TelefonoInput id="usuario-telefono" value={form.telefono} onChange={(telefono) => setForm((actual) => ({ ...actual, telefono }))} />
                 </Field>
 
                 {selectedRole?.nombre === "cliente" && modal.mode === "crear" && (
@@ -678,10 +674,10 @@ export default function UsuariosPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">{label}</label>
+      <label htmlFor={htmlFor} className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">{label}</label>
       {children}
     </div>
   );

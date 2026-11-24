@@ -41,6 +41,8 @@ it("el registro exige marcar términos y autorización por separado y luego pide
 
   escribir("Juan", "Ana"); escribir("Pérez", "Pérez"); escribir("12.345.678-9", "12.345.678-5");
   escribir("correo@ejemplo.com", "ana@example.com");
+  // El teléfono trae +56 9 y solo se escriben los 8 dígitos restantes.
+  fireEvent.change(screen.getByLabelText("Teléfono (opcional)"), { target: { value: "12345678" } });
   for (const campo of screen.getAllByPlaceholderText("••••••••")) fireEvent.change(campo, { target: { value: "clave123" } });
   fireEvent.click(screen.getByRole("button", { name: "Tipo de cliente" }));
   fireEvent.click(screen.getByRole("button", { name: "Particular" }));
@@ -59,6 +61,7 @@ it("el registro exige marcar términos y autorización por separado y luego pide
   await act(async () => { fireEvent.click(registrar); });
   expect(m.registrar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
     aceptaTerminos: true, versionTerminos: VERSION_TERMINOS, autorizaDatos: true, versionPrivacidad: VERSION_PRIVACIDAD, email: "ana@example.com",
+    telefono: "+56 9 1234 5678",
   }));
   expect(screen.getByText("Verifica tu correo")).toBeTruthy();
   expect(await screen.findByText("ana@example.com", {}, { timeout: 3000 })).toBeTruthy();

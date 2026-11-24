@@ -1,4 +1,4 @@
-import { isValidChileanPhone } from "@/lib/validators";
+import { normalizarTelefono, validarTelefono } from "@/lib/telefonos";
 import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
 export const SERVICIOS_CONTACTO = ["industrial", "domestica", "retiro-entrega", "otro"];
 export function validarContacto(body: unknown) {
@@ -17,7 +17,8 @@ export function validarContacto(body: unknown) {
   const telefono = entrada.telefono === undefined || entrada.telefono === "" ? "" : texto("telefono", 20);
   const servicio = texto("servicio", 30), mensaje = texto("mensaje", 2000);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || /[\r\n]/.test(nombre)) throw new Error("Revisa el nombre y el correo.");
-  if (telefono && !isValidChileanPhone(telefono)) throw new Error("Ingresa un teléfono chileno válido.");
+  const errorTelefono = validarTelefono(telefono);
+  if (errorTelefono) throw new Error(errorTelefono);
   if (!SERVICIOS_CONTACTO.includes(servicio)) throw new Error("Selecciona un servicio válido.");
-  return { id, nombre, email, telefono, servicio, mensaje };
+  return { id, nombre, email, telefono: normalizarTelefono(telefono), servicio, mensaje };
 }

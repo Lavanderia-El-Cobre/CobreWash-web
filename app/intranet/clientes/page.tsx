@@ -7,7 +7,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Building2, Mail, MapPin, Package, Pencil, Phone, Plus, Loader2, Search, User, X } from "lucide-react";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { dataConnect } from "@/lib/firebase/client";
-import { formatChileanPhone, formatRut, getChileanPhoneType, isValidChileanPhone, isValidRut } from "@/lib/validators";
+import { formatRut, isValidRut } from "@/lib/validators";
+import { normalizarTelefono, validarTelefono } from "@/lib/telefonos";
+import TelefonoInput from "@/components/ui/TelefonoInput";
 import { ComandaEstado, TipoCliente } from "@/src/dataconnect-generated";
 import { executeMutation, executeQuery, mutationRef, queryRef } from "firebase/data-connect";
 import GlassSelect from "@/components/ui/GlassSelect";
@@ -147,8 +149,9 @@ export default function ClientesPage() {
       setNotice("Ingresa un RUT chileno válido.");
       return;
     }
-    if (form.telefono.trim() && !isValidChileanPhone(form.telefono)) {
-      setNotice("Ingresa un celular o teléfono fijo chileno válido.");
+    const errorTelefono = validarTelefono(form.telefono);
+    if (errorTelefono) {
+      setNotice(errorTelefono);
       return;
     }
     if (!form.id && !form.email.trim()) {
@@ -169,7 +172,7 @@ export default function ClientesPage() {
       nombre: form.nombre.trim(),
       tipoCliente: form.tipoCliente,
       rut: formatRut(form.rut),
-      telefono: form.telefono.trim() ? formatChileanPhone(form.telefono) : "",
+      telefono: normalizarTelefono(form.telefono),
       email: form.email.trim(),
       direccion: form.direccion.trim(),
     };
@@ -312,14 +315,15 @@ export default function ClientesPage() {
                   />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field
-                    label="Teléfono"
-                    value={form.telefono}
-                    onChange={(telefono) => setForm({ ...form, telefono: formatChileanPhone(telefono) })}
-                    placeholder="+56 9 1234 5678"
-                    hint={form.telefono ? (getChileanPhoneType(form.telefono) || "Número chileno incompleto") : "Celular o teléfono fijo"}
-                    valid={form.telefono ? isValidChileanPhone(form.telefono) : undefined}
-                  />
+                  <div className="space-y-1.5">
+                    <label htmlFor="cliente-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
+                    <TelefonoInput
+                      id="cliente-telefono"
+                      value={form.telefono}
+                      onChange={(telefono) => setForm((actual) => (actual ? { ...actual, telefono } : actual))}
+                      ayuda="Celular por defecto; elige «Chile · teléfono fijo» u otro país"
+                    />
+                  </div>
                   <Field label={form.id ? "Correo" : "Correo (obligatorio)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
                 </div>
                 <Field label="Dirección" value={form.direccion} onChange={(direccion) => setForm({ ...form, direccion })} placeholder="Av. Balmaceda 1234, Calama" />
