@@ -6,12 +6,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle, Archive, ArrowDownToLine, ArrowUpFromLine, CheckCircle2,
-  Loader2, Pencil, Plus, Power, Radio, RotateCcw,
-  QrCode as QrIcon, Search, X, XCircle,
+  Loader2, Pencil, Plus, Power, RotateCcw,
+  QrCode as QrIcon, Search, XCircle,
 } from "lucide-react";
 import { QueryFetchPolicy, subscribe } from "firebase/data-connect";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import QrInsumo from "@/components/intranet/QrInsumo";
+import EncabezadoSeccion, { BOTON_ENCABEZADO, BOTON_ENCABEZADO_SECUNDARIO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PELIGRO, BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
+import GlassSelect from "@/components/ui/GlassSelect";
 import ConteosInventario from "@/components/intranet/ConteosInventario";
 import HistorialInventario from "@/components/intranet/HistorialInventario";
 import { dataConnect } from "@/lib/firebase/client";
@@ -270,10 +273,16 @@ export default function InventarioPage() {
     <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
       <AnimatePresence>{notice && <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role={notice.tipo === "error" ? "alert" : "status"} aria-live="polite" className={`fixed right-5 top-5 z-[70] max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${noticeStyle[notice.tipo]}`}>{notice.text}</motion.div>}</AnimatePresence>
 
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400"><Radio className="h-3 w-3 animate-pulse" />Inventario conectado</div><h1 className="font-display text-2xl font-extrabold dark:text-white">Gestión de Inventario</h1><p className="mt-1 text-sm text-stone-500">Stock y movimientos sincronizados automáticamente.</p></div>
-        <div className="flex flex-wrap gap-2"><button onClick={() => abrirMovimiento(TipoMovimiento.SALIDA)} disabled={!conStock.length} className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-40 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><ArrowUpFromLine className="h-4 w-4" />Registrar salida</button><button onClick={() => abrirMovimiento(TipoMovimiento.ENTRADA)} disabled={!activos.length} className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:opacity-40 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300"><ArrowDownToLine className="h-4 w-4" />Registrar entrada</button><button onClick={() => setForm(FORM_VACIO)} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-bold text-white shadow-premium"><Plus className="h-4 w-4" />Nuevo insumo</button></div>
-      </div>
+      <EncabezadoSeccion
+        antetitulo="Bodega · Inventario conectado"
+        titulo="Gestión de Inventario"
+        descripcion="Stock y movimientos sincronizados automáticamente."
+        acciones={<>
+          <button onClick={() => abrirMovimiento(TipoMovimiento.SALIDA)} disabled={!conStock.length} className="flex cursor-pointer items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-40 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><ArrowUpFromLine className="h-4 w-4" />Registrar salida</button>
+          <button onClick={() => abrirMovimiento(TipoMovimiento.ENTRADA)} disabled={!activos.length} className={BOTON_ENCABEZADO_SECUNDARIO}><ArrowDownToLine className="h-4 w-4" />Registrar entrada</button>
+          <button onClick={() => setForm(FORM_VACIO)} className={BOTON_ENCABEZADO}><Plus className="h-4 w-4" />Nuevo insumo</button>
+        </>}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[
         { label: "Insumos activos", value: activos.length, cls: "text-stone-800 dark:text-white" },
@@ -298,38 +307,24 @@ export default function InventarioPage() {
 
       <AnimatePresence>
         {form && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-insumo" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saving && setForm(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.form
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={guardarInsumo}
-              className="glass-panel relative w-full max-w-lg space-y-5 rounded-3xl p-6 sm:p-7 shadow-2xl border border-stone-200/80 dark:border-white/10 z-10 max-h-[90vh] overflow-y-auto"
-            >
-              <button
-                type="button"
-                onClick={() => setForm(null)}
-                disabled={saving}
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
+          <ModalIntranet
+            onCerrar={() => setForm(null)}
+            bloqueado={saving}
+            onSubmit={guardarInsumo}
+            icono={Archive}
+            etiqueta="Catálogo de inventario"
+            titulo={form.id ? "Editar insumo" : "Registrar insumo"}
+            subtitulo="Control de existencias y parámetros de alerta."
+            idTitulo="titulo-insumo"
+            claseCuerpo="space-y-5"
+            pie={<>
+              <button type="button" onClick={() => setForm(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+              <button disabled={saving} className={BOTON_MODAL_PRIMARIO}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {form.id ? "Guardar cambios" : "Registrar insumo"}
               </button>
-
-              <div className="flex items-start gap-3.5 mb-2 pr-8">
-                <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-400">
-                  <Archive className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Catálogo de inventario</p>
-                  <h2 id="titulo-insumo" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">
-                    {form.id ? "Editar insumo" : "Registrar insumo"}
-                  </h2>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Control de existencias y parámetros de alerta.</p>
-                </div>
-              </div>
-
+            </>}
+          >
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Nombre del insumo</label>
                 <input
@@ -401,78 +396,44 @@ export default function InventarioPage() {
                 </label>
               )}
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setForm(null)}
-                  disabled={saving}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {form.id ? "Guardar cambios" : "Registrar insumo"}
-                </button>
-              </div>
-            </motion.form>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {movimiento && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-movimiento" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saving && setMovimiento(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.form
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={registrarMovimiento}
-              className="glass-panel relative w-full max-w-lg space-y-5 rounded-3xl p-6 sm:p-7 shadow-2xl border border-stone-200/80 dark:border-white/10 z-10 max-h-[90vh] overflow-y-auto"
-            >
-              <button
-                type="button"
-                onClick={() => setMovimiento(null)}
-                disabled={saving}
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
+          <ModalIntranet
+            onCerrar={() => setMovimiento(null)}
+            bloqueado={saving}
+            onSubmit={registrarMovimiento}
+            icono={movimiento.tipo === TipoMovimiento.ENTRADA ? ArrowDownToLine : ArrowUpFromLine}
+            tono={movimiento.tipo === TipoMovimiento.ENTRADA ? "exito" : "peligro"}
+            etiqueta="Movimiento de inventario"
+            titulo={`Registrar ${movimiento.tipo === TipoMovimiento.ENTRADA ? "entrada" : "salida"} de stock`}
+            subtitulo="El stock y el historial se actualizarán automáticamente."
+            idTitulo="titulo-movimiento"
+            claseCuerpo="space-y-5"
+            pie={<>
+              <button type="button" onClick={() => setMovimiento(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+              <button disabled={saving || !movimiento.insumoId} className={movimiento.tipo === TipoMovimiento.ENTRADA ? BOTON_MODAL_PRIMARIO : BOTON_MODAL_PELIGRO}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Registrar {movimiento.tipo === TipoMovimiento.ENTRADA ? "entrada" : "salida"}
               </button>
-
-              <div className="flex items-start gap-3.5 mb-2 pr-8">
-                <div className={`w-12 h-12 rounded-2xl ${movimiento.tipo === TipoMovimiento.ENTRADA ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-red-500/10 text-red-600 dark:text-red-400"} flex items-center justify-center shrink-0`}>
-                  {movimiento.tipo === TipoMovimiento.ENTRADA ? <ArrowDownToLine className="w-6 h-6" /> : <ArrowUpFromLine className="w-6 h-6" />}
-                </div>
-                <div>
-                  <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${movimiento.tipo === TipoMovimiento.ENTRADA ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                    Movimiento de inventario
-                  </p>
-                  <h2 id="titulo-movimiento" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">
-                    Registrar {movimiento.tipo === TipoMovimiento.ENTRADA ? "entrada" : "salida"} de stock
-                  </h2>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">El stock y el historial se actualizarán automáticamente.</p>
-                </div>
-              </div>
-
+            </>}
+          >
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Insumo</label>
-                <select
-                  required
+                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Insumo</span>
+                <GlassSelect
+                  ariaLabel="Insumo"
+                  searchable
+                  searchPlaceholder="Buscar insumo…"
                   value={movimiento.insumoId}
-                  onChange={(event) => setMovimiento({ ...movimiento, insumoId: event.target.value })}
-                  className="w-full rounded-xl border border-stone-200/80 bg-stone-50/70 px-4 py-3 text-sm text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800/80 dark:text-stone-200 transition-all"
-                >
-                  {(movimiento.tipo === TipoMovimiento.SALIDA ? conStock : activos).map((item) => (
-                    <option key={item.id} value={item.id} className="dark:bg-stone-900">
-                      {item.nombre} · {item.stockActual.toLocaleString("es-CL")} {item.unidadMedida}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(insumoId) => setMovimiento({ ...movimiento, insumoId })}
+                  options={(movimiento.tipo === TipoMovimiento.SALIDA ? conStock : activos).map((item) => ({
+                    value: item.id,
+                    label: `${item.nombre} · ${item.stockActual.toLocaleString("es-CL")} ${item.unidadMedida}`,
+                  }))}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -503,27 +464,7 @@ export default function InventarioPage() {
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setMovimiento(null)}
-                  disabled={saving}
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  disabled={saving || !movimiento.insumoId}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 ${
-                    movimiento.tipo === TipoMovimiento.ENTRADA ? "bg-gradient-brand" : "bg-red-600 hover:bg-red-700"
-                  }`}
-                >
-                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Registrar {movimiento.tipo === TipoMovimiento.ENTRADA ? "entrada" : "salida"}
-                </button>
-              </div>
-            </motion.form>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
     </div>

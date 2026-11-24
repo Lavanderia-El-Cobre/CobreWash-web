@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -15,12 +14,12 @@ import {
   Navigation,
   PackageCheck,
   RotateCcw,
-  Truck,
   User,
 } from "lucide-react";
 import Link from "next/link";
 import { registrarError } from "@/lib/registro-seguro";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
+import EncabezadoSeccion from "@/components/intranet/EncabezadoSeccion";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import FotoEvidencia from "@/components/intranet/FotoEvidencia";
 import AdjuntarEvidencia from "@/components/intranet/AdjuntarEvidencia";
@@ -225,26 +224,22 @@ export default function RepartoPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6 lg:p-8">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-start justify-between gap-3">
-        <div>
-          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
-            <Truck className="h-3 w-3" /> Reparto
-          </p>
-          <h1 className="font-display text-2xl font-extrabold text-stone-900 dark:text-white">Mi vehículo</h1>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            Elige un vehículo, registra la inspección de salida con fotos y, al volver, el regreso.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void cargar()}
-          disabled={cargando}
-          aria-label="Actualizar"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-stone-200/80 bg-white/80 text-stone-600 transition hover:bg-stone-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-stone-300"
-        >
-          {cargando ? <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> : <RotateCcw className="h-4 w-4" />}
-        </button>
-      </motion.div>
+      <EncabezadoSeccion
+        antetitulo="Reparto · Mi jornada"
+        titulo="Mi vehículo"
+        descripcion="Elige un vehículo, registra la inspección de salida con fotos y, al volver, el regreso."
+        acciones={
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            disabled={cargando}
+            aria-label="Actualizar"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-stone-200/80 bg-white/80 text-stone-600 transition hover:bg-stone-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-stone-300"
+          >
+            {cargando ? <Loader2 className="h-4 w-4 animate-spin text-brand-500" /> : <RotateCcw className="h-4 w-4" />}
+          </button>
+        }
+      />
 
       {aviso && (
         <p role="status" className={`rounded-2xl border px-4 py-3 text-sm font-semibold ${aviso.tipo === "exito" ? "border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-stone-900 dark:text-green-300" : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-stone-900 dark:text-red-300"}`}>

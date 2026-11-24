@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { auth } from "@/lib/firebase/client";
-import { ShieldCheck, RefreshCw, AlertCircle, Clock3, FileText, Save, Inbox, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { RefreshCw, AlertCircle, Clock3, FileText, Save, Inbox, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion, { BOTON_ENCABEZADO_SECUNDARIO } from "@/components/intranet/EncabezadoSeccion";
 import { ETIQUETAS_DERECHOS, type Derecho } from "@/lib/privacidad/modelo";
 type Actuacion = { id: string; estado: string; nota: string; evidenciaIdentidad: string; evidenciaEnvio: string; creadoEn: string; actor: { nombre: string } };
 type Solicitud = { id: string; nombre: string; email: string; derecho: Derecho; detalle: string; estado: string; revision: number; creadoEn: string; objetivoAtencion: string; actuacionDerechos_on_solicitud: Actuacion[] };
@@ -32,8 +33,13 @@ export default function GestionPrivacidadPage() {
   const invalidar = useCallback(() => { generacion.current++; }, []);
   useEffect(() => { const timer = setTimeout(() => { setDatos(null); void cargar(); }, 0); return () => { clearTimeout(timer); invalidar(); }; }, [cargar, invalidar]);
   if (!permitido) return <p className="flex items-center gap-2 p-6 text-sm text-stone-500"><Loader2 className="h-4 w-4 animate-spin" />Cargando…</p>;
-  return <main className="space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><span className="rounded-2xl bg-gradient-brand p-3 text-white shadow-premium"><ShieldCheck className="h-6 w-6" /></span><div><p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-brand-600 dark:text-brand-400">Administración · Privacidad</p><h1 className="font-display text-2xl font-extrabold">Solicitudes de datos personales</h1><p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-500 dark:text-stone-400">Acceso reservado a administración. Verifica identidad y representación con medios proporcionales. No solicites copias de cédulas por defecto.</p></div></div><button disabled={ocupado} onClick={() => void cargar()} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm font-semibold text-stone-600 transition-colors hover:bg-brand-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-stone-300"><RefreshCw className={ocupado ? "h-4 w-4 animate-spin" : "h-4 w-4"} />Actualizar</button></header>
+  return <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
+    <EncabezadoSeccion
+      antetitulo="Administración · Privacidad"
+      titulo="Solicitudes de datos personales"
+      descripcion="Acceso reservado a administración. Verifica identidad y representación con medios proporcionales. No solicites copias de cédulas por defecto."
+      acciones={<button disabled={ocupado} onClick={() => void cargar()} className={BOTON_ENCABEZADO_SECUNDARIO}><RefreshCw className={ocupado ? "h-4 w-4 animate-spin" : "h-4 w-4"} />Actualizar</button>}
+    />
     <div className="flex items-start gap-3 rounded-2xl border border-copper-200 bg-copper-50/80 p-4 text-xs leading-relaxed text-copper-900 dark:border-copper-500/20 dark:bg-copper-500/10 dark:text-copper-200"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" /><p>Bloqueo: atención urgente y suspensión del tratamiento afectado cuando corresponda. Esta bandeja registra la gestión; no ejecuta por sí sola bloqueos, exportaciones ni borrados. Los objetivos de 24/48 horas son internos y no amplían los plazos legales.</p></div>
     <div className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4"><label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-stone-600 dark:text-stone-300"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={respondidas} onChange={e => { setRespondidas(e.target.checked); setPagina(0); }} />Ver respondidas</label><span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">{datos?.total[0]?._count ?? 0} solicitudes</span></div>
     {error && <p role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>}
@@ -51,18 +57,19 @@ export default function GestionPrivacidadPage() {
     </article>)}
     {datos?.solicitudDerechos.length === 0 && <div className="glass-panel flex flex-col items-center gap-3 rounded-2xl px-6 py-12 text-center"><span className="rounded-2xl bg-brand-50 p-4 text-brand-500 dark:bg-brand-500/10"><Inbox className="h-7 w-7" /></span><p className="font-display text-lg font-bold">No hay solicitudes {respondidas ? "respondidas" : "pendientes"}</p><p className="text-sm text-stone-500">Las solicitudes recibidas aparecerán aquí.</p></div>}
     <nav aria-label="Páginas de solicitudes de datos" className="flex items-center justify-between gap-3 text-xs font-semibold text-stone-500 dark:text-stone-400"><button className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 transition-colors hover:bg-brand-50 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5" disabled={ocupado || pagina === 0} onClick={() => setPagina(p => p - 1)}><ChevronLeft className="h-4 w-4" />Anterior</button><span>Página {pagina + 1}</span><button className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-stone-200 px-3 py-2 transition-colors hover:bg-brand-50 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5" disabled={ocupado || !datos || (pagina + 1) * 20 >= (datos.total[0]?._count || 0)} onClick={() => setPagina(p => p + 1)}>Siguiente<ChevronRight className="h-4 w-4" /></button></nav>
-  </main>;
+  </div>;
 }
 
 function FormularioActuacion({ ocupado, onSubmit }: { ocupado: boolean; onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void> }) {
   const [estado, setEstado] = useState("VERIFICACION");
+  const [resultado, setResultado] = useState("");
   return <form className="space-y-4 border-t border-stone-200 pt-5 dark:border-white/10" onSubmit={onSubmit}>
     <input type="hidden" name="estado" value={estado} />
     <div className="max-w-sm space-y-2"><p className={etiquetaInterna}>Nueva actuación</p><GlassSelect ariaLabel="Nueva actuación" value={estado} onChange={setEstado} disabled={ocupado} options={[{ value: "VERIFICACION", label: "Verificando identidad" }, { value: "EN_GESTION", label: "En gestión" }, { value: "RESPONDIDA", label: "Respuesta enviada" }]} /></div>
     <label className={etiquetaInterna}>Actuación o respuesta fundada<textarea name="nota" required maxLength={4000} rows={3} className={campoInterno} /></label>
     <div className="grid gap-4 lg:grid-cols-2"><label className={etiquetaInterna}>Cómo se verificó identidad y representación<input name="identidad" maxLength={500} className={campoInterno} /></label><label className={etiquetaInterna}>Evidencia de envío, fecha y referencia del canal<input name="envio" maxLength={500} className={campoInterno} /></label></div>
     {estado === "RESPONDIDA" && <fieldset className="space-y-3 rounded-xl border border-stone-200 p-4 dark:border-white/10"><legend className="text-sm font-bold">Resultado y ejecución efectiva</legend>
-      <label className={etiquetaInterna}>Resultado<select name="resultado" required className={campoInterno}><option value="">Selecciona un resultado</option><option value="ACOGIDA">Acogida íntegramente</option><option value="PARCIAL">Acogida parcialmente</option><option value="DENEGADA">Denegada</option></select></label>
+      <div className="relative space-y-2"><p className={etiquetaInterna}>Resultado</p><GlassSelect ariaLabel="Resultado" value={resultado} onChange={setResultado} disabled={ocupado} placeholder="Selecciona un resultado" options={[{ value: "ACOGIDA", label: "Acogida íntegramente" }, { value: "PARCIAL", label: "Acogida parcialmente" }, { value: "DENEGADA", label: "Denegada" }]} />{/* Campo real del formulario: conserva la validación obligatoria del navegador. */}<input name="resultado" required value={resultado} onChange={() => {}} tabIndex={-1} aria-hidden className="pointer-events-none absolute bottom-0 left-4 h-px w-px opacity-0" /></div>
       <label className={etiquetaInterna}>Medidas realizadas y evidencia, o motivo de no ejecución<input name="ejecucion" required maxLength={500} className={campoInterno} /></label>
       <label className={etiquetaInterna}>Comunicación a destinatarios de rectificación, supresión u oposición; o justificación de no procedencia<input name="destinatarios" required maxLength={500} className={campoInterno} /></label>
       <label className="flex items-start gap-2 text-xs"><input type="checkbox" name="reclamacion" />Si existe denegación total o parcial, la respuesta enviada informa fundamento, vía y plazo de reclamación. Desde la vigencia de la reforma: 30 días hábiles ante la Agencia; antes, aplicar el régimen judicial vigente.</label>
