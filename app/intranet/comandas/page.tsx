@@ -35,9 +35,11 @@ import {
 import { normalizarEtapas, type EtapaVisible } from "@/lib/produccion/modelo";
 import { guardarComandaConFlujo, editarComandaConDetalles, type CrearComandaConFlujoVariables } from "@/lib/produccion/guardar";
 import { getMiComandaGuardada } from "@/src/dataconnect-generated";
+import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
+import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
 import { dataConnect } from "@/lib/firebase/client";
 import { formatChileanPhone, formatRut, getChileanPhoneType, isValidChileanPhone, isValidRut } from "@/lib/validators";
-import { executeMutation, executeQuery, mutationRef, queryRef } from "firebase/data-connect";
+import { executeQuery, queryRef } from "firebase/data-connect";
 import { 
   TipoCliente, 
   ComandaEstado,
@@ -98,15 +100,6 @@ const leerDetalleHotel = (value?: string | null) => {
   return { recibido: match ? Number(match[1]) : 0, observacion: match?.[2] || value || "" };
 };
 
-type CrearClienteComandaData = { cliente_insert: { id: string } };
-type CrearClienteComandaVariables = {
-  nombre: string;
-  tipoCliente: TipoCliente;
-  rut?: string;
-  telefono?: string;
-  email?: string;
-  direccion?: string;
-};
 
 const prendasTotales = (c: Comanda) => c.detalle.reduce((s, d) => s + d.cantidad, 0);
 const valorTotal = (c: Comanda) => c.valorTotal;
@@ -289,6 +282,7 @@ export default function ComandasPage() {
   const [anular, setAnular] = useState<Comanda | null>(null);
   const [motivo, setMotivo] = useState("");
   const [nuevoCliente, setNuevoCliente] = useState(false);
+  const [clienteInformado, setClienteInformado] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [anularError, setAnularError] = useState<string | null>(null);
   const [entregar, setEntregar] = useState<Comanda | null>(null);
@@ -409,8 +403,12 @@ export default function ComandasPage() {
       setFormError("Ingresa un celular o teléfono fijo chileno válido.");
       return;
     }
-    if (nuevoCliente && formData.email.trim() && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
-      setFormError("Ingresa un correo válido.");
+    if (nuevoCliente && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
+      setFormError("Ingresa el correo del cliente: se usa para crear su cuenta.");
+      return;
+    }
+    if (nuevoCliente && !clienteInformado) {
+      setFormError("Confirma que informaste al cliente sobre su cuenta.");
       return;
     }
 
@@ -418,10 +416,11 @@ export default function ComandasPage() {
     setIsSubmitting(true);
     // La confirmación se lee por UUID, independientemente de filtros y página.
     // Un fallo de esta lectura no convierte un INSERT confirmado en fallido.
+    let avisoCuenta = "";
     const mostrarCreada = async (id: string) => {
       envioPendiente.current = null;
       setForm(null);
-      setNotice("Comanda creada correctamente.");
+      setNotice(avisoCuenta ? `Comanda creada correctamente. ${avisoCuenta}` : "Comanda creada correctamente.");
       await refetch(true);
       try {
         const resultado = await getComandaDetalle(dataConnect, { id }, { fetchPolicy: "SERVER_ONLY" });
@@ -486,22 +485,20 @@ export default function ComandasPage() {
         let clienteId = formData.clienteId;
 
         if (nuevoCliente) {
-          const variables: CrearClienteComandaVariables = {
+          // El cliente nuevo queda con cuenta asociada: recibe un enlace para activarla.
+          const email = formData.email.trim();
+          const resultado = await registrarClienteConCuenta(dataConnect, {
             nombre: formData.cliente.trim(),
             tipoCliente: formData.tipoCliente,
             rut: formatRut(formData.rut),
             telefono: formData.telefono.trim() ? formatChileanPhone(formData.telefono) : undefined,
-            email: formData.email.trim() || undefined,
+            email,
             direccion: formData.direccion.trim() || undefined,
-          };
-          const clienteRef = mutationRef<CrearClienteComandaData, CrearClienteComandaVariables>(
-            dataConnect,
-            "CrearClienteComanda",
-            variables,
-          );
-          const clienteCreado = await executeMutation(clienteRef);
-          clienteId = clienteCreado.data.cliente_insert.id;
+          });
+          clienteId = resultado.id;
+          avisoCuenta = avisoClienteConCuenta(resultado, email);
           setNuevoCliente(false);
+          setClienteInformado(false);
           setFormData((prev) => ({ ...prev, clienteId }));
         }
         
@@ -965,9 +962,10 @@ export default function ComandasPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FieldInput label="Teléfono" value={formData.telefono} onChange={(v) => setFormData({ ...formData, telefono: formatChileanPhone(v) })} placeholder="+56 9 1234 5678" hint={nuevoCliente && formData.telefono ? (getChileanPhoneType(formData.telefono) || "Número chileno incompleto") : undefined} valid={nuevoCliente && formData.telefono ? isValidChileanPhone(formData.telefono) : undefined} />
-                  <FieldInput label="Correo" value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
+                  <FieldInput label={nuevoCliente ? "Correo (obligatorio)" : "Correo"} value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
                 </div>
                 <FieldInput label="Dirección" value={formData.direccion} onChange={(v) => setFormData({ ...formData, direccion: v })} placeholder="Dirección de retiro / entrega" />
+                {nuevoCliente && <ConfirmacionCuentaCliente marcada={clienteInformado} onChange={setClienteInformado} disabled={isSubmitting} />}
                 {/* Servicio y peso de la comanda: base de la estimación de insumos */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">

@@ -9,11 +9,13 @@ vi.mock("@/lib/firebase/client", () => ({ auth: {} }));
 vi.mock("@/lib/firebase/useUsuarioActual", () => ({ useUsuarioActual: mocks.perfil }));
 vi.mock("@/lib/portal/usePedidosCliente", () => ({ usePedidosCliente: mocks.pedidos }));
 vi.mock("@/lib/portal/consultar", () => ({ TAMANO_PAGINA: 10, vincularPedido: mocks.vincular }));
+vi.mock("@/components/privacidad/AceptarCondicionesPendientes", () => ({ default: ({ primeraVez }: { primeraVez: boolean }) => createElement("p", null, primeraVez ? "Aceptación inicial" : "Aceptación de nueva versión") }));
 import CuentaPage from "./page";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
-  mocks.perfil.mockReturnValue({ loading: false, usuario: { id: "cliente", nombre: "Ana", email: "ana@example.test", activo: true, rol: { nombre: "cliente" }, clientes_on_usuario: [{ tipoCliente: "HOTEL" }] } });
+  mocks.perfil.mockReturnValue({ loading: false, usuario: { id: "cliente", nombre: "Ana", email: "ana@example.test", activo: true, versionPrivacidad: VERSION_PRIVACIDAD, versionTerminos: VERSION_TERMINOS, rol: { nombre: "cliente" }, clientes_on_usuario: [{ tipoCliente: "HOTEL" }] } });
   mocks.pedidos.mockReturnValue({ pedidos: [], total: 0, cargando: false, error: "", actualizar: mocks.actualizar });
   mocks.vincular.mockResolvedValue(undefined);
 });
@@ -68,4 +70,17 @@ it("cambiar entre activos e historial reinicia la página y los filtros incompat
   expect(mocks.pedidos).toHaveBeenLastCalledWith("cliente", "EN_PROCESO", 0, "activos");
   fireEvent.click(screen.getByRole("button", { name: "Historial" }));
   expect(mocks.pedidos).toHaveBeenLastCalledWith("cliente", null, 0, "historial");
+});
+
+it("pide aceptar términos y aviso antes de mostrar pedidos a una cuenta creada en recepción", () => {
+  mocks.perfil.mockReturnValue({ loading: false, usuario: { id: "cliente", nombre: "Ana", email: "ana@example.test", activo: true, versionPrivacidad: null, versionTerminos: null, rol: { nombre: "cliente" }, clientes_on_usuario: [] } });
+  render(createElement(CuentaPage));
+  expect(screen.getByText("Aceptación inicial")).toBeTruthy();
+  expect(mocks.pedidos).toHaveBeenLastCalledWith(null, null, 0, "todos");
+});
+
+it("pide aceptar la nueva versión a quien aceptó una anterior", () => {
+  mocks.perfil.mockReturnValue({ loading: false, usuario: { id: "cliente", nombre: "Ana", email: "ana@example.test", activo: true, versionPrivacidad: "2026-11-01", versionTerminos: null, rol: { nombre: "cliente" }, clientes_on_usuario: [] } });
+  render(createElement(CuentaPage));
+  expect(screen.getByText("Aceptación de nueva versión")).toBeTruthy();
 });

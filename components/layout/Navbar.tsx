@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, Phone, MapPin, AlertCircle, Search } from "lucide-react";
+import { signOut } from "firebase/auth";
+import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, Phone, MapPin, AlertCircle, Search, MailCheck, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { auth, dataConnect } from "@/lib/firebase/client";
@@ -10,18 +11,25 @@ import { TipoCliente } from "@/src/dataconnect-generated";
 import { cleanRut, formatRut, isValidRut, validatePassword } from "@/lib/validators";
 import { mapAuthError } from "@/lib/firebase/errors";
 import {
+  completarRegistroCliente,
   registerPublicClient,
   requestPasswordReset,
+  resolverIngreso,
   signInAndResolveLanding,
+  type ResultadoIngreso,
 } from "@/lib/firebase/auth-flows";
 import {
+  validateClientCompletion,
   validateLogin,
   validatePasswordReset,
   validatePublicClientRegistration,
 } from "@/lib/auth-validation";
 import GlassSelect from "@/components/ui/GlassSelect";
 import AutorizacionDatos, { useAvisoPublicado } from "@/components/privacidad/AutorizacionDatos";
-import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
+import AceptacionTerminos from "@/components/privacidad/AceptacionTerminos";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
+import { enviarVerificacion } from "@/lib/firebase/verificacion";
+import { leerRegistroPendiente } from "@/lib/registro-pendiente";
 
 const tipoClienteOptions = [
   { value: TipoCliente.PARTICULAR, label: "Particular" },
@@ -60,7 +68,12 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   };
 
   // Auth Form States
-  const [authView, setAuthView] = useState<"login" | "register" | "forgot">("login");
+  // "verificar": la cuenta espera la verificación del correo.
+  // "completar": correo verificado, falta crear el perfil de cliente.
+  const [authView, setAuthView] = useState<"login" | "register" | "forgot" | "verificar" | "completar">("login");
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [correoPendiente, setCorreoPendiente] = useState("");
+  const [authInfo, setAuthInfo] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
@@ -86,6 +99,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
 
   const resetRegisterFields = () => {
     setAutorizaDatos(false);
+    setAceptaTerminos(false);
     setAuthName("");
     setAuthApellido("");
     setAuthRut("");
@@ -102,11 +116,20 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("login") !== "1") return;
+    let vigente = true;
     const timeoutId = window.setTimeout(() => {
       setIsLoginOpen(true);
       setAuthView(params.get("registro") === "1" ? "register" : "login");
     }, 0);
-    return () => window.clearTimeout(timeoutId);
+    // Al volver desde el enlace de verificación la sesión sigue abierta:
+    // se retoma el registro o el ingreso donde quedó.
+    void auth.authStateReady().then(async () => {
+      if (!vigente || !auth.currentUser) return;
+      try { await continuarIngreso(await resolverIngreso({ auth, dataConnect }), true); }
+      catch { /* Se mantiene el formulario de ingreso. */ }
+    });
+    return () => { vigente = false; window.clearTimeout(timeoutId); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Lock body scroll when the modal is open
@@ -134,10 +157,103 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const entrar = (ruta: string) => {
+    setAuthSuccess(true);
+    setTimeout(() => {
+      setIsLoginOpen(false);
+      setAuthSuccess(false);
+      setAuthEmail("");
+      setAuthPassword("");
+      resetRegisterFields();
+      router.push(ruta);
+    }, 1200);
+  };
+
+  /** Lleva el modal al paso que corresponde según el estado de la cuenta. */
+  async function continuarIngreso(resultado: ResultadoIngreso, silencioso = false) {
+    if (resultado.tipo === "landing") { setAuthView("login"); entrar(resultado.ruta); return; }
+    setCorreoPendiente(resultado.email);
+    setIsLoginOpen(true);
+    if (resultado.tipo === "verificar") { setAuthView("verificar"); return; }
+    const uid = auth.currentUser?.uid;
+    const pendiente = uid ? leerRegistroPendiente(uid) : null;
+    if (pendiente) {
+      // Datos y aceptación ingresados al registrarse: se termina la cuenta.
+      try {
+        setAuthView("completar");
+        const ruta = await completarRegistroCliente({ auth, dataConnect }, { ...pendiente, tipoCliente: pendiente.tipoCliente as TipoCliente, aceptaTerminos: true, autorizaDatos: true });
+        entrar(ruta);
+        return;
+      } catch (err) {
+        if (!silencioso) setAuthError(mapAuthError(err));
+        setAuthName(pendiente.nombre); setAuthApellido(pendiente.apellido); setAuthRut(formatRut(pendiente.rut));
+        setAuthTelefono(pendiente.telefono); setAuthDireccion(pendiente.direccion); setAuthTipoCliente(pendiente.tipoCliente as TipoCliente);
+      }
+    }
+    setAuthView("completar");
+  }
+
+  const comprobarVerificacion = useCallback(async (manual: boolean) => {
+    const user = auth.currentUser;
+    if (!user) { setAuthView("login"); return; }
+    await user.reload().catch(() => undefined);
+    if (!user.emailVerified) {
+      if (manual) setAuthError("Aún no vemos tu correo verificado. Abre el enlace que te enviamos y vuelve a intentarlo.");
+      return;
+    }
+    setAuthError("");
+    setAuthLoading(true);
+    try { await continuarIngreso(await resolverIngreso({ auth, dataConnect })); }
+    catch (err) { setAuthError(mapAuthError(err)); }
+    finally { setAuthLoading(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mientras se espera la verificación, se revisa cada pocos segundos.
+  useEffect(() => {
+    if (!isLoginOpen || authView !== "verificar" || authSuccess) return;
+    const intervalo = window.setInterval(() => { void comprobarVerificacion(false); }, 5000);
+    return () => window.clearInterval(intervalo);
+  }, [isLoginOpen, authView, authSuccess, comprobarVerificacion]);
+
+  const reenviarVerificacion = async () => {
+    setAuthError(""); setAuthInfo("");
+    try {
+      if (!auth.currentUser) throw new Error("Sin sesión");
+      await enviarVerificacion(auth.currentUser);
+      setAuthInfo(`Te enviamos un nuevo enlace a ${correoPendiente}.`);
+    } catch (err) { setAuthError(mapAuthError(err)); }
+  };
+
+  const usarOtraCuenta = async () => {
+    await signOut(auth).catch(() => undefined);
+    setAuthError(""); setAuthInfo(""); setCorreoPendiente("");
+    setAuthView("login");
+  };
+
   // Auth Submission (Firebase Auth + Data Connect)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
+    setAuthInfo("");
+
+    if (authView === "verificar") {
+      await comprobarVerificacion(true);
+      return;
+    }
+    if (authView === "completar") {
+      const datos = {
+        nombre: authName, apellido: authApellido, rut: authRut, telefono: authTelefono, direccion: authDireccion,
+        tipoCliente: authTipoCliente, aceptaTerminos, versionTerminos: VERSION_TERMINOS, autorizaDatos, versionPrivacidad: VERSION_PRIVACIDAD,
+      };
+      const validationError = validateClientCompletion(datos);
+      if (validationError) { setAuthError(validationError); return; }
+      setAuthLoading(true);
+      try { entrar(await completarRegistroCliente({ auth, dataConnect }, datos)); }
+      catch (err) { setAuthError(mapAuthError(err)); }
+      finally { setAuthLoading(false); }
+      return;
+    }
 
     if (authView === "login") {
       const validationError = validateLogin(authEmail, authPassword);
@@ -147,18 +263,12 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       }
       setAuthLoading(true);
       try {
-        const landing = await signInAndResolveLanding({ auth, dataConnect }, authEmail, authPassword);
-
+        // Cada rol es redirigido a su vista; una cuenta sin verificar o sin
+        // perfil continúa en el paso que le falta.
+        const resultado = await signInAndResolveLanding({ auth, dataConnect }, authEmail, authPassword);
         setAuthLoading(false);
-        setAuthSuccess(true);
-        setTimeout(() => {
-          setIsLoginOpen(false);
-          setAuthSuccess(false);
-          setAuthEmail("");
-          setAuthPassword("");
-          // Cada rol es redirigido automáticamente a su propia vista.
-          router.push(landing);
-        }, 1200);
+        setAuthPassword("");
+        await continuarIngreso(resultado);
       } catch (err) {
         setAuthLoading(false);
         setAuthError(mapAuthError(err));
@@ -174,6 +284,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         tipoCliente: authTipoCliente,
         password: authPassword,
         confirmPassword: authConfirmPass,
+        aceptaTerminos, versionTerminos: VERSION_TERMINOS,
         autorizaDatos, versionPrivacidad: VERSION_PRIVACIDAD,
       };
       const validationError = validatePublicClientRegistration(registration);
@@ -187,16 +298,14 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         const aviso = await fetch("/api/privacidad/configuracion", { cache: "no-store" });
         const legal = aviso.ok ? await aviso.json() : null;
         if (!legal?.publicada || legal.version !== VERSION_PRIVACIDAD) throw new Error("El aviso de privacidad aún no está publicado.");
-        await registerPublicClient({ auth, dataConnect }, registration);
+        const { email, correoEnviado } = await registerPublicClient({ auth, dataConnect }, registration);
 
         setAuthLoading(false);
-        setAuthSuccess(true);
-        setTimeout(() => {
-          setIsLoginOpen(false);
-          router.push("/cuenta");
-          setAuthSuccess(false);
-          resetRegisterFields();
-        }, 1550);
+        setAuthPassword("");
+        setAuthConfirmPass("");
+        setCorreoPendiente(email);
+        setAuthView("verificar");
+        if (!correoEnviado) setAuthError("Tu cuenta quedó pendiente, pero no pudimos enviar el correo. Usa \"Reenviar correo\".");
       } catch (err) {
         setAuthLoading(false);
         setAuthError(mapAuthError(err));
@@ -485,11 +594,15 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                     {authView === "login" && "Iniciar Sesión"}
                     {authView === "register" && "Crear cuenta de cliente"}
                     {authView === "forgot" && "Recuperar Contraseña"}
+                    {authView === "verificar" && "Verifica tu correo"}
+                    {authView === "completar" && "Termina de crear tu cuenta"}
                   </h3>
                   <p className="text-xs text-stone-500 max-w-xs leading-normal">
                     {authView === "login" && "Ingresa tus datos para acceder a tu intranet de lavandería."}
                     {authView === "register" && "Crea tu cuenta de cliente particular o empresa para revisar tus pedidos e historial."}
                     {authView === "forgot" && "Ingresa tu correo y te enviaremos un enlace de recuperación."}
+                    {authView === "verificar" && "Tu cuenta se termina de crear cuando confirmas que el correo es tuyo."}
+                    {authView === "completar" && "Tu correo está verificado. Completa tus datos para acceder a tus pedidos."}
                   </p>
                 </div>
 
@@ -509,11 +622,13 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                           {authView === "login" && "¡Acceso Exitoso!"}
                           {authView === "register" && "¡Registro Completado!"}
                           {authView === "forgot" && "¡Enlace Enviado!"}
+                          {authView === "completar" && "¡Cuenta creada!"}
                         </h4>
                         <p className="text-xs text-stone-500 mt-1 max-w-[240px] mx-auto">
                           {authView === "login" && "Redireccionando a tu intranet..."}
                           {authView === "register" && "Ya puedes iniciar sesión con tu cuenta."}
                           {authView === "forgot" && "Revisa tu bandeja de entrada o carpeta de spam."}
+                          {authView === "completar" && "Redireccionando a tu cuenta..."}
                         </p>
                       </div>
                     </motion.div>
@@ -528,13 +643,33 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                       noValidate // Disable browser validation balloons
                     >
                       {authError && (
-                        <div className="p-3 bg-red-50 border border-red-200 text-red-755 text-xs font-semibold rounded-xl">
+                        <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-755 text-xs font-semibold rounded-xl">
                           {authError}
                         </div>
                       )}
+                      {authInfo && (
+                        <div role="status" className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-xl">
+                          {authInfo}
+                        </div>
+                      )}
+
+                      {authView === "verificar" && (
+                        <div className="space-y-3 rounded-2xl border border-brand-100 bg-brand-50/50 p-4 text-xs leading-relaxed text-stone-600">
+                          <p className="flex items-start gap-2.5"><MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" /><span>Enviamos un enlace de verificación a <strong className="break-all text-stone-800">{correoPendiente || "tu correo"}</strong>. Ábrelo desde tu correo; esta ventana continuará sola en cuanto lo confirmes.</span></p>
+                          <p className="text-stone-500">Si no lo ves, revisa la carpeta de spam o pide un nuevo enlace.</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
+                            <button type="button" onClick={() => void reenviarVerificacion()} className="inline-flex items-center gap-1.5 font-bold text-brand-700 underline underline-offset-4"><RefreshCw className="h-3.5 w-3.5" />Reenviar correo</button>
+                            <button type="button" onClick={() => void usarOtraCuenta()} className="font-semibold text-stone-500 underline underline-offset-4">Usar otra cuenta</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {authView === "completar" && correoPendiente && (
+                        <p className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-xs font-semibold text-green-700"><CheckCircle2 className="h-4 w-4 shrink-0" /><span className="break-all">Correo verificado: {correoPendiente}</span></p>
+                      )}
 
                       {/* Register-only fields */}
-                      {authView === "register" && (
+                      {(authView === "register" || authView === "completar") && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
@@ -632,7 +767,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                       )}
 
                       {/* Common Email Input */}
-                      <div className="space-y-1.5">
+                      {authView !== "verificar" && authView !== "completar" && <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Correo Electrónico</label>
                         <div className="relative">
                           <input
@@ -644,10 +779,10 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                           />
                           <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         </div>
-                      </div>
+                      </div>}
 
                       {/* Password input for Login / Register */}
-                      {authView !== "forgot" && (
+                      {(authView === "login" || authView === "register") && (
                         <div className="space-y-1.5">
                           <div className="flex justify-between items-center">
                             <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Contraseña</label>
@@ -703,11 +838,14 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         </div>
                       )}
 
-                      {authView === "register" && <AutorizacionDatos finalidad="cuenta" aceptada={autorizaDatos} onChange={setAutorizaDatos} publicada={avisoPublicado} />}
+                      {(authView === "register" || authView === "completar") && <>
+                        <AceptacionTerminos aceptada={aceptaTerminos} onChange={setAceptaTerminos} disabled={!avisoPublicado} />
+                        <AutorizacionDatos finalidad="cuenta" aceptada={autorizaDatos} onChange={setAutorizaDatos} publicada={avisoPublicado} />
+                      </>}
                       {/* Submit Button */}
                       <button
                         type="submit"
-                        disabled={authLoading || (authView === "register" && (!avisoPublicado || !autorizaDatos))}
+                        disabled={authLoading || ((authView === "register" || authView === "completar") && (!avisoPublicado || !autorizaDatos || !aceptaTerminos))}
                         className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg disabled:opacity-50 transition-all duration-200 hover:scale-[1.01] cursor-pointer"
                       >
                         {authLoading ? (
@@ -717,6 +855,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                             {authView === "login" && "Ingresar"}
                             {authView === "register" && "Registrarse"}
                             {authView === "forgot" && "Enviar Instrucciones"}
+                            {authView === "verificar" && "Ya verifiqué mi correo"}
+                            {authView === "completar" && "Crear mi cuenta"}
                           </>
                         )}
                       </button>

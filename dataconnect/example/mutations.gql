@@ -71,17 +71,26 @@ mutation RegistrarseComoCliente(
   $direccion: String
   $tipoCliente: TipoCliente!
   $versionPrivacidad: String!
+  $versionTerminos: String
 ) @auth(level: USER) @transaction {
+  # La cuenta solo termina de crearse con el correo verificado y con el aviso
+  # de privacidad y los términos vigentes aceptados por el propio titular.
   query @redact @check(
     expr: "auth.token.email != null && vars.email == auth.token.email"
     message: "El correo debe coincidir con la cuenta autenticada"
+  ) @check(
+    expr: "auth.token.email_verified == true"
+    message: "CORREO_NO_VERIFICADO: verifica tu correo para terminar de crear la cuenta"
+  ) @check(
+    expr: "vars.versionPrivacidad == '2026-11-24' && vars.versionTerminos == '2026-11-24'"
+    message: "Debes aceptar los términos y autorizar el aviso de privacidad vigentes"
   ) {
     previa: cliente(first: { where: { rut: { eq: $rut } } })
       @check(expr: "vars.crearFicha == (this == null)", message: "FICHA_RUT_EXISTENTE: vuelve a preparar la cuenta sin duplicar la ficha") { id }
 
     rolCliente: rol(first: { where: { nombre: { eq: "cliente" } } })
       @check(expr: "this != null", message: "El rol cliente no está configurado") {
-      id @check(expr: "vars.versionPrivacidad == '2026-11-01'", message: "Debes autorizar el aviso de privacidad vigente")
+      id
     }
   }
   usuario_insert(data: {
@@ -89,6 +98,8 @@ mutation RegistrarseComoCliente(
     rolId_expr: "response.query.rolCliente.id"
     versionPrivacidad: $versionPrivacidad
     autorizadaEn_expr: "request.time"
+    versionTerminos: $versionTerminos
+    terminosAceptadosEn_expr: "request.time"
     rut: $rut
     nombre: $nombre
     apellido: $apellido
@@ -153,6 +164,73 @@ mutation CrearClienteAdministrado(
     email: $email
     direccion: $direccion
   }) @include(if: $crearFicha)
+}
+
+# El titular acepta los términos y autoriza el aviso vigentes desde su propia
+# sesión: cuentas creadas por el personal o aceptadas con una versión anterior.
+mutation AceptarCondicionesVigentes($versionPrivacidad: String!, $versionTerminos: String!) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.versionPrivacidad == '2026-11-24' && vars.versionTerminos == '2026-11-24'"
+    message: "Debes aceptar los términos y autorizar el aviso de privacidad vigentes"
+  ) {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+    }
+  }
+  usuario_update(id_expr: "auth.uid", data: {
+    versionPrivacidad: $versionPrivacidad
+    autorizadaEn_expr: "request.time"
+    versionTerminos: $versionTerminos
+    terminosAceptadosEn_expr: "request.time"
+    actualizadoEn_expr: "request.time"
+  })
+}
+
+# Recepción o administración registran un cliente con correo y le crean una
+# cuenta asociada. El uid viene de la cuenta de Auth creada en la app
+# secundaria; el cliente define su contraseña con el enlace enviado a su correo
+# y acepta los términos y el aviso al ingresar por primera vez.
+mutation CrearClienteConCuenta(
+  $usuarioId: String!
+  $nombreUsuario: String!
+  $apellidoUsuario: String
+  $nombre: String!
+  $tipoCliente: TipoCliente!
+  $rut: String
+  $telefono: String
+  $email: String!
+  $direccion: String
+) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$') && vars.usuarioId.size() > 0 && vars.usuarioId.size() <= 128"
+    message: "El correo o la cuenta son inválidos"
+  ) {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this in ['admin', 'recepcionista']", message: "No autorizado para crear clientes") }
+    }
+    rolCliente: rol(first: { where: { nombre: { eq: "cliente" } } })
+      @check(expr: "this != null", message: "El rol cliente no está configurado") { id }
+    existente: usuario(id: $usuarioId) @check(expr: "this == null", message: "La cuenta ya existe") { id }
+  }
+  usuario_insert(data: {
+    id: $usuarioId
+    rolId_expr: "response.query.rolCliente.id"
+    rut: $rut
+    nombre: $nombreUsuario
+    apellido: $apellidoUsuario
+    telefono: $telefono
+    email: $email
+  })
+  cliente_insert(data: {
+    usuario: { id: $usuarioId }
+    nombre: $nombre
+    tipoCliente: $tipoCliente
+    rut: $rut
+    telefono: $telefono
+    email: $email
+    direccion: $direccion
+  })
 }
 
 # Edita una cuenta existente (rol, datos y estado activo/inactivo). Solo

@@ -54,9 +54,10 @@ await check("se preserva la trazabilidad y el cierre es definitivo", async () =>
 await check("el alta pública exige y guarda versión y fecha de autorización", async () => {
   const vars = { versionPrivacidad: "obsoleta", rut: "12.345.678-5", nombre: "Nuevo", apellido: "Cliente", email: "nuevo-privacidad@example.test", tipoCliente: "PARTICULAR" };
   await assert.rejects(execute(registro, "RegistrarseComoCliente", vars, "nuevo-privacidad"));
-  await execute(registro, "RegistrarseComoCliente", { ...vars, versionPrivacidad: "2026-11-01" }, "nuevo-privacidad");
-  const d = await execute('query Verificar { usuario(id:"nuevo-privacidad") { versionPrivacidad autorizadaEn } }', "Verificar");
-  assert.equal(d.usuario.versionPrivacidad, "2026-11-01"); assert(d.usuario.autorizadaEn);
+  await execute(registro, "RegistrarseComoCliente", { ...vars, versionPrivacidad: "2026-11-24", versionTerminos: "2026-11-24" }, "nuevo-privacidad");
+  const d = await execute('query Verificar { usuario(id:"nuevo-privacidad") { versionPrivacidad autorizadaEn versionTerminos terminosAceptadosEn } }', "Verificar");
+  assert.equal(d.usuario.versionPrivacidad, "2026-11-24"); assert(d.usuario.autorizadaEn);
+  assert.equal(d.usuario.versionTerminos, "2026-11-24"); assert(d.usuario.terminosAceptadosEn);
 });
 await check("la limpieza técnica no elimina solicitudes y no está disponible a clientes", async () => {
   const antesDe = "2001-01-01T00:00:00Z", viejo = `vencido-${randomUUID()}`;

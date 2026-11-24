@@ -99,6 +99,15 @@ export enum UnidadCobro {
 
 
 
+export interface AceptarCondicionesVigentesData {
+  usuario_update?: Usuario_Key | null;
+}
+
+export interface AceptarCondicionesVigentesVariables {
+  versionPrivacidad: string;
+  versionTerminos: string;
+}
+
 export interface ActuacionDerecho_Key {
   id: UUIDString;
   __typename?: 'ActuacionDerecho_Key';
@@ -420,6 +429,23 @@ export interface CrearClienteComandaVariables {
   rut?: string | null;
   telefono?: string | null;
   email?: string | null;
+  direccion?: string | null;
+}
+
+export interface CrearClienteConCuentaData {
+  usuario_insert: Usuario_Key;
+  cliente_insert: Cliente_Key;
+}
+
+export interface CrearClienteConCuentaVariables {
+  usuarioId: string;
+  nombreUsuario: string;
+  apellidoUsuario?: string | null;
+  nombre: string;
+  tipoCliente: TipoCliente;
+  rut?: string | null;
+  telefono?: string | null;
+  email: string;
   direccion?: string | null;
 }
 
@@ -1658,6 +1684,8 @@ export interface GetMiPerfilData {
     telefono?: string | null;
     activo: boolean;
     creadoEn: TimestampString;
+    versionPrivacidad?: string | null;
+    versionTerminos?: string | null;
     rol: {
       id: UUIDString;
       nombre: string;
@@ -2702,6 +2730,7 @@ export interface RegistrarseComoClienteVariables {
   direccion?: string | null;
   tipoCliente: TipoCliente;
   versionPrivacidad: string;
+  versionTerminos?: string | null;
 }
 
 export interface RegistrarseData {
@@ -3327,6 +3356,30 @@ export const crearClienteAdministradoRef: CrearClienteAdministradoRef;
 
 export function crearClienteAdministrado(vars: CrearClienteAdministradoVariables): MutationPromise<CrearClienteAdministradoData, CrearClienteAdministradoVariables>;
 export function crearClienteAdministrado(dc: DataConnect, vars: CrearClienteAdministradoVariables): MutationPromise<CrearClienteAdministradoData, CrearClienteAdministradoVariables>;
+
+interface AceptarCondicionesVigentesRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: AceptarCondicionesVigentesVariables): MutationRef<AceptarCondicionesVigentesData, AceptarCondicionesVigentesVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: AceptarCondicionesVigentesVariables): MutationRef<AceptarCondicionesVigentesData, AceptarCondicionesVigentesVariables>;
+  operationName: string;
+}
+export const aceptarCondicionesVigentesRef: AceptarCondicionesVigentesRef;
+
+export function aceptarCondicionesVigentes(vars: AceptarCondicionesVigentesVariables): MutationPromise<AceptarCondicionesVigentesData, AceptarCondicionesVigentesVariables>;
+export function aceptarCondicionesVigentes(dc: DataConnect, vars: AceptarCondicionesVigentesVariables): MutationPromise<AceptarCondicionesVigentesData, AceptarCondicionesVigentesVariables>;
+
+interface CrearClienteConCuentaRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CrearClienteConCuentaVariables): MutationRef<CrearClienteConCuentaData, CrearClienteConCuentaVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CrearClienteConCuentaVariables): MutationRef<CrearClienteConCuentaData, CrearClienteConCuentaVariables>;
+  operationName: string;
+}
+export const crearClienteConCuentaRef: CrearClienteConCuentaRef;
+
+export function crearClienteConCuenta(vars: CrearClienteConCuentaVariables): MutationPromise<CrearClienteConCuentaData, CrearClienteConCuentaVariables>;
+export function crearClienteConCuenta(dc: DataConnect, vars: CrearClienteConCuentaVariables): MutationPromise<CrearClienteConCuentaData, CrearClienteConCuentaVariables>;
 
 interface ActualizarUsuarioRef {
   /* Allow users to create refs without passing in DataConnect */

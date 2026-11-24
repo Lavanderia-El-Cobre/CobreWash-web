@@ -1,4 +1,6 @@
-export const VERSION_PRIVACIDAD = "2026-11-01";
+export const VERSION_PRIVACIDAD = "2026-11-24";
+// Versión vigente de los Términos y Condiciones del portal y del servicio.
+export const VERSION_TERMINOS = "2026-11-24";
 export const DERECHOS = ["ACCESO", "RECTIFICACION", "SUPRESION", "OPOSICION", "BLOQUEO", "PORTABILIDAD", "REVOCACION"] as const;
 export type Derecho = typeof DERECHOS[number];
 export const ETIQUETAS_DERECHOS: Record<Derecho, string> = {
