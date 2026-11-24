@@ -819,14 +819,15 @@ mutation EliminarDetallesComanda(
   comandaDetalle_deleteMany(where: { comandaId: { eq: $comandaId } })
 }
 
+# Las prendas escritas a mano quedan en mayúsculas, igual que el catálogo base.
 mutation CrearTipoPrenda($nombre: String!) @auth(level: USER) @transaction {
-  query @redact {
+  query @redact @check(expr: "vars.nombre.size() >= 2 && vars.nombre.size() <= 60", message: "El nombre de la prenda debe tener entre 2 y 60 caracteres") {
     usuario(id_expr: "auth.uid") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para crear prendas") }
     }
   }
-  tipoPrenda_insert(data: { nombre: $nombre, activo: true })
+  tipoPrenda_insert(data: { nombre_expr: "vars.nombre.upperAscii()", activo: true })
 }
 
 mutation CrearTipoServicio($nombre: String!, $precioBase: Float!) @auth(level: USER) @transaction {

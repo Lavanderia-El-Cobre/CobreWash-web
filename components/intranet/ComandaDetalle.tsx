@@ -24,13 +24,22 @@ import FlujoProduccion from "@/components/intranet/FlujoProduccion";
 import {
   ETAPAS,
   estadoConfig,
+  pesoTotal,
   prendasTotales,
+  subtotalLinea,
   valorTotal,
   progreso,
   type Comanda,
 } from "@/lib/mock/comandas";
 
 const clp = (n: number) => `$${n.toLocaleString("es-CL")}`;
+const kg = (n: number) => `${n.toLocaleString("es-CL", { maximumFractionDigits: 2 })} kg`;
+
+/** "12,5 kg × $2.500/kg" para comandas que se cobran por peso. */
+function cobroPorKg(comanda: Comanda) {
+  if (comanda.modalidadCobro !== "KILO" || !comanda.precioKg) return null;
+  return `${kg(pesoTotal(comanda))} × ${clp(comanda.precioKg)}/kg`;
+}
 
 /* ─────────────────────────  DETALLE  ───────────────────────── */
 export default function ComandaDetalle({
@@ -138,10 +147,13 @@ export default function ComandaDetalle({
                       <tr key={i} className="border-t border-stone-100 dark:border-white/5">
                         <td className="px-3 py-2 font-semibold text-stone-700 dark:text-stone-200">{d.tipoPrenda}</td>
                         <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{d.servicio}</td>
-                        <td className="px-3 py-2 text-center text-stone-500 dark:text-stone-400">{d.cantidad}</td>
+                        <td className="px-3 py-2 text-center text-stone-500 dark:text-stone-400">
+                          {d.cantidad}
+                          {comanda.modalidadCobro === "KILO" && d.pesoKg ? <span className="block text-[10px] text-stone-400">{kg(d.pesoKg)}</span> : null}
+                        </td>
                         <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{d.detalle || "—"}</td>
                         <td className="px-3 py-2 text-right font-semibold text-stone-700 dark:text-stone-200">
-                          {clp(d.cantidad * d.precioUnitario)}
+                          {clp(subtotalLinea(d))}
                         </td>
                       </tr>
                     ))}
@@ -150,6 +162,7 @@ export default function ComandaDetalle({
                     <tr className="border-t border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-white/5">
                       <td colSpan={3} className="px-3 py-2 text-stone-500 dark:text-stone-400">
                         {prendasTotales(comanda)} prendas
+                        {cobroPorKg(comanda) && <span className="ml-1 font-semibold text-stone-600 dark:text-stone-300">· Cobro por kg: {cobroPorKg(comanda)}</span>}
                       </td>
                       <td className="px-3 py-2 text-right font-bold text-stone-500 dark:text-stone-400">Total</td>
                       <td className="px-3 py-2 text-right font-extrabold text-brand-600 dark:text-brand-400">{clp(total)}</td>
@@ -333,11 +346,17 @@ export function ComprobanteModal({ comanda, onClose }: { comanda: Comanda; onClo
               {comanda.detalle.map((d, i) => (
                 <div key={i} className="flex justify-between py-1 border-b border-dashed border-stone-100">
                   <span className="text-stone-700">{d.cantidad}× {d.tipoPrenda} <span className="text-stone-400">· {d.servicio}{d.detalle ? ` · ${d.detalle}` : ""}</span></span>
-                  <span className="font-semibold shrink-0 ml-2">{clp(d.cantidad * d.precioUnitario)}</span>
+                  <span className="font-semibold shrink-0 ml-2">{clp(subtotalLinea(d))}</span>
                 </div>
               ))}
             </div>
 
+            {cobroPorKg(comanda) && (
+              <div className="flex justify-between text-xs text-stone-600">
+                <span>Cobro por kg</span>
+                <span className="font-semibold">{cobroPorKg(comanda)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-1">
               <span className="font-bold text-sm">TOTAL</span>
               <span className="font-extrabold text-lg text-brand-600">{clp(total)}</span>

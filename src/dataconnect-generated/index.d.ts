@@ -710,6 +710,7 @@ export interface GetCatalogosComandaData {
     id: UUIDString;
     nombre: string;
     precioBase: number;
+    precioKg: number;
     unidadCobro: UnidadCobro;
   } & TipoServicio_Key)[];
   tipoPrendas: ({
@@ -735,6 +736,8 @@ export interface GetComandaDetalleData {
     numeroComanda: string;
     estado: ComandaEstado;
     valorTotal: number;
+    modalidadCobro: UnidadCobro;
+    precioKg?: number | null;
     empresa?: string | null;
     proyecto?: string | null;
     observaciones?: string | null;
@@ -1001,6 +1004,8 @@ export interface GetComandasPaginadasData {
     codigoQr: UUIDString;
     estado: ComandaEstado;
     valorTotal: number;
+    modalidadCobro: UnidadCobro;
+    precioKg?: number | null;
     empresa?: string | null;
     proyecto?: string | null;
     fechaRecepcion: TimestampString;
@@ -1046,6 +1051,7 @@ export interface GetComandasPaginadasData {
       detalle?: string | null;
       pesoKg?: number | null;
       precioUnitario: number;
+      subtotal: number;
       tipoPrenda: {
         nombre: string;
       };

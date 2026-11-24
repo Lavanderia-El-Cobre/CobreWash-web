@@ -27,6 +27,9 @@ import ConsumoEstimado from "@/components/intranet/ia/ConsumoEstimado";
 import { leerPesoKg, repartirPeso, type ModeloComanda } from "@/lib/ia/comanda";
 import GlassSelect from "@/components/ui/GlassSelect";
 import {
+  PRENDA_POR_KILO, leerPrecioKg, normalizarPrendaNueva, opcionesPrendas, subtotalesPorKg, totalPorKg, type ModalidadCobro,
+} from "@/lib/comandas/cobro";
+import {
   estadoConfig,
   type EstadoComanda,
   type PrendaLinea,
@@ -45,6 +48,7 @@ import { executeQuery, queryRef } from "firebase/data-connect";
 import { 
   TipoCliente, 
   ComandaEstado,
+  UnidadCobro,
   getCatalogosComanda,
   getComandaDetalle,
   getModeloComandaIa,
@@ -122,6 +126,9 @@ export interface Comanda {
   servicio: string;
   detalle: PrendaLinea[];
   valorTotal: number;
+  modalidadCobro: ModalidadCobro;
+  /** Precio por kg aplicado cuando la comanda se cobra por peso. */
+  precioKg?: number;
   fechaRecepcion: string;
   fechaRecepcionIso: string;
   fechaEntregaEstimada?: string;
@@ -149,8 +156,11 @@ function presentarComanda(c: GetComandasPaginadasData["comandas"][number]): Coma
         (nombre) => normalizarCatalogo(nombre) === normalizarCatalogo(d.tipoPrenda.nombre),
       ) || d.tipoPrenda.nombre,
       servicio: d.tipoServicio.nombre, cantidad: d.cantidad, precioUnitario: d.precioUnitario, detalle: d.detalle || "", pesoKg: d.pesoKg,
+      subtotal: d.subtotal,
     })),
     valorTotal: c.valorTotal,
+    modalidadCobro: c.modalidadCobro === UnidadCobro.KILO ? "KILO" : "PRENDA",
+    precioKg: c.precioKg ?? undefined,
     fechaRecepcion: new Date(c.fechaRecepcion).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }),
     fechaRecepcionIso: new Date(c.fechaRecepcion).toISOString().slice(0, 10),
     fechaEntregaEstimada: c.fechaEntregaEstimada ? new Date(c.fechaEntregaEstimada).toLocaleDateString("es-CL", { timeZone: "America/Santiago" }) : undefined,
@@ -174,6 +184,9 @@ type FormState = {
   servicio: string;
   /** Peso total de la comanda en kg, tal como se escribe ("12,5"). */
   pesoKg: string;
+  modalidad: ModalidadCobro;
+  /** Precio por kg tal como se escribe; solo se usa en la modalidad KILO. */
+  precioKg: string;
   detalle: FormLinea[];
   observaciones: string;
 };
@@ -190,6 +203,8 @@ const emptyForm: FormState = {
   direccion: "",
   servicio: "",
   pesoKg: "",
+  modalidad: "PRENDA",
+  precioKg: "",
   detalle: [{ tipoPrenda: "", servicio: "Lavado", cantidad: 1, precioUnitario: 1000, detalle: "", recibido: 0 }],
   observaciones: "",
 };
@@ -339,6 +354,7 @@ export default function ComandasPage() {
       rut: cliente?.rut || "",
       tipoCliente: cliente?.tipoCliente || TipoCliente.PARTICULAR,
       servicio: servicio?.nombre || "",
+      precioKg: servicio?.precioKg ? String(servicio.precioKg) : "",
       detalle: [{
         tipoPrenda: prendas[0],
         servicio: servicio?.nombre || "",
@@ -373,6 +389,10 @@ export default function ComandasPage() {
         const total = Math.round(c.detalle.reduce((s, d) => s + (d.pesoKg ?? 0), 0) * 100) / 100;
         return total > 0 ? String(total).replace(".", ",") : "";
       })(),
+      modalidad: c.modalidadCobro,
+      precioKg: c.precioKg
+        ? String(c.precioKg)
+        : String(catData?.tipoServicios.find((s) => s.nombre === c.servicio)?.precioKg || ""),
       detalle: c.detalle.map((d) => {
         const hotel = leerDetalleHotel(d.detalle);
         return { ...d, detalle: c.tipoCliente === TipoCliente.HOTEL ? hotel.observacion : d.detalle || "", recibido: hotel.recibido };
@@ -385,10 +405,20 @@ export default function ComandasPage() {
 
   const guardar = async () => {
     if (guardando.current) return;
-    const detalleLimpio = formData.detalle.filter((d) => d.tipoPrenda.trim());
-    if (!formData.cliente.trim() || detalleLimpio.length === 0) {
+    const porKg = formData.modalidad === "KILO";
+    let detalleLimpio = formData.detalle.filter((d) => d.tipoPrenda.trim());
+    if (!formData.cliente.trim() || (!porKg && detalleLimpio.length === 0)) {
       setFormError("Selecciona un cliente y agrega al menos una prenda.");
       return;
+    }
+    const precioKg = porKg ? leerPrecioKg(formData.precioKg) : null;
+    if (porKg && precioKg === null) {
+      setFormError("Ingresa el precio por kg (mayor que 0).");
+      return;
+    }
+    // Por kg las prendas son opcionales: sin detalle se registra la ropa a granel.
+    if (porKg && detalleLimpio.length === 0) {
+      detalleLimpio = [{ tipoPrenda: PRENDA_POR_KILO, servicio: formData.servicio, cantidad: 1, precioUnitario: 0, detalle: "", recibido: 0 }];
     }
     const pesoTotal = leerPesoKg(formData.pesoKg);
     if (pesoTotal === null) {
@@ -397,6 +427,14 @@ export default function ComandasPage() {
     }
     // El peso se mide por comanda; se reparte entre las líneas según la cantidad.
     const pesos = repartirPeso(pesoTotal, detalleLimpio.map((d) => d.cantidad));
+    const subtotalesKg = precioKg === null ? [] : subtotalesPorKg(pesos, precioKg);
+    // Por prendas: cantidad × precio. Por kg: la parte del peso × $/kg.
+    const cobroLinea = (d: FormLinea, indice: number) => precioKg === null
+      ? { precioUnitario: d.precioUnitario, subtotal: d.cantidad * d.precioUnitario }
+      : { precioUnitario: precioKg, subtotal: subtotalesKg[indice] };
+    const cobroComanda = precioKg === null
+      ? { modalidadCobro: UnidadCobro.PRENDA }
+      : { modalidadCobro: UnidadCobro.KILO, precioKg };
     if (nuevoCliente && !isValidRut(formData.rut)) {
       setFormError("Ingresa un RUT chileno válido para el cliente.");
       return;
@@ -454,7 +492,8 @@ export default function ComandasPage() {
         const clave = normalizarCatalogo(nombre);
         const existente = tiposPrendaResueltos.get(clave);
         if (existente) return existente;
-        const creado = await crearTipoPrenda(dataConnect, { nombre });
+        // Las prendas nuevas se guardan en mayúsculas, como el resto del catálogo.
+        const creado = await crearTipoPrenda(dataConnect, { nombre: normalizarPrendaNueva(nombre) });
         const id = creado.data.tipoPrenda_insert.id;
         tiposPrendaResueltos.set(clave, id);
         return id;
@@ -514,13 +553,14 @@ export default function ComandasPage() {
           empresa: formData.empresa.trim() || undefined,
           proyecto: formData.proyecto.trim() || undefined,
           observaciones: formData.observaciones.trim() || undefined,
+          ...cobroComanda,
           detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => ({
             tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
             detalle: formData.tipoCliente === TipoCliente.HOTEL
               ? `Entregado: ${d.cantidad} · Recibido: ${d.recibido} · Pendiente: ${Math.max(0, d.cantidad - d.recibido)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
               : d.detalle.trim() || undefined,
             pesoKg: pesos[indice],
-            precioUnitario: d.precioUnitario, subtotal: d.cantidad * d.precioUnitario,
+            ...cobroLinea(d, indice),
           })),
         };
         envioPendiente.current = variables;
@@ -534,6 +574,7 @@ export default function ComandasPage() {
             empresa: formData.empresa.trim() || undefined,
             proyecto: formData.proyecto.trim() || undefined,
             observaciones: formData.observaciones.trim() || undefined,
+            ...cobroComanda,
             detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => ({
               comandaId: form.id,
               tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
@@ -541,7 +582,7 @@ export default function ComandasPage() {
                 ? `Entregado: ${d.cantidad} · Recibido: ${d.recibido} · Pendiente: ${Math.max(0, d.cantidad - d.recibido)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
                 : d.detalle.trim() || undefined,
               pesoKg: pesos[indice],
-              precioUnitario: d.precioUnitario, subtotal: d.cantidad * d.precioUnitario,
+              ...cobroLinea(d, indice),
             })),
           });
         }
@@ -605,7 +646,23 @@ export default function ComandasPage() {
       detalle: f.detalle.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
     }));
 
-  const formTotal = formData.detalle.reduce((s, d) => s + d.cantidad * d.precioUnitario, 0);
+  const formPorKg = formData.modalidad === "KILO";
+  const formPeso = leerPesoKg(formData.pesoKg);
+  const formPrecioKg = leerPrecioKg(formData.precioKg);
+  const formTotal = formPorKg
+    ? (formPeso !== null && formPrecioKg !== null ? totalPorKg(formPeso, formPrecioKg) : 0)
+    : formData.detalle.reduce((s, d) => s + d.cantidad * d.precioUnitario, 0);
+  // Prendas agregadas por el personal: las de la BD fuera del catálogo base.
+  const prendasBase = new Set([...PRENDAS_FORMULARIO, ...PRENDAS_HOTEL].map(normalizarCatalogo));
+  const prendasAgregadas = (catData?.tipoPrendas ?? []).map((p) => p.nombre).filter((n) => !prendasBase.has(normalizarCatalogo(n)));
+  const opcionesPrenda = opcionesPrendas(
+    formData.tipoCliente === TipoCliente.HOTEL ? PRENDAS_HOTEL : PRENDAS_FORMULARIO,
+    prendasAgregadas,
+    formData.detalle.map((d) => d.tipoPrenda).filter((n) => !prendasBase.has(normalizarCatalogo(n))),
+  ).map((nombre) => ({ value: nombre, label: nombre }));
+  const columnasLinea = formData.tipoCliente === TipoCliente.HOTEL
+    ? (formPorKg ? "sm:grid-cols-[1.4fr_80px_80px_80px_1.2fr_auto]" : "sm:grid-cols-[1.4fr_80px_80px_80px_1.2fr_90px_auto]")
+    : (formPorKg ? "sm:grid-cols-[1.2fr_80px_1.5fr_auto]" : "sm:grid-cols-[1.2fr_80px_1.5fr_90px_auto]");
 
   return (
     <div className="min-h-screen text-stone-900 dark:text-stone-100 p-4 sm:p-6 space-y-6">
@@ -972,8 +1029,35 @@ export default function ComandasPage() {
                 </div>
                 <FieldInput label="Dirección" value={formData.direccion} onChange={(v) => setFormData({ ...formData, direccion: v })} placeholder="Dirección de retiro / entrega" />
                 {nuevoCliente && <ConfirmacionCuentaCliente marcada={clienteInformado} onChange={setClienteInformado} disabled={isSubmitting} />}
-                {/* Servicio y peso de la comanda: base de la estimación de insumos */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Modalidad de cobro: por prendas (cantidad × precio) o por kg (peso × $/kg) */}
+                <div className="space-y-1.5">
+                  <span id="modalidad-cobro" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Cobro</span>
+                  <div role="radiogroup" aria-labelledby="modalidad-cobro" className="grid grid-cols-2 gap-1 rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-white/10 dark:bg-stone-800">
+                    {([["PRENDA", "Por prendas"], ["KILO", "Por kg"]] as const).map(([valor, etiqueta]) => (
+                      <button
+                        key={valor}
+                        type="button"
+                        role="radio"
+                        aria-checked={formData.modalidad === valor}
+                        onClick={() => {
+                          const servicio = catData?.tipoServicios.find((s) => s.nombre === formData.servicio);
+                          setFormData({
+                            ...formData,
+                            modalidad: valor,
+                            precioKg: formData.precioKg || (servicio?.precioKg ? String(servicio.precioKg) : ""),
+                          });
+                        }}
+                        className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${formData.modalidad === valor
+                          ? "bg-white text-brand-600 shadow-sm dark:bg-stone-900 dark:text-brand-400"
+                          : "text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"}`}
+                      >
+                        {etiqueta}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Servicio y peso de la comanda: base del cobro por kg y de la estimación de insumos */}
+                <div className={`grid grid-cols-1 gap-3 ${formPorKg ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Servicio</label>
                     <GlassSelect
@@ -981,10 +1065,12 @@ export default function ComandasPage() {
                       onChange={(v) => {
                         const anterior = catData?.tipoServicios.find((s) => s.nombre === formData.servicio);
                         const nuevo = catData?.tipoServicios.find((s) => s.nombre === v);
+                        // Solo cambia los precios que seguían el valor base del servicio anterior.
+                        const precioKgAnterior = anterior?.precioKg ? String(anterior.precioKg) : "";
                         setFormData({
                           ...formData,
                           servicio: v,
-                          // Solo cambia los precios que seguían el valor base del servicio anterior.
+                          precioKg: nuevo?.precioKg && (!formData.precioKg || formData.precioKg === precioKgAnterior) ? String(nuevo.precioKg) : formData.precioKg,
                           detalle: formData.detalle.map((linea) => ({
                             ...linea,
                             servicio: v,
@@ -1002,14 +1088,26 @@ export default function ComandasPage() {
                     value={formData.pesoKg}
                     onChange={(v) => setFormData({ ...formData, pesoKg: v })}
                     placeholder="Ej: 12,5"
-                    hint={formData.pesoKg && leerPesoKg(formData.pesoKg) === null ? "Ingresa un peso mayor que 0 y hasta 10.000 kg" : "Obligatorio. Peso de toda la ropa recibida."}
-                    valid={formData.pesoKg ? leerPesoKg(formData.pesoKg) !== null : undefined}
+                    hint={formData.pesoKg && formPeso === null ? "Ingresa un peso mayor que 0 y hasta 10.000 kg" : formPorKg ? "Obligatorio. Es la base del cobro." : "Obligatorio. Peso de toda la ropa recibida."}
+                    valid={formData.pesoKg ? formPeso !== null : undefined}
                   />
+                  {formPorKg && (
+                    <FieldInput
+                      label="Precio por kg"
+                      value={formData.precioKg}
+                      onChange={(v) => setFormData({ ...formData, precioKg: v })}
+                      placeholder="Ej: 2.500"
+                      hint={formData.precioKg && formPrecioKg === null ? "Ingresa un precio mayor que 0" : "Sugerido según el servicio; puedes ajustarlo."}
+                      valid={formData.precioKg ? formPrecioKg !== null : undefined}
+                    />
+                  )}
                 </div>
                 {/* Detalle lines */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Prendas</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                      {formPorKg ? "Prendas (opcional)" : "Prendas"}
+                    </label>
                     <button
                       onClick={() => {
                         const servicio = catData?.tipoServicios.find((s) => s.nombre === formData.servicio) ?? catData?.tipoServicios[0];
@@ -1021,31 +1119,50 @@ export default function ComandasPage() {
                       <Plus className="w-3.5 h-3.5" /> Agregar
                     </button>
                   </div>
-                  <div className={`hidden px-2 text-[9px] font-extrabold uppercase tracking-wider text-stone-400 sm:grid sm:gap-2 ${formData.tipoCliente === TipoCliente.HOTEL ? "sm:grid-cols-[1.4fr_80px_80px_80px_1.2fr_90px_auto]" : "sm:grid-cols-[1.2fr_80px_1.5fr_90px_auto]"}`}>
-                    {formData.tipoCliente === TipoCliente.HOTEL ? (
-                      <><span>Prenda</span><span>Entregado</span><span>Recibido</span><span>Pendiente</span><span>Observación</span><span>Precio</span><span /></>
-                    ) : (
-                      <><span>Prenda</span><span>Cantidad</span><span>Detalle</span><span>Precio</span><span /></>
-                    )}
-                  </div>
+                  {formPorKg && (
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                      Se cobra el peso total. Detallar las prendas es opcional; sin detalle se registra como {PRENDA_POR_KILO}.
+                    </p>
+                  )}
+                  {formData.detalle.length > 0 && (
+                    <div className={`hidden px-2 text-[9px] font-extrabold uppercase tracking-wider text-stone-400 sm:grid sm:gap-2 ${columnasLinea}`}>
+                      <span>Prenda</span>
+                      {formData.tipoCliente === TipoCliente.HOTEL
+                        ? <><span>Entregado</span><span>Recibido</span><span>Pendiente</span><span>Observación</span></>
+                        : <><span>Cantidad</span><span>Detalle</span></>}
+                      {!formPorKg && <span>Precio</span>}
+                      <span />
+                    </div>
+                  )}
                   {formData.detalle.map((d, i) => (
-                    <div key={i} className={`grid grid-cols-1 gap-2 rounded-xl border border-stone-200 p-2 sm:items-center dark:border-white/10 ${formData.tipoCliente === TipoCliente.HOTEL ? "sm:grid-cols-[1.4fr_80px_80px_80px_1.2fr_90px_auto]" : "sm:grid-cols-[1.2fr_80px_1.5fr_90px_auto]"}`}>
-                      <GlassSelect value={d.tipoPrenda} onChange={(v) => updateLinea(i, { tipoPrenda: v })} ariaLabel="Tipo de prenda" options={(formData.tipoCliente === TipoCliente.HOTEL ? PRENDAS_HOTEL : PRENDAS_FORMULARIO).map((nombre) => ({ value: nombre, label: nombre }))} />
-                      <input type="number" min={1} value={d.cantidad} onChange={(e) => updateLinea(i, { cantidad: Math.max(1, +e.target.value) })} className="w-14 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
+                    <div key={i} className={`grid grid-cols-1 gap-2 rounded-xl border border-stone-200 p-2 sm:items-center dark:border-white/10 ${columnasLinea}`}>
+                      <GlassSelect
+                        value={d.tipoPrenda}
+                        onChange={(v) => updateLinea(i, { tipoPrenda: v })}
+                        ariaLabel="Tipo de prenda"
+                        options={opcionesPrenda}
+                        nuevaOpcion={{ placeholder: "Escribir otra prenda…", normalizar: normalizarPrendaNueva }}
+                      />
+                      <input type="number" min={1} value={d.cantidad} aria-label="Cantidad" onChange={(e) => updateLinea(i, { cantidad: Math.max(1, +e.target.value) })} className="w-14 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
                       {formData.tipoCliente === TipoCliente.HOTEL && <>
                         <input type="number" min={0} max={d.cantidad} value={d.recibido} onChange={(e) => updateLinea(i, { recibido: Math.min(d.cantidad, Math.max(0, +e.target.value)) })} aria-label="Cantidad recibida" className="w-16 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
                         <output aria-label="Cantidad pendiente" className="w-16 px-2 py-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs text-center font-bold">{Math.max(0, d.cantidad - d.recibido)}</output>
                       </>}
                       <input value={d.detalle} onChange={(e) => updateLinea(i, { detalle: e.target.value })} placeholder="Detalle de la prenda" className="min-w-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-800 focus:border-brand-500 focus:outline-none dark:border-white/10 dark:bg-stone-800 dark:text-stone-200" />
-                      <input type="number" min={0} step={100} value={d.precioUnitario} onChange={(e) => updateLinea(i, { precioUnitario: Math.max(0, +e.target.value) })} className="w-20 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
-                      {formData.detalle.length > 1 && (
-                        <button onClick={() => setFormData({ ...formData, detalle: formData.detalle.filter((_, idx) => idx !== i) })} className="p-1.5 text-stone-400 hover:text-red-500 cursor-pointer">
+                      {!formPorKg && (
+                        <input type="number" min={0} step={100} value={d.precioUnitario} aria-label="Precio por prenda" onChange={(e) => updateLinea(i, { precioUnitario: Math.max(0, +e.target.value) })} className="w-20 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
+                      )}
+                      {(formPorKg || formData.detalle.length > 1) && (
+                        <button onClick={() => setFormData({ ...formData, detalle: formData.detalle.filter((_, idx) => idx !== i) })} aria-label="Quitar prenda" className="p-1.5 text-stone-400 hover:text-red-500 cursor-pointer">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
                   ))}
                   <p className="text-right text-xs font-bold text-stone-500 dark:text-stone-400">
+                    {formPorKg && formPeso !== null && formPrecioKg !== null && (
+                      <span className="mr-2 font-semibold">{formPeso.toLocaleString("es-CL")} kg × {clp(formPrecioKg)}/kg =</span>
+                    )}
                     Total: <span className="text-brand-600 dark:text-brand-400">{clp(formTotal)}</span>
                   </p>
                 </div>

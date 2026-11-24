@@ -7,9 +7,13 @@ mutation CrearComandaConFlujo(
   $empresa: String
   $proyecto: String
   $observaciones: String
+  # KILO: cada línea lleva su parte del peso, precioUnitario = $precioKg y
+  # subtotal = peso × precio (redondeado al peso más cercano).
+  $modalidadCobro: UnidadCobro! = PRENDA
+  $precioKg: Float
   $detalles: [ComandaDetalle_Data!]! @allow(fields: "tipoPrendaId tipoServicioId cantidad detalle pesoKg precioUnitario subtotal", maxCount: 100)
 ) @auth(level: USER) @transaction {
-  query @redact @check(expr: "vars.numeroComanda.matches('^[A-Za-z0-9-]{1,20}$') && (!vars.numeroComanda.upperAscii().startsWith('ELCOBRE-') || (vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]{4}$') && vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]*[A-Z][A-Z0-9]*$') && vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]*[0-9][A-Z0-9]*$'))) && vars.detalles.size() > 0 && vars.detalles.all(d, has(d.tipoPrendaId) && d.tipoPrendaId != null && has(d.tipoServicioId) && d.tipoServicioId != null && has(d.cantidad) && d.cantidad != null && d.cantidad > 0 && has(d.precioUnitario) && d.precioUnitario != null && d.precioUnitario >= 0 && has(d.subtotal) && d.subtotal != null && d.subtotal >= 0 && d.subtotal == double(d.cantidad) * d.precioUnitario && (!has(d.pesoKg) || d.pesoKg == null || (d.pesoKg > 0.0 && d.pesoKg <= 10000.0)))", message: "Las prendas, cantidades, montos o pesos son inválidos") {
+  query @redact @check(expr: "vars.numeroComanda.matches('^[A-Za-z0-9-]{1,20}$') && (!vars.numeroComanda.upperAscii().startsWith('ELCOBRE-') || (vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]{4}$') && vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]*[A-Z][A-Z0-9]*$') && vars.numeroComanda.upperAscii().matches('^ELCOBRE-[A-Z0-9]*[0-9][A-Z0-9]*$'))) && vars.detalles.size() > 0 && vars.detalles.all(d, has(d.tipoPrendaId) && d.tipoPrendaId != null && has(d.tipoServicioId) && d.tipoServicioId != null && has(d.cantidad) && d.cantidad != null && d.cantidad > 0 && has(d.precioUnitario) && d.precioUnitario != null && d.precioUnitario >= 0 && has(d.subtotal) && d.subtotal != null && d.subtotal >= 0 && (!has(d.pesoKg) || d.pesoKg == null || (d.pesoKg > 0.0 && d.pesoKg <= 10000.0)) && (vars.modalidadCobro == 'KILO' ? (has(d.pesoKg) && d.pesoKg != null && d.precioUnitario == vars.precioKg && d.subtotal >= d.pesoKg * d.precioUnitario - 1.0 && d.subtotal <= d.pesoKg * d.precioUnitario + 1.0) : d.subtotal == double(d.cantidad) * d.precioUnitario)) && (vars.modalidadCobro != 'KILO' || (has(vars.precioKg) && vars.precioKg != null && vars.precioKg > 0.0 && vars.precioKg <= 1000000.0))", message: "Las prendas, cantidades, montos, pesos o el precio por kg son inválidos") {
     usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this in ['admin', 'recepcionista']", message: "No autorizado para gestionar comandas") }
@@ -29,6 +33,8 @@ mutation CrearComandaConFlujo(
     empresa: $empresa
     proyecto: $proyecto
     observaciones: $observaciones
+    modalidadCobro: $modalidadCobro
+    precioKg: $precioKg
     recepcionistaId_expr: "auth.uid"
     estado: PENDIENTE
     comandaDetalles_on_comanda: $detalles
@@ -100,9 +106,11 @@ mutation EditarComandaConDetalles(
   $empresa: String
   $proyecto: String
   $observaciones: String
+  $modalidadCobro: UnidadCobro! = PRENDA
+  $precioKg: Float
   $detalles: [ComandaDetalle_Data!]! @allow(fields: "comandaId tipoPrendaId tipoServicioId cantidad detalle pesoKg precioUnitario subtotal", maxCount: 100)
 ) @auth(level: USER) @transaction {
-  query @redact @check(expr: "vars.detalles.size() > 0 && vars.detalles.all(d, has(d.comandaId) && d.comandaId == vars.id && has(d.tipoPrendaId) && d.tipoPrendaId != null && has(d.tipoServicioId) && d.tipoServicioId != null && has(d.cantidad) && d.cantidad != null && d.cantidad > 0 && has(d.precioUnitario) && d.precioUnitario != null && d.precioUnitario >= 0 && has(d.subtotal) && d.subtotal != null && d.subtotal >= 0 && d.subtotal == double(d.cantidad) * d.precioUnitario && (!has(d.pesoKg) || d.pesoKg == null || (d.pesoKg > 0.0 && d.pesoKg <= 10000.0)))", message: "Las prendas, cantidades, montos o pesos son inválidos") {
+  query @redact @check(expr: "vars.detalles.size() > 0 && vars.detalles.all(d, has(d.comandaId) && d.comandaId == vars.id && has(d.tipoPrendaId) && d.tipoPrendaId != null && has(d.tipoServicioId) && d.tipoServicioId != null && has(d.cantidad) && d.cantidad != null && d.cantidad > 0 && has(d.precioUnitario) && d.precioUnitario != null && d.precioUnitario >= 0 && has(d.subtotal) && d.subtotal != null && d.subtotal >= 0 && (!has(d.pesoKg) || d.pesoKg == null || (d.pesoKg > 0.0 && d.pesoKg <= 10000.0)) && (vars.modalidadCobro == 'KILO' ? (has(d.pesoKg) && d.pesoKg != null && d.precioUnitario == vars.precioKg && d.subtotal >= d.pesoKg * d.precioUnitario - 1.0 && d.subtotal <= d.pesoKg * d.precioUnitario + 1.0) : d.subtotal == double(d.cantidad) * d.precioUnitario)) && (vars.modalidadCobro != 'KILO' || (has(vars.precioKg) && vars.precioKg != null && vars.precioKg > 0.0 && vars.precioKg <= 1000000.0))", message: "Las prendas, cantidades, montos, pesos o el precio por kg son inválidos") {
     usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this in ['admin', 'recepcionista']", message: "No autorizado para editar comandas") }
@@ -118,7 +126,7 @@ mutation EditarComandaConDetalles(
   }
   bloqueo: comanda_update(
     first: { where: { id: { eq: $id }, estado: { eq: PENDIENTE }, actualizadoEn: { eq: $version } } }
-    data: { actualizadoEn_expr: "request.time", empresa: $empresa, proyecto: $proyecto, observaciones: $observaciones }
+    data: { actualizadoEn_expr: "request.time", empresa: $empresa, proyecto: $proyecto, observaciones: $observaciones, modalidadCobro: $modalidadCobro, precioKg: $precioKg }
   ) @check(expr: "this != null", message: "La comanda cambió o ya no está pendiente. Actualiza antes de editar")
   comandaDetalle_deleteMany(where: { comandaId: { eq: $id } })
   comandaDetalle_insertMany(data: $detalles)

@@ -31,7 +31,7 @@ const etapaIds = [
 ];
 const detail = { tipoPrendaId: "00000000-0000-4000-8000-000000000011", tipoServicioId: "00000000-0000-4000-8000-000000000012", cantidad: 2, precioUnitario: 1000, subtotal: 2000 };
 function variables() { const id = randomUUID(); return { id, numeroComanda: "TEST-" + id.slice(0, 8), clienteId, detalles: [{ ...detail }] }; }
-const read = (id) => execute(`query Inspect($id:UUID!) { comanda(id:$id) { id codigoQr estado valorTotal recepcionistaId fechaEntregaReal actualizadoEn empresa proyecto observaciones
+const read = (id) => execute(`query Inspect($id:UUID!) { comanda(id:$id) { id codigoQr estado valorTotal modalidadCobro precioKg recepcionistaId fechaEntregaReal actualizadoEn empresa proyecto observaciones
   comandaDetalles_on_comanda { cantidad subtotal }
   comandaEtapas_on_comanda(orderBy:[{ordenEtapa:ASC}]) { etapaId estado nombreEtapa ordenEtapa descripcionEtapa tiempoEstimadoMin fechaInicio fechaCompletado operarioId }
   comandaHistorialEstados_on_comanda { estadoNuevo usuarioId }
@@ -121,6 +121,33 @@ for (const [name, detalles] of [
   ["prenda inexistente", [{ ...detail, tipoPrendaId: randomUUID() }]],
 ]) await check("rollback: " + name, async () => {
   const v = { ...variables(), detalles }; await assert.rejects(execute(mutation, "CrearComandaConFlujo", v, "test-admin")); assert.equal(await read(v.id), null);
+});
+const lineaKg = { ...detail, cantidad: 2, pesoKg: 3.33, precioUnitario: 2500, subtotal: 8325 };
+const variablesKg = (extra = {}) => ({ ...variables(), modalidadCobro: "KILO", precioKg: 2500, detalles: [{ ...lineaKg }], ...extra });
+await check("comanda por kg: cobra el peso por el precio por kg y lo guarda", async () => {
+  const v = variablesKg();
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  const c = await read(v.id);
+  assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.precioKg, 2500); assert.equal(c.valorTotal, 8325);
+  assert.equal(c.comandaEtapas_on_comanda.length, 5);
+  // Por prendas sigue siendo la modalidad por omisión.
+  assert.equal((await read(good.id)).modalidadCobro, "PRENDA");
+});
+for (const [name, extra] of [
+  ["por kg sin precio por kg", { precioKg: undefined }],
+  ["por kg con precio 0", { precioKg: 0 }],
+  ["por kg con línea sin peso", { detalles: [{ ...lineaKg, pesoKg: undefined }] }],
+  ["por kg con precio de línea distinto", { detalles: [{ ...lineaKg, precioUnitario: 2000 }] }],
+  ["por kg con subtotal adulterado", { detalles: [{ ...lineaKg, subtotal: 5000 }] }],
+  ["por prendas con subtotal calculado por kg", { modalidadCobro: "PRENDA" }],
+]) await check("rollback: " + name, async () => {
+  const v = variablesKg(extra); await assert.rejects(execute(mutation, "CrearComandaConFlujo", v, "test-admin")); assert.equal(await read(v.id), null);
+});
+await check("una prenda escrita a mano se guarda en mayúsculas", async () => {
+  const id = (await execute(legacy, "CrearTipoPrenda", { nombre: "overol termico" }, "test-recepcion")).tipoPrenda_insert.id;
+  const prenda = (await execute(`query P($id: UUID!) { tipoPrenda(id: $id) { nombre } }`, "P", { id })).tipoPrenda;
+  assert.equal(prenda.nombre, "OVEROL TERMICO");
+  await assert.rejects(execute(legacy, "CrearTipoPrenda", { nombre: "x" }, "test-recepcion"));
 });
 await check("configuración solo admin y snapshot estable", async () => {
   const config = { id:"00000000-0000-4000-8000-000000000021", nombre:"Lavado industrial", descripcion:"Nueva descripción", tiempoEstimadoMin:45 };
@@ -256,6 +283,14 @@ await check("edición atómica preserva prendas y monto si falla una clave forá
   const iniciada = await read(v.id);
   await assert.rejects(execute(mutation, "EditarComandaConDetalles", { ...cambios, version: iniciada.actualizadoEn }, "test-recepcion"));
   assert.deepEqual(await read(v.id), iniciada);
+});
+await check("editar una comanda la puede pasar a cobro por kg y recalcula el total", async () => {
+  const v = variables();
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  const anterior = await read(v.id);
+  await execute(mutation, "EditarComandaConDetalles", { id: v.id, version: anterior.actualizadoEn, modalidadCobro: "KILO", precioKg: 2500, detalles: [{ ...lineaKg, comandaId: v.id }] }, "test-recepcion");
+  const c = await read(v.id);
+  assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.precioKg, 2500); assert.equal(c.valorTotal, 8325);
 });
 await check("dos editores simultáneos no mezclan las prendas ni pierden cambios confirmados", async () => {
   const v = variables();
