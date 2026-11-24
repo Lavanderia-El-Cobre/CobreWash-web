@@ -75,10 +75,12 @@ export async function consultarReporte(
   vista: VistaReporte,
   filtros: FiltrosReporte,
 ) {
+  // Un filtro vacío se omite: Data Connect traduce `eq: null` a `IS NULL`,
+  // así que enviar null dejaría el reporte sin comandas.
   const variables = {
     ...rangoConsulta(filtros.desde, filtros.hasta),
-    clienteId: filtros.clienteId || null,
-    empresa: filtros.empresa || null,
+    clienteId: filtros.clienteId || undefined,
+    empresa: filtros.empresa || undefined,
     limit: TAMANO_PAGINA,
   };
   if (vista === "volumen") {
@@ -124,7 +126,7 @@ export async function consultarReporte(
     return totales(volumenPorCuenta(detalle), detalle);
   }
   if (vista === "servicio") {
-    const vars = { ...variables, servicioId: filtros.servicioId || null };
+    const vars = { ...variables, servicioId: filtros.servicioId || undefined };
     const [servicios, detalles] = await Promise.all([
       todasLasPaginas(
         async (offset) =>

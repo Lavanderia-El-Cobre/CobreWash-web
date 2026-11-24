@@ -28,3 +28,11 @@ it.each([null, { id: "ajeno", activo: true, rol: { nombre: "cliente" } }, { id: 
   m.query.mockResolvedValue({ data: { usuario: perfil } });
   const r = await GET(request()); expect(r.status).toBe(403); expect(await r.text()).not.toContain('"perfil"');
 });
+it("informa una falla de credenciales del servidor sin culpar a la sesión", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  m.verify.mockRejectedValueOnce(Object.assign(new Error("sin ADC"), { code: "app/invalid-credential" }));
+  const r = await GET(request());
+  expect(r.status).toBe(503);
+  expect(await r.text()).not.toContain("venció");
+  expect(m.query).not.toHaveBeenCalled();
+});
