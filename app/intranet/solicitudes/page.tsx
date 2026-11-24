@@ -4,6 +4,7 @@ import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { dataConnect } from "@/lib/firebase/client";
 import { actualizarEstadoSolicitudContacto, getSolicitudesContacto, SolicitudContactoEstado, type GetSolicitudesContactoData } from "@/src/dataconnect-generated";
 import { fechaSeguimiento } from "@/lib/seguimiento/publico";
+import { TAMANO_BANDEJA, variablesBandeja } from "@/lib/solicitudes/bandeja";
 
 const etiquetas: Record<SolicitudContactoEstado, string> = { RECIBIDA: "Recibida", EN_REVISION: "En revisión", ATENDIDA: "Atendida" };
 export default function SolicitudesPage() {
@@ -20,7 +21,7 @@ export default function SolicitudesPage() {
     const solicitud = ++version.current;
     setCargando(true); setError("");
     try {
-      const result = await getSolicitudesContacto(dataConnect, { estado, offset: pagina * 20, limit: 20 }, { fetchPolicy: "SERVER_ONLY" });
+      const result = await getSolicitudesContacto(dataConnect, variablesBandeja(estado, pagina),{ fetchPolicy: "SERVER_ONLY" });
       if (solicitud === version.current) setDatos(result.data);
     } catch { if (solicitud === version.current) setError("No se pudo cargar la bandeja. Intenta nuevamente."); }
     finally { if (solicitud === version.current) setCargando(false); }
@@ -46,6 +47,6 @@ export default function SolicitudesPage() {
         finally { setGuardando(null); }
       }}>{Object.entries(etiquetas).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </article>)}</div>
-    <nav aria-label="Páginas de solicitudes" className="flex gap-4 text-sm"><button disabled={cargando || pagina === 0} onClick={() => setPagina(p => p - 1)}>Anterior</button><span>Página {pagina + 1}</span><button disabled={cargando || (pagina + 1) * 20 >= total} onClick={() => setPagina(p => p + 1)}>Siguiente</button></nav>
+    <nav aria-label="Páginas de solicitudes" className="flex gap-4 text-sm"><button disabled={cargando || pagina === 0} onClick={() => setPagina(p => p - 1)}>Anterior</button><span>Página {pagina + 1}</span><button disabled={cargando || (pagina + 1) * TAMANO_BANDEJA >= total} onClick={() => setPagina(p => p + 1)}>Siguiente</button></nav>
   </main>;
 }
