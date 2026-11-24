@@ -2,11 +2,14 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, History, Loader2, RefreshCw, Search, Settings, UserRoundPen, X } from "lucide-react";
+import { AlertTriangle, History, Loader2, RefreshCw, Search, Settings, UserRoundPen } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import FlujoProduccion from "@/components/intranet/FlujoProduccion";
+import EncabezadoSeccion, { BOTON_ENCABEZADO, BOTON_ENCABEZADO_SECUNDARIO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
+import GlassSelect from "@/components/ui/GlassSelect";
 import AsignarOperarioModal, { type AsignacionOperario } from "@/components/intranet/AsignarOperarioModal";
 import { useAlertasRetraso } from "@/components/intranet/AlertasRetraso";
 import { limiteEtapaMin } from "@/lib/produccion/limites";
@@ -154,24 +157,26 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
   const total = data?.total[0]?._count ?? 0;
   const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-4">
-      <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Operaciones</p><h1 className="font-display text-2xl font-extrabold">Seguimiento de Producción</h1><p className="mt-1 text-sm text-stone-500">{total} comandas pendientes, en proceso o listas para entregar</p></div>
-      <div className="flex gap-2">
-        {admin && <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setConfiguracion(!configuracion)} className="flex items-center gap-2 rounded-xl bg-stone-100 px-4 py-2.5 text-sm font-bold text-stone-700 transition-all hover:bg-stone-200 dark:bg-white/5 dark:text-stone-200 dark:hover:bg-white/10"><Settings className="h-4 w-4" />Configurar etapas</motion.button>}
-        <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => void cargar()} disabled={loading} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Actualizar</motion.button>
-      </div>
-    </motion.div>
+    <EncabezadoSeccion
+      antetitulo="Operaciones · Producción en curso"
+      titulo="Seguimiento de Producción"
+      descripcion={`${total} comandas pendientes, en proceso o listas para entregar`}
+      acciones={<>
+        {admin && <button onClick={() => setConfiguracion(!configuracion)} aria-expanded={configuracion} className={BOTON_ENCABEZADO_SECUNDARIO}><Settings className="h-4 w-4" />Configurar etapas</button>}
+        <button onClick={() => void cargar()} disabled={loading} className={BOTON_ENCABEZADO}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Actualizar</button>
+      </>}
+    />
     <AnimatePresence mode="popLayout">
       {error && <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{error}</motion.div>}
       {notice && <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">{notice}</motion.div>}
     </AnimatePresence>
     {!loading && catalogo.length !== 5 && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">Falta configurar el catálogo de las cinco etapas de producción. Contacta a administración.</p>}
-    {admin && configuracion && <section className="space-y-3 rounded-2xl border border-stone-200 p-5 dark:border-white/10">
+    {admin && configuracion && <motion.section initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="glass-panel space-y-3 rounded-2xl p-5">
       <h2 className="font-bold">Etapas del flujo</h2>
       <p className="text-sm text-stone-500">La secuencia es Recepción, Lavado, Secado, Planchado y Entrega. Puedes ajustar sus nombres, descripciones y tiempos. Las comandas asociadas conservan su configuración.</p>
       <Link href="/intranet/configuracion" className="inline-block text-sm font-bold text-brand-600 dark:text-brand-400">Los límites automáticos se ajustan en Configuración → Límites de etapas.</Link>
       {catalogo.map((etapa) => <div key={etapa.id} className="flex items-center justify-between gap-3 rounded-xl bg-stone-50 p-3 dark:bg-white/5"><span className="text-sm">{etapa.orden}. {etapa.nombre}<span className="ml-2 text-xs text-stone-500">{limiteEtapaMin(etapa.orden, etapa.tiempoEstimadoMin)} min</span></span><button onClick={() => { setError(""); setEditar({ ...etapa, tiempoEstimadoMin: limiteEtapaMin(etapa.orden, etapa.tiempoEstimadoMin) }); }} className="text-sm font-bold text-brand-600 dark:text-brand-400">Editar</button></div>)}
-    </section>}
+    </motion.section>}
     <label className="relative block max-w-md"><span className="sr-only">Buscar comanda o cliente</span><Search className="absolute left-3 top-3 h-4 w-4 text-stone-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar comanda o cliente..." className="w-full rounded-2xl border border-stone-200/70 bg-white/70 py-2.5 pl-9 pr-3 text-sm backdrop-blur-sm transition-colors focus:border-brand-500/40 focus:outline-none dark:border-white/5 dark:bg-white/5" /></label>
     {loading ? <div role="status" className="flex justify-center gap-2 py-12"><Loader2 className="h-5 w-5 animate-spin" />Cargando producción...</div> : <div className="space-y-3">
       {data?.comandas.map((c, index) => {
@@ -203,41 +208,47 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
     <div className="flex items-center justify-between gap-4 text-sm"><span>{total} resultados · Página {page} de {paginas}</span><div className="flex gap-2"><button disabled={loading || page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Anterior</button><button disabled={loading || page >= paginas} onClick={() => setPage(page + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Siguiente</button></div></div>
     <AnimatePresence>
       {incidencia && puedeReportarIncidencia && (
-        <div role="dialog" aria-modal="true" aria-labelledby="titulo-incidencia" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIncidencia(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-          <motion.form initial={{ scale: 0.95, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 16 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} onSubmit={guardarIncidencia} className="glass-modal relative z-10 w-full max-w-lg space-y-5 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl dark:bg-stone-900 border border-stone-200/80 dark:border-white/10">
-        <button type="button" onClick={() => setIncidencia(null)} aria-label="Cerrar incidencia" className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 dark:bg-white/5"><X className="h-4 w-4" /></button>
-        <div className="flex items-start gap-3 pr-12"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400"><AlertTriangle className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-600 dark:text-red-400">Incidencia de producción</p><h2 id="titulo-incidencia" className="font-display text-xl font-extrabold">Reportar problema</h2></div></div>
+        <ModalIntranet
+          key="incidencia"
+          onCerrar={() => setIncidencia(null)}
+          onSubmit={guardarIncidencia}
+          icono={AlertTriangle}
+          tono="peligro"
+          etiqueta="Incidencia de producción"
+          titulo="Reportar problema"
+          idTitulo="titulo-incidencia"
+          etiquetaCerrar="Cerrar incidencia"
+          claseCuerpo="space-y-5"
+          pie={<><button type="button" onClick={() => setIncidencia(null)} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button><button disabled={busy != null} className={BOTON_MODAL_PRIMARIO}>{busy === incidencia.id && <Loader2 className="h-4 w-4 animate-spin" />}Registrar incidencia</button></>}
+        >
         <div className="grid gap-3 rounded-2xl bg-stone-50 p-4 text-sm sm:grid-cols-2 dark:bg-white/5"><div><p className="text-xs text-stone-400">Comanda</p><p className="font-bold text-brand-600 dark:text-brand-400">{incidencia.numero}</p></div><div><p className="text-xs text-stone-400">Cliente</p><p className="font-semibold">{incidencia.cliente}</p></div></div>
-        <label className="block text-sm font-semibold">Motivo <span className="text-red-500">*</span><select required value={motivoIncidencia} onChange={(event) => setMotivoIncidencia(event.target.value as MotivoIncidencia)} className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-stone-950">{MOTIVOS_INCIDENCIA.map((motivo) => <option key={motivo} value={motivo}>{motivo}</option>)}</select></label>
+        <div className="space-y-2 text-sm font-semibold"><p>Motivo <span className="text-red-500">*</span></p><GlassSelect ariaLabel="Motivo" value={motivoIncidencia} onChange={(valor) => setMotivoIncidencia(valor as MotivoIncidencia)} options={MOTIVOS_INCIDENCIA.map((motivo) => ({ value: motivo, label: motivo }))} /></div>
         <label className="block text-sm font-semibold">Descripción <span className="font-normal text-stone-400">(opcional)</span><textarea value={descripcionIncidencia} onChange={(event) => setDescripcionIncidencia(event.target.value)} maxLength={300} rows={4} placeholder="Describe qué ocurrió, cuántas prendas afecta o qué acción realizaste..." className="mt-2 w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-stone-950" /><span className="mt-1 block text-right text-[10px] text-stone-400">{descripcionIncidencia.length}/300</span></label>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">La incidencia quedará abierta para seguimiento de administración o recepción.</div>
-        <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setIncidencia(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors">Cancelar</button><button disabled={busy != null} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50">{busy === incidencia.id && <Loader2 className="h-4 w-4 animate-spin" />}Registrar incidencia</button></div>
-          </motion.form>
-        </div>
+        </ModalIntranet>
       )}
       {editar && admin && (
-        <div role="dialog" aria-modal="true" aria-labelledby="titulo-etapa" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !busy && setEditar(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-          <motion.form initial={{ scale: 0.95, opacity: 0, y: 16 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 16 }} transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} onSubmit={guardarEtapa} className="glass-modal relative z-10 w-full max-w-lg space-y-5 rounded-3xl bg-white p-6 sm:p-7 shadow-2xl dark:bg-stone-900 border border-stone-200/80 dark:border-white/10">
-        <button type="button" disabled={busy != null} onClick={() => setEditar(null)} aria-label="Cerrar configuración" className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors"><X className="h-4 w-4" /></button>
-        <div className="flex items-start gap-3.5 pr-12">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><Settings className="h-6 w-6" /></span>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Configuración de catálogo</p>
-            <h2 id="titulo-etapa" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">Configurar etapa {editar.orden}</h2>
-          </div>
-        </div>
+        <ModalIntranet
+          key="etapa"
+          onCerrar={() => setEditar(null)}
+          bloqueado={busy != null}
+          onSubmit={guardarEtapa}
+          icono={Settings}
+          etiqueta="Configuración de catálogo"
+          titulo={`Configurar etapa ${editar.orden}`}
+          idTitulo="titulo-etapa"
+          etiquetaCerrar="Cerrar configuración"
+          claseCuerpo="space-y-5"
+          pie={<><button type="button" disabled={busy != null} onClick={() => setEditar(null)} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button><button disabled={busy != null || !editar.nombre.trim()} className={BOTON_MODAL_PRIMARIO}>{busy === editar.id && <Loader2 className="h-4 w-4 animate-spin" />}{busy === editar.id ? "Guardando..." : "Guardar configuración"}</button></>}
+        >
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <label className="block text-sm">Nombre<input required maxLength={40} value={editar.nombre} onChange={(e) => setEditar({ ...editar, nombre: e.target.value })} className={inputStyle} /></label>
         <label className="block text-sm">Descripción<textarea maxLength={200} value={editar.descripcion ?? ""} onChange={(e) => setEditar({ ...editar, descripcion: e.target.value })} className={inputStyle} /></label>
         <label className="block text-sm">Tiempo esperado (minutos)<input required type="number" min={1} max={43200} step={1} value={editar.tiempoEstimadoMin ?? ""} onChange={(e) => setEditar({ ...editar, tiempoEstimadoMin: e.target.value === "" ? null : Number(e.target.value) })} className={inputStyle} /></label>
         <div className="rounded-xl border border-stone-200/70 bg-stone-50/70 p-3.5 text-xs text-stone-500 dark:border-white/5 dark:bg-white/5">Los cambios se aplicarán a las nuevas comandas que inicien su flujo.</div>
-        <div className="flex justify-end gap-2 pt-2"><button type="button" disabled={busy != null} onClick={() => setEditar(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors">Cancelar</button><button disabled={busy != null || !editar.nombre.trim()} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50">{busy === editar.id && <Loader2 className="h-4 w-4 animate-spin" />}{busy === editar.id ? "Guardando..." : "Guardar configuración"}</button></div>
-          </motion.form>
-        </div>
+        </ModalIntranet>
       )}
-      {reasignacion && admin && <AsignarOperarioModal valor={reasignacion} operarios={data?.operarios ?? []} guardando={busy != null} error={error} onChange={setReasignacion} onSubmit={guardarReasignacion} onCerrar={() => !busy && setReasignacion(null)} />}
+      {reasignacion && admin && <AsignarOperarioModal key="reasignacion" valor={reasignacion} operarios={data?.operarios ?? []} guardando={busy != null} error={error} onChange={setReasignacion} onSubmit={guardarReasignacion} onCerrar={() => !busy && setReasignacion(null)} />}
     </AnimatePresence>
   </div>;
 }

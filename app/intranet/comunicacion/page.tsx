@@ -2,10 +2,12 @@
 
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Megaphone, Plus, X, Loader2, Clock } from "lucide-react";
+import { Megaphone, Plus, Loader2, Clock } from "lucide-react";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion, { BOTON_ENCABEZADO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
 import { publicarAviso } from "@/lib/avisos/publicar";
 import { useAvisos } from "@/lib/avisos/useAvisos";
 import { AVISOS_POR_PAGINA } from "@/lib/avisos/consultar";
@@ -15,7 +17,7 @@ import {
 } from "@/lib/avisos/modelo";
 
 export default function ComunicacionPage() {
-  const permitido = useRoleGuard(["admin", "operario", "recepcionista"]);
+  const permitido = useRoleGuard(["admin", "operario", "recepcionista", "repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();
   const esAdmin = usuario?.rol.nombre === "admin";
 
@@ -71,26 +73,20 @@ export default function ComunicacionPage() {
 
   return (
     <div className="min-h-screen text-stone-900 dark:text-stone-100 p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-extrabold text-stone-900 dark:text-white">
-            {esAdmin ? "Comunicación Interna" : "Avisos"}
-          </h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">
-            {esAdmin ? "Publica avisos para los equipos de la lavandería" : "Avisos generales y de tu equipo · solo lectura"}
-          </p>
-        </div>
-        {esAdmin && (
+      <EncabezadoSeccion
+        antetitulo={esAdmin ? "Equipo · Comunicación interna" : "Equipo · Avisos"}
+        titulo={esAdmin ? "Comunicación Interna" : "Avisos"}
+        descripcion={esAdmin ? "Publica avisos para los equipos de la lavandería" : "Avisos generales y de tu equipo · solo lectura"}
+        acciones={esAdmin && (
           <button
             onClick={() => { setErrorPublicacion(""); setMensaje(""); setNuevo(true); }}
-            className="flex items-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all self-start sm:self-auto cursor-pointer"
+            className={BOTON_ENCABEZADO}
           >
             <Plus className="w-4 h-4" />
             Publicar aviso
           </button>
         )}
-      </motion.div>
+      />
 
       {/* Avisos */}
       {mensaje && <p role="status" className="text-sm text-green-700 dark:text-green-400">{mensaje}</p>}
@@ -145,35 +141,30 @@ export default function ComunicacionPage() {
       {/* Publicar modal (solo admin) */}
       <AnimatePresence>
         {nuevo && esAdmin && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-publicar-aviso" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={cerrarModal} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel rounded-3xl p-6 sm:p-7 w-full max-w-lg relative z-10 shadow-2xl border border-stone-200/80 dark:border-white/10"
-            >
-              <button
-                onClick={cerrarModal}
-                disabled={guardando}
-                aria-label="Cerrar publicación de aviso"
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-start gap-3.5 mb-6 pr-8">
-                <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-400">
-                  <Megaphone className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Comunicación interna</p>
-                  <h3 id="titulo-publicar-aviso" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">Publicar aviso</h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Difunde novedades al equipo de la lavandería.</p>
-                </div>
-              </div>
-
+          <ModalIntranet
+            onCerrar={cerrarModal}
+            bloqueado={guardando}
+            icono={Megaphone}
+            etiqueta="Comunicación interna"
+            titulo="Publicar aviso"
+            subtitulo="Difunde novedades al equipo de la lavandería."
+            idTitulo="titulo-publicar-aviso"
+            etiquetaCerrar="Cerrar publicación de aviso"
+            pie={
+              <>
+                <button onClick={cerrarModal} disabled={guardando} className={BOTON_MODAL_SECUNDARIO}>
+                  Cancelar
+                </button>
+                <button
+                  onClick={publicar}
+                  disabled={guardando || !form.titulo.trim() || !form.contenido.trim()}
+                  className={BOTON_MODAL_PRIMARIO}
+                >
+                  {guardando ? "Publicando…" : "Publicar aviso"}
+                </button>
+              </>
+            }
+          >
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="aviso-titulo" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Título</label>
@@ -211,29 +202,13 @@ export default function ComunicacionPage() {
                       { value: "todos", label: "Todos los equipos" },
                       { value: "operario", label: "Solo Operarios" },
                       { value: "recepcionista", label: "Solo Recepción" },
+                      { value: "repartidor", label: "Solo Reparto" },
                     ]}
                   />
                 </div>
                 {errorPublicacion && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{errorPublicacion}</p>}
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={cerrarModal}
-                    disabled={guardando}
-                    className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={publicar}
-                    disabled={guardando || !form.titulo.trim() || !form.contenido.trim()}
-                    className="flex-1 bg-gradient-brand text-white py-2.5 px-5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {guardando ? "Publicando…" : "Publicar aviso"}
-                  </button>
-                </div>
               </div>
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
     </div>

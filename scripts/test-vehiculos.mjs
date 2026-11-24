@@ -295,8 +295,114 @@ await check("RF-VE04: consulta historial completo con inspecciones ANTES/DESPUES
   assert.equal(despues.fotos.length, 1);
 });
 
+// ===================== Sección del repartidor =====================
+// La web envía siempre los opcionales; la CEL de las mutaciones los compara con null.
+const SIN_OBS = { observaciones: null, observacionesInspeccion: null };
+const SIN_OBS_RETORNO = { observacionesRetorno: null, observacionesInspeccion: null };
+const crearVehiculo = async (p) =>
+  (await execute(mutations, "RegistrarVehiculoFlota", { patente: p, marca: "Hyundai", modelo: "H-100", anio: 2022, descripcion: null }, "test-admin")).vehiculo_insert.id;
+const sufijo = () => String(Math.floor(10 + Math.random() * 89));
+const vehiculoRepartoId = await crearVehiculo("RPTO-" + sufijo());
+const segundoVehiculoId = await crearVehiculo("RPTB-" + sufijo());
+let salidaRepartoId = "";
+let inspeccionRepartoId = "";
+
+await check("el panel de reparto solo lo abren repartidores activos y muestra disponibilidad y último kilometraje", async () => {
+  for (const user of [null, "test-admin", "test-recepcion", "test-operario", "test-cliente", "test-inactivo", "sin-perfil"]) {
+    await assert.rejects(execute(queries, "GetPanelRepartidor", {}, user), undefined, `Acceso indebido: ${user}`);
+  }
+  for (const user of ["test-repartidor", "test-conductor"]) {
+    const panel = await execute(queries, "GetPanelRepartidor", {}, user);
+    const vehiculo = panel.vehiculos.find((v) => v.id === vehiculoId);
+    assert.equal(vehiculo.enCurso.length, 0);
+    assert.equal(Math.max(...vehiculo.recientes.flatMap((s) => s.inspecciones.map((i) => i.kilometraje))), 15268.5);
+    assert(panel.misSalidas.every((s) => user === "test-repartidor" || s.id !== salidaId));
+  }
+  const propio = await execute(queries, "GetPanelRepartidor", {}, "test-repartidor");
+  assert.equal(propio.misSalidas.find((s) => s.id === salidaId).inspecciones.length, 2);
+  const ajeno = await execute(queries, "GetPanelRepartidor", {}, "test-conductor");
+  assert.equal(ajeno.misSalidas.find((s) => s.id === salidaId), undefined);
+});
+
+await check("el repartidor registra su propia salida, no la de otro ni dos vehículos a la vez", async () => {
+  await assert.rejects(execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    vehiculoId: vehiculoRepartoId, repartidorId: "test-conductor", kilometraje: 100, estadoVehiculo: "APTO",
+  }, "test-repartidor"), /propio repartidor/);
+  for (const user of ["test-operario", "test-recepcion", "test-cliente", "test-inactivo"]) {
+    await assert.rejects(execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+      vehiculoId: vehiculoRepartoId, repartidorId: user, kilometraje: 100, estadoVehiculo: "APTO",
+    }, user));
+  }
+  await assert.rejects(execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    vehiculoId: vehiculoRepartoId, repartidorId: "test-repartidor", kilometraje: 100, estadoVehiculo: "NO_APTO",
+  }, "test-repartidor"), /NO_APTO/);
+  const salida = await execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    salidaId: randomUUID(), inspeccionId: randomUUID(),
+    vehiculoId: vehiculoRepartoId, repartidorId: "test-repartidor", kilometraje: 120.5,
+    estadoVehiculo: "CON_OBSERVACIONES", observaciones: "Ruta hoteles centro", observacionesInspeccion: "Rayón puerta trasera",
+  }, "test-repartidor");
+  salidaRepartoId = salida.salida.id;
+  inspeccionRepartoId = salida.inspeccion.id;
+  await assert.rejects(execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    vehiculoId: segundoVehiculoId, repartidorId: "test-repartidor", kilometraje: 0, estadoVehiculo: "APTO",
+  }, "test-repartidor"), /Ya tienes un vehículo en ruta/);
+  // Otro repartidor no puede tomar un vehículo que ya está en ruta.
+  await assert.rejects(execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    vehiculoId: vehiculoRepartoId, repartidorId: "test-conductor", kilometraje: 130, estadoVehiculo: "APTO",
+  }, "test-conductor"), /en ruta|salida activa/);
+  const panel = await execute(queries, "GetPanelRepartidor", {}, "test-conductor");
+  const enRuta = panel.vehiculos.find((v) => v.id === vehiculoRepartoId);
+  assert.equal(enRuta.enCurso[0].repartidor.id, "test-repartidor");
+  assert.equal(enRuta.enCurso[0].estado, "EN_SERVICIO");
+});
+
+await check("la evidencia y la confirmación de un movimiento quedan acotadas al repartidor de la salida", async () => {
+  const confirmado = await execute(evidencias, "GetMovimientoFlotaPorInspeccion", { id: inspeccionRepartoId }, "test-repartidor");
+  assert.equal(confirmado.inspeccionVehiculo.salidaId, salidaRepartoId);
+  assert.equal(confirmado.inspeccionVehiculo.salida, undefined);
+  assert.equal((await execute(evidencias, "GetMovimientoFlotaPorInspeccion", { id: randomUUID() }, "test-repartidor")).inspeccionVehiculo, null);
+  await execute(evidencias, "GetMovimientoFlotaPorInspeccion", { id: inspeccionRepartoId }, "test-admin");
+  for (const user of ["test-conductor", "test-operario", "test-cliente", null]) {
+    await assert.rejects(execute(evidencias, "GetMovimientoFlotaPorInspeccion", { id: inspeccionRepartoId }, user));
+    await assert.rejects(execute(evidencias, "GetInspeccionParaEvidencias", { id: inspeccionRepartoId }, user));
+  }
+  await execute(evidencias, "GetInspeccionParaEvidencias", { id: inspeccionRepartoId }, "test-repartidor");
+  await guardarEvidencia({ id: randomUUID(), inspeccionId: inspeccionRepartoId, rutaStorage: `fixture-servidor/${randomUUID()}.jpg`, descripcion: "Rayón", orden: 1 });
+});
+
+await check("solo el repartidor de la salida (o administración) registra el regreso", async () => {
+  await assert.rejects(execute(mutations, "RegistrarRetornoFlota", { ...SIN_OBS_RETORNO,
+    salidaId: salidaRepartoId, kilometraje: 180, estadoVehiculo: "APTO",
+  }, "test-conductor"), /no está registrada a tu nombre/);
+  await assert.rejects(execute(mutations, "RegistrarRetornoFlota", { ...SIN_OBS_RETORNO,
+    salidaId: salidaRepartoId, kilometraje: 180, estadoVehiculo: "APTO",
+  }, "test-operario"), /Solo administración/);
+  await assert.rejects(execute(mutations, "RegistrarRetornoFlota", { ...SIN_OBS_RETORNO,
+    salidaId: salidaRepartoId, kilometraje: 100, estadoVehiculo: "APTO",
+  }, "test-repartidor"), /no puede ser menor/);
+  const retorno = await execute(mutations, "RegistrarRetornoFlota", { ...SIN_OBS_RETORNO,
+    inspeccionId: randomUUID(), salidaId: salidaRepartoId, kilometraje: 185.3, estadoVehiculo: "APTO",
+    observacionesRetorno: "Ruta hoteles centro: 5 entregas", observacionesInspeccion: "Sin novedades",
+  }, "test-repartidor");
+  assert.ok(retorno.inspeccion.id);
+  const panel = await execute(queries, "GetPanelRepartidor", {}, "test-repartidor");
+  const cerrada = panel.misSalidas.find((s) => s.id === salidaRepartoId);
+  assert.equal(cerrada.estado, "FINALIZADA");
+  assert.equal(cerrada.observaciones, "Ruta hoteles centro: 5 entregas");
+  assert.deepEqual(cerrada.inspecciones.map((i) => [i.momento, i.kilometraje, i.fotos.length]), [["ANTES", 120.5, 1], ["DESPUES", 185.3, 0]]);
+  assert.equal(panel.vehiculos.find((v) => v.id === vehiculoRepartoId).enCurso.length, 0);
+  // Liberado el vehículo, puede tomar otro; el historial de administración lo ve completo.
+  const otra = await execute(mutations, "RegistrarSalidaFlota", { ...SIN_OBS,
+    vehiculoId: segundoVehiculoId, repartidorId: "test-repartidor", kilometraje: 0, estadoVehiculo: "APTO",
+  }, "test-repartidor");
+  await execute(mutations, "RegistrarRetornoFlota", { ...SIN_OBS_RETORNO, salidaId: otra.salida.id, kilometraje: 12, estadoVehiculo: "APTO" }, "test-admin");
+  const hist = await execute(queries, "GetHistorialVehiculos", { repartidorId: "test-repartidor", vehiculoId: vehiculoRepartoId }, "test-admin");
+  assert.equal(hist.salidas.length, 1);
+  assert.equal(hist.salidas[0].inspecciones.length, 2);
+});
+
 await check("restringe todas las consultas y mutaciones de flota exclusivamente a administradores activos", async () => {
-  for (const user of [null, "test-recepcion", "test-operario", "test-cliente", "test-inactivo", "sin-perfil"]) {
+  for (const user of [null, "test-recepcion", "test-operario", "test-cliente", "test-inactivo", "sin-perfil", "test-repartidor", "test-conductor"]) {
     await assert.rejects(execute(queries, "GetFlotaVehiculos", { limit: 200, offset: 0 }, user));
     await assert.rejects(execute(queries, "GetHistorialVehiculos", {}, user));
     await assert.rejects(

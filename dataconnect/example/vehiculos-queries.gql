@@ -153,3 +153,81 @@ query GetHistorialVehiculos(
     }
   }
 }
+
+# Sección del repartidor: vehículos activos con su disponibilidad y el último
+# kilometraje registrado, más las salidas propias con inspecciones y fotografías.
+# No expone el historial de otros repartidores, solo quién tiene hoy cada vehículo.
+query GetPanelRepartidor($limit: Int = 30) @auth(level: USER) {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
+    activo @check(expr: "this == true", message: "La cuenta está inactiva")
+    rol {
+      nombre @check(
+        expr: "this in ['repartidor', 'conductor']"
+        message: "Sección reservada a repartidores"
+      )
+    }
+  }
+  vehiculos(where: { activo: { eq: true } }, orderBy: [{ patente: ASC }, { id: ASC }]) {
+    id
+    patente
+    marca
+    modelo
+    anio
+    descripcion
+    enCurso: salidaVehiculos_on_vehiculo(
+      where: { estado: { in: [PROGRAMADA, EN_SERVICIO] } }
+      orderBy: [{ creadoEn: DESC }]
+      limit: 1
+    ) {
+      id
+      estado
+      fechaSalida
+      repartidor {
+        id
+        nombre
+        apellido
+      }
+    }
+    # El odómetro no retrocede: la última salida inspeccionada tiene el mayor valor.
+    recientes: salidaVehiculos_on_vehiculo(orderBy: [{ creadoEn: DESC }, { id: DESC }], limit: 5) {
+      inspecciones: inspeccionVehiculos_on_salida(orderBy: [{ kilometraje: DESC }], limit: 1) {
+        kilometraje
+      }
+    }
+  }
+  misSalidas: salidaVehiculos(
+    where: { repartidorId: { eq_expr: "auth.uid" } }
+    orderBy: [{ creadoEn: DESC }, { id: DESC }]
+    limit: $limit
+  ) {
+    id
+    estado
+    fechaSalida
+    fechaRetorno
+    observaciones
+    creadoEn
+    vehiculo {
+      id
+      patente
+      marca
+      modelo
+      anio
+      activo
+    }
+    inspecciones: inspeccionVehiculos_on_salida(orderBy: [{ registradoEn: ASC }]) {
+      id
+      momento
+      estadoVehiculo
+      kilometraje
+      observaciones
+      registradoEn
+      fotos: fotoInspeccionVehiculos_on_inspeccion(where: { guardada: { eq: true } }, orderBy: [{ orden: ASC }]) {
+        id
+        rutaStorage
+        descripcion
+        orden
+        creadoEn
+      }
+    }
+  }
+}

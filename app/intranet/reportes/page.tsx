@@ -14,6 +14,7 @@ import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { HBarChart, DonutChart, BarChart } from "@/components/intranet/Charts";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion from "@/components/intranet/EncabezadoSeccion";
 import { useReportes } from "@/lib/reportes/useReportes";
 import { fechaChile, periodoInicial } from "@/lib/reportes/fechas";
 import {
@@ -131,21 +132,11 @@ export default function ReportesPage() {
 
   return (
     <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"
-      >
-        <div>
-          <h1 className="font-display text-2xl font-extrabold dark:text-white">
-            Reportes
-          </h1>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            Análisis del periodo · {datos?.comandas ?? 0} comandas · Montos en
-            CLP
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <EncabezadoSeccion
+        antetitulo="Gestión · Indicadores del negocio"
+        titulo="Reportes"
+        descripcion={`Análisis del periodo · ${datos?.comandas ?? 0} comandas · Montos en CLP`}
+        acciones={<>
           <button onClick={recargar} disabled={cargando} className={boton}>
             <RefreshCw className="h-4 w-4" />
             Actualizar
@@ -165,8 +156,8 @@ export default function ReportesPage() {
               Exportar {formato === "pdf" ? "PDF" : "Excel"}
             </button>
           ))}
-        </div>
-      </motion.div>
+        </>}
+      />
 
       {descarga?.clave === clave && (descarga.error || descarga.mensaje) && (
         <p

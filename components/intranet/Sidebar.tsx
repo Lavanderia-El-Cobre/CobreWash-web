@@ -25,6 +25,8 @@ const rolLabel: Record<Rol, string> = {
   admin: "Administrador",
   recepcionista: "Recepcionista",
   operario: "Operario",
+  repartidor: "Repartidor",
+  conductor: "Conductor",
   cliente: "Cliente",
 };
 

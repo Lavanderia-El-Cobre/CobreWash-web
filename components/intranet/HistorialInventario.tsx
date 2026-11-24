@@ -8,6 +8,7 @@ import { limitesFechasConsulta } from "@/lib/reportes/fechas";
 import { crearCsvMovimientos } from "@/lib/inventario/movimientos";
 import { leerHistorialCompleto } from "@/lib/inventario/historial";
 import { registrarError } from "@/lib/registro-seguro";
+import GlassSelect from "@/components/ui/GlassSelect";
 
 const TAMANO = 20;
 export default function HistorialInventario({ insumos, revision }: {
@@ -73,13 +74,13 @@ export default function HistorialInventario({ insumos, revision }: {
   }
   const total = datos?.total[0]?._count ?? 0;
   const paginas = Math.max(1, Math.ceil(total / TAMANO));
-  const clase = "mt-1 w-full rounded-xl border border-stone-200 bg-transparent px-3 py-2 text-sm dark:border-white/10";
+  const clase = "mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm dark:border-white/10 dark:bg-stone-800";
   return <section className="glass-panel overflow-hidden rounded-2xl" aria-label="Historial de inventario">
     <div className="space-y-4 border-b border-stone-100 px-5 py-4 dark:border-white/5">
       <div className="flex items-center gap-2"><History className="h-5 w-5 text-brand-500" /><div><h2 className="text-sm font-extrabold">Historial de movimientos</h2><p className="text-xs text-stone-400">Consulta y descarga todas las entradas y salidas.</p></div></div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-        <label className="text-xs font-semibold text-stone-500">Insumo<select value={insumoId} onChange={e => { setInsumoId(e.target.value); setPagina(0); }} className={clase}><option value="">Todos</option>{insumos.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}</select></label>
-        <label className="text-xs font-semibold text-stone-500">Tipo<select value={tipo} onChange={e => { setTipo(e.target.value as "" | TipoMovimiento); setPagina(0); }} className={clase}><option value="">Todos</option><option value="ENTRADA">Entradas</option><option value="SALIDA">Salidas</option></select></label>
+        <div className="text-xs font-semibold text-stone-500"><span className="mb-1 block">Insumo</span><GlassSelect ariaLabel="Insumo" searchable searchPlaceholder="Buscar insumo…" value={insumoId} onChange={v => { setInsumoId(v); setPagina(0); }} options={[{ value: "", label: "Todos" }, ...insumos.map(i => ({ value: i.id, label: i.nombre }))]} /></div>
+        <div className="text-xs font-semibold text-stone-500"><span className="mb-1 block">Tipo</span><GlassSelect ariaLabel="Tipo" value={tipo} onChange={v => { setTipo(v as "" | TipoMovimiento); setPagina(0); }} options={[{ value: "", label: "Todos" }, { value: "ENTRADA", label: "Entradas" }, { value: "SALIDA", label: "Salidas" }]} /></div>
         <label className="text-xs font-semibold text-stone-500">Desde<input type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className={clase} /></label>
         <label className="text-xs font-semibold text-stone-500">Hasta<input type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className={clase} /></label>
         <div className="flex items-end gap-2"><button title="Limpiar filtros" onClick={() => { setInsumoId(""); setTipo(""); setDesde(""); setHasta(""); setPagina(0); }} className="rounded-xl border border-stone-200 p-2.5 text-stone-500 dark:border-white/10"><SlidersHorizontal className="h-4 w-4" /></button><button onClick={() => void exportar()} disabled={exportando || cargando || !total} className="flex items-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40">{exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exportando ? "Descargando…" : "CSV completo"}</button></div>

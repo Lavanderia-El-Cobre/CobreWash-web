@@ -10,12 +10,17 @@ query GetInspeccionParaEvidencias($id: UUID!) @auth(level: USER) {
 }
 
 # Lectura de confirmación después de una respuesta perdida. No crea movimientos.
+# Un repartidor solo puede confirmar inspecciones de sus propias salidas.
 query GetMovimientoFlotaPorInspeccion($id: UUID!) @auth(level: USER) {
   yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null") {
     activo @check(expr: "this == true")
-    rol { nombre @check(expr: "this == 'admin'") }
+    rol { nombre @check(expr: "this in ['admin', 'repartidor', 'conductor']") }
   }
-  inspeccionVehiculo(id: $id) { id salidaId momento kilometraje }
+  inspeccionVehiculo(id: $id)
+    @check(expr: "this == null || response.yo.rol.nombre == 'admin' || this.salida.repartidorId == auth.uid", message: "La inspección no pertenece a tu salida") {
+    id salidaId momento kilometraje
+    salida @redact { repartidorId }
+  }
 }
 
 mutation RegistrarEvidenciaGuardada($id: UUID!, $inspeccionId: UUID!, $rutaStorage: String!, $descripcion: String, $orden: Int!, $confirmar: Boolean! = true)

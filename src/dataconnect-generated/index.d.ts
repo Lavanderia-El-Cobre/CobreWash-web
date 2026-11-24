@@ -624,11 +624,13 @@ export interface EntregarComandaData {
   comanda_update?: Comanda_Key | null;
   entrega: number;
   comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+  problemasResueltos: number;
   comandaNotificacion_insert: ComandaNotificacion_Key;
 }
 
 export interface EntregarComandaVariables {
   id: UUIDString;
+  detalle?: string | null;
 }
 
 export interface EtapaProduccion_Key {
@@ -1117,6 +1119,57 @@ export interface GetComandasParaAlertasData {
 }
 
 export interface GetComandasParaAlertasVariables {
+  limit?: number | null;
+  offset?: number | null;
+}
+
+export interface GetComandasParaEntregaData {
+  comandas: ({
+    id: UUIDString;
+    numeroComanda: string;
+    empresa?: string | null;
+    proyecto?: string | null;
+    observaciones?: string | null;
+    fechaEntregaEstimada?: TimestampString | null;
+    cliente: {
+      nombre: string;
+      tipoCliente: TipoCliente;
+      telefono?: string | null;
+      direccion?: string | null;
+    };
+    prendas: ({
+      cantidad: number;
+      tipoPrenda: {
+        nombre: string;
+      };
+    })[];
+    problemas: ({
+      id: UUIDString;
+      motivo: string;
+      descripcion?: string | null;
+      estado: IncidenciaEstado;
+      fecha: TimestampString;
+      reportadaPor: {
+        nombre: string;
+        apellido?: string | null;
+      };
+    } & IncidenciaComanda_Key)[];
+  } & Comanda_Key)[];
+  misEntregas: ({
+    id: UUIDString;
+    fecha: TimestampString;
+    motivo?: string | null;
+    comanda: {
+      id: UUIDString;
+      numeroComanda: string;
+      cliente: {
+        nombre: string;
+      };
+    } & Comanda_Key;
+  } & ComandaHistorialEstado_Key)[];
+}
+
+export interface GetComandasParaEntregaVariables {
   limit?: number | null;
   offset?: number | null;
 }
@@ -2040,6 +2093,67 @@ export interface GetPanelProduccionVariables {
   offset?: number | null;
 }
 
+export interface GetPanelRepartidorData {
+  vehiculos: ({
+    id: UUIDString;
+    patente: string;
+    marca: string;
+    modelo: string;
+    anio?: number | null;
+    descripcion?: string | null;
+    enCurso: ({
+      id: UUIDString;
+      estado: SalidaVehiculoEstado;
+      fechaSalida?: TimestampString | null;
+      repartidor: {
+        id: string;
+        nombre: string;
+        apellido?: string | null;
+      } & Usuario_Key;
+    } & SalidaVehiculo_Key)[];
+    recientes: ({
+      inspecciones: ({
+        kilometraje: number;
+      })[];
+    })[];
+  } & Vehiculo_Key)[];
+  misSalidas: ({
+    id: UUIDString;
+    estado: SalidaVehiculoEstado;
+    fechaSalida?: TimestampString | null;
+    fechaRetorno?: TimestampString | null;
+    observaciones?: string | null;
+    creadoEn: TimestampString;
+    vehiculo: {
+      id: UUIDString;
+      patente: string;
+      marca: string;
+      modelo: string;
+      anio?: number | null;
+      activo: boolean;
+    } & Vehiculo_Key;
+    inspecciones: ({
+      id: UUIDString;
+      momento: MomentoInspeccion;
+      estadoVehiculo: EstadoVehiculo;
+      kilometraje: number;
+      observaciones?: string | null;
+      registradoEn: TimestampString;
+      fotos: ({
+        id: UUIDString;
+        rutaStorage: string;
+        descripcion?: string | null;
+        orden: number;
+        creadoEn: TimestampString;
+      } & FotoInspeccionVehiculo_Key)[];
+    } & InspeccionVehiculo_Key)[];
+  } & SalidaVehiculo_Key)[];
+}
+
+export interface GetPanelRepartidorVariables {
+  limit?: number | null;
+}
+
 export interface GetRegistrosExistentesIaData {
   conteoInventarios: ({
     insumoId: UUIDString;
@@ -2752,6 +2866,18 @@ export interface RegistrarseVariables {
   email: string;
 }
 
+export interface ReportarProblemaEntregaData {
+  bloqueo?: Comanda_Key | null;
+  incidenciaComanda_insert: IncidenciaComanda_Key;
+  comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+}
+
+export interface ReportarProblemaEntregaVariables {
+  comandaId: UUIDString;
+  motivo: string;
+  detalle?: string | null;
+}
+
 export interface ResolverMiIncidenciaData {
   incidenciaComanda_update?: IncidenciaComanda_Key | null;
 }
@@ -3002,6 +3128,18 @@ export const actualizarEstadoSolicitudContactoRef: ActualizarEstadoSolicitudCont
 
 export function actualizarEstadoSolicitudContacto(vars: ActualizarEstadoSolicitudContactoVariables): MutationPromise<ActualizarEstadoSolicitudContactoData, ActualizarEstadoSolicitudContactoVariables>;
 export function actualizarEstadoSolicitudContacto(dc: DataConnect, vars: ActualizarEstadoSolicitudContactoVariables): MutationPromise<ActualizarEstadoSolicitudContactoData, ActualizarEstadoSolicitudContactoVariables>;
+
+interface GetComandasParaEntregaRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars?: GetComandasParaEntregaVariables): QueryRef<GetComandasParaEntregaData, GetComandasParaEntregaVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars?: GetComandasParaEntregaVariables): QueryRef<GetComandasParaEntregaData, GetComandasParaEntregaVariables>;
+  operationName: string;
+}
+export const getComandasParaEntregaRef: GetComandasParaEntregaRef;
+
+export function getComandasParaEntrega(vars?: GetComandasParaEntregaVariables, options?: ExecuteQueryOptions): QueryPromise<GetComandasParaEntregaData, GetComandasParaEntregaVariables>;
+export function getComandasParaEntrega(dc: DataConnect, vars?: GetComandasParaEntregaVariables, options?: ExecuteQueryOptions): QueryPromise<GetComandasParaEntregaData, GetComandasParaEntregaVariables>;
 
 interface GetInspeccionParaEvidenciasRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -3554,6 +3692,18 @@ export const entregarComandaRef: EntregarComandaRef;
 
 export function entregarComanda(vars: EntregarComandaVariables): MutationPromise<EntregarComandaData, EntregarComandaVariables>;
 export function entregarComanda(dc: DataConnect, vars: EntregarComandaVariables): MutationPromise<EntregarComandaData, EntregarComandaVariables>;
+
+interface ReportarProblemaEntregaRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ReportarProblemaEntregaVariables): MutationRef<ReportarProblemaEntregaData, ReportarProblemaEntregaVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ReportarProblemaEntregaVariables): MutationRef<ReportarProblemaEntregaData, ReportarProblemaEntregaVariables>;
+  operationName: string;
+}
+export const reportarProblemaEntregaRef: ReportarProblemaEntregaRef;
+
+export function reportarProblemaEntrega(vars: ReportarProblemaEntregaVariables): MutationPromise<ReportarProblemaEntregaData, ReportarProblemaEntregaVariables>;
+export function reportarProblemaEntrega(dc: DataConnect, vars: ReportarProblemaEntregaVariables): MutationPromise<ReportarProblemaEntregaData, ReportarProblemaEntregaVariables>;
 
 interface EditarComandaRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -4274,3 +4424,15 @@ export const getHistorialVehiculosRef: GetHistorialVehiculosRef;
 
 export function getHistorialVehiculos(vars?: GetHistorialVehiculosVariables, options?: ExecuteQueryOptions): QueryPromise<GetHistorialVehiculosData, GetHistorialVehiculosVariables>;
 export function getHistorialVehiculos(dc: DataConnect, vars?: GetHistorialVehiculosVariables, options?: ExecuteQueryOptions): QueryPromise<GetHistorialVehiculosData, GetHistorialVehiculosVariables>;
+
+interface GetPanelRepartidorRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars?: GetPanelRepartidorVariables): QueryRef<GetPanelRepartidorData, GetPanelRepartidorVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars?: GetPanelRepartidorVariables): QueryRef<GetPanelRepartidorData, GetPanelRepartidorVariables>;
+  operationName: string;
+}
+export const getPanelRepartidorRef: GetPanelRepartidorRef;
+
+export function getPanelRepartidor(vars?: GetPanelRepartidorVariables, options?: ExecuteQueryOptions): QueryPromise<GetPanelRepartidorData, GetPanelRepartidorVariables>;
+export function getPanelRepartidor(dc: DataConnect, vars?: GetPanelRepartidorVariables, options?: ExecuteQueryOptions): QueryPromise<GetPanelRepartidorData, GetPanelRepartidorVariables>;

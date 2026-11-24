@@ -4,7 +4,7 @@ import { registrarError } from "@/lib/registro-seguro";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, Mail, MapPin, Package, Pencil, Phone, Plus, Loader2, Search, User, X } from "lucide-react";
+import { Building2, Mail, MapPin, Package, Pencil, Phone, Plus, Loader2, Search, User } from "lucide-react";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { dataConnect } from "@/lib/firebase/client";
 import { formatRut, isValidRut } from "@/lib/validators";
@@ -13,6 +13,8 @@ import TelefonoInput from "@/components/ui/TelefonoInput";
 import { ComandaEstado, TipoCliente } from "@/src/dataconnect-generated";
 import { executeMutation, executeQuery, mutationRef, queryRef } from "firebase/data-connect";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion, { BOTON_ENCABEZADO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
 import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
 import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
 import { mapAuthError } from "@/lib/firebase/errors";
@@ -214,15 +216,16 @@ export default function ClientesPage() {
     <div className="min-h-screen space-y-6 p-4 text-stone-900 dark:text-stone-100 sm:p-6">
       {notice && <div className="fixed right-5 top-20 z-[70] rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white shadow-xl dark:bg-white dark:text-stone-900">{notice}</div>}
 
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-extrabold text-stone-900 dark:text-white">Clientes</h1>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{clientes.length} fichas registradas en Firebase</p>
-        </div>
-        <button onClick={() => setForm({ ...FORM_VACIO })} className="flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-bold text-white shadow-premium">
-          <Plus className="h-4 w-4" /> Registrar cliente
-        </button>
-      </motion.div>
+      <EncabezadoSeccion
+        antetitulo="Comercial · Fichas de clientes"
+        titulo="Clientes"
+        descripcion={`${clientes.length} fichas registradas en Firebase`}
+        acciones={
+          <button onClick={() => setForm({ ...FORM_VACIO })} className={BOTON_ENCABEZADO}>
+            <Plus className="h-4 w-4" /> Registrar cliente
+          </button>
+        }
+      />
 
       <div className="relative max-w-md">
         <input type="text" placeholder="Buscar por nombre, RUT, correo o teléfono..." value={search} onChange={(e) => setSearch(e.target.value)} className="glass-panel w-full rounded-xl py-2.5 pl-9 pr-4 text-sm text-stone-700 shadow-sm placeholder-stone-400 focus:outline-none focus:border-brand-500/50 dark:text-stone-200" />
@@ -260,97 +263,68 @@ export default function ClientesPage() {
       </motion.div>
 
       <AnimatePresence>
-        {form && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-cliente" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => !saving && setForm(null)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel relative z-10 w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl border border-stone-200/80 dark:border-white/10 max-h-[90vh] overflow-y-auto"
+      {form && <ModalIntranet
+        onCerrar={() => setForm(null)}
+        bloqueado={saving}
+        icono={User}
+        etiqueta="Ficha administrativa"
+        titulo={form.id ? "Editar cliente" : "Registrar cliente"}
+        subtitulo="Gestión de datos de facturación y contacto."
+        pie={
+          <>
+            <button type="button" onClick={() => setForm(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>
+              Cancelar
+            </button>
+            <button
+              onClick={guardar}
+              disabled={saving || !form.nombre.trim() || (!form.id && (!form.email.trim() || !informado))}
+              className={BOTON_MODAL_PRIMARIO}
             >
-              <button
-                onClick={() => setForm(null)}
-                disabled={saving}
-                className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="flex items-start gap-3.5 mb-6 pr-8">
-                <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-400">
-                  <User className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">Ficha administrativa</p>
-                  <h2 id="titulo-cliente" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">
-                    {form.id ? "Editar cliente" : "Registrar cliente"}
-                  </h2>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Gestión de datos de facturación y contacto.</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <Field label="Nombre o razón social" value={form.nombre} onChange={(nombre) => setForm({ ...form, nombre })} required />
-                <Field
-                  label="RUT de persona o empresa"
-                  value={form.rut}
-                  onChange={(rut) => setForm({ ...form, rut: formatRut(rut) })}
-                  required
-                  placeholder="12.345.678-5"
-                  hint={form.rut ? (isValidRut(form.rut) ? "RUT válido" : "Dígito verificador incorrecto") : "Se validará automáticamente"}
-                  valid={form.rut ? isValidRut(form.rut) : undefined}
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? "Guardando..." : form.id ? "Guardar cambios" : "Registrar cliente"}
+            </button>
+          </>
+        }
+      >
+          <div className="space-y-4">
+            <Field label="Nombre o razón social" value={form.nombre} onChange={(nombre) => setForm({ ...form, nombre })} required />
+            <Field
+              label="RUT de persona o empresa"
+              value={form.rut}
+              onChange={(rut) => setForm({ ...form, rut: formatRut(rut) })}
+              required
+              placeholder="12.345.678-5"
+              hint={form.rut ? (isValidRut(form.rut) ? "RUT válido" : "Dígito verificador incorrecto") : "Se validará automáticamente"}
+              valid={form.rut ? isValidRut(form.rut) : undefined}
+            />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Tipo de cliente</label>
+              <GlassSelect
+                value={form.tipoCliente}
+                onChange={(val) => setForm({ ...form, tipoCliente: val as TipoCliente })}
+                ariaLabel="Tipo de cliente"
+                options={[
+                  { value: TipoCliente.PARTICULAR, label: "Particular / Empresa" },
+                  { value: TipoCliente.HOTEL, label: "Hotel" },
+                ]}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="cliente-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
+                <TelefonoInput
+                  id="cliente-telefono"
+                  value={form.telefono}
+                  onChange={(telefono) => setForm((actual) => (actual ? { ...actual, telefono } : actual))}
+                  ayuda="Celular por defecto; elige «Chile · teléfono fijo» u otro país"
                 />
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Tipo de cliente</label>
-                  <GlassSelect
-                    value={form.tipoCliente}
-                    onChange={(val) => setForm({ ...form, tipoCliente: val as TipoCliente })}
-                    ariaLabel="Tipo de cliente"
-                    options={[
-                      { value: TipoCliente.PARTICULAR, label: "Particular / Empresa" },
-                      { value: TipoCliente.HOTEL, label: "Hotel" },
-                    ]}
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label htmlFor="cliente-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
-                    <TelefonoInput
-                      id="cliente-telefono"
-                      value={form.telefono}
-                      onChange={(telefono) => setForm((actual) => (actual ? { ...actual, telefono } : actual))}
-                      ayuda="Celular por defecto; elige «Chile · teléfono fijo» u otro país"
-                    />
-                  </div>
-                  <Field label={form.id ? "Correo" : "Correo (obligatorio)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
-                </div>
-                <Field label="Dirección" value={form.direccion} onChange={(direccion) => setForm({ ...form, direccion })} placeholder="Av. Balmaceda 1234, Calama" />
-                {!form.id && <ConfirmacionCuentaCliente marcada={informado} onChange={setInformado} disabled={saving} />}
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setForm(null)}
-                    disabled={saving}
-                    className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={guardar}
-                    disabled={saving || !form.nombre.trim() || (!form.id && (!form.email.trim() || !informado))}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {saving ? "Guardando..." : form.id ? "Guardar cambios" : "Registrar cliente"}
-                  </button>
-                </div>
               </div>
-            </motion.div>
+              <Field label={form.id ? "Correo" : "Correo (obligatorio)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
+            </div>
+            <Field label="Dirección" value={form.direccion} onChange={(direccion) => setForm({ ...form, direccion })} placeholder="Av. Balmaceda 1234, Calama" />
+            {!form.id && <ConfirmacionCuentaCliente marcada={informado} onChange={setInformado} disabled={saving} />}
           </div>
-        )}
+      </ModalIntranet>}
       </AnimatePresence>
     </div>
   );

@@ -13,12 +13,12 @@ import {
   Eye,
   Pencil,
   Ban,
-  X,
   Trash2,
   Loader2,
   Check,
   AlertTriangle,
   CheckCircle2,
+  ClipboardList,
 } from "lucide-react";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
@@ -26,6 +26,8 @@ import ComandaDetalle from "@/components/intranet/ComandaDetalle";
 import ConsumoEstimado from "@/components/intranet/ia/ConsumoEstimado";
 import { leerPesoKg, repartirPeso, type ModeloComanda } from "@/lib/ia/comanda";
 import GlassSelect from "@/components/ui/GlassSelect";
+import EncabezadoSeccion, { BOTON_ENCABEZADO } from "@/components/intranet/EncabezadoSeccion";
+import ModalIntranet, { BOTON_MODAL_EXITO, BOTON_MODAL_PELIGRO, BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
 import {
   PRENDA_POR_KILO, leerPrecioKg, normalizarPrendaNueva, opcionesPrendas, subtotalesPorKg, totalPorKg, type ModalidadCobro,
 } from "@/lib/comandas/cobro";
@@ -666,26 +668,17 @@ export default function ComandasPage() {
 
   return (
     <div className="min-h-screen text-stone-900 dark:text-stone-100 p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-      >
-        <div>
-          <h1 className="text-2xl font-display font-extrabold text-stone-900 dark:text-white">Comandas</h1>
-          <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">
-            {totalGlobal} órdenes · mostrando {comandas.length} en esta página
-          </p>
-        </div>
-        <button
-          onClick={openCrear}
-          className="flex items-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Comanda
-        </button>
-      </motion.div>
+      <EncabezadoSeccion
+        antetitulo="Operaciones · Recepción y despacho"
+        titulo="Comandas"
+        descripcion={`${totalGlobal} órdenes · mostrando ${comandas.length} en esta página`}
+        acciones={
+          <button onClick={openCrear} className={BOTON_ENCABEZADO}>
+            <Plus className="w-4 h-4" />
+            Nueva Comanda
+          </button>
+        }
+      />
 
       {/* Summary */}
       <motion.div
@@ -907,21 +900,20 @@ export default function ComandasPage() {
       {/* Crear / Editar modal */}
       <AnimatePresence>
         {form && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setForm(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel rounded-3xl p-6 sm:p-8 w-full max-w-4xl relative z-10 max-h-[90vh] overflow-y-auto"
-            >
-              <button onClick={() => setForm(null)} className="absolute top-4 right-4 p-2 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-white/5 transition-all cursor-pointer">
-                <X className="w-5 h-5" />
+          <ModalIntranet
+            onCerrar={() => setForm(null)}
+            bloqueado={isSubmitting}
+            tamano="xl"
+            icono={ClipboardList}
+            etiqueta="Recepción"
+            titulo={form.mode === "crear" ? "Nueva Comanda" : "Editar Comanda"}
+            pie={
+              <button onClick={guardar} disabled={isSubmitting} className={`${BOTON_MODAL_PRIMARIO} sm:min-w-48`}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Guardando..." : form.mode === "crear" ? "Crear Comanda" : "Guardar Cambios"}
               </button>
-              <h3 className="text-xl font-extrabold text-stone-900 dark:text-white font-display mb-6">
-                {form.mode === "crear" ? "Nueva Comanda" : "Editar Comanda"}
-              </h3>
+            }
+          >
 
               {formError && (
                 <div className="mb-4 flex items-center gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
@@ -1180,42 +1172,31 @@ export default function ComandasPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Observaciones</label>
                   <textarea value={formData.observaciones} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} rows={3} placeholder="Observaciones generales de recepción..." className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 focus:border-brand-500 focus:outline-none dark:border-white/10 dark:bg-stone-800 dark:text-stone-200" />
                 </div>
-
-                <button onClick={guardar} disabled={isSubmitting} className="w-full bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                  {isSubmitting ? "Guardando..." : form.mode === "crear" ? "Crear Comanda" : "Guardar Cambios"}
-                </button>
               </div>
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       {/* Anular modal */}
       <AnimatePresence>
         {anular && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-anular" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAnular(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel rounded-3xl p-6 sm:p-7 w-full max-w-md relative z-10 shadow-2xl border border-stone-200/80 dark:border-white/10"
-            >
-              <button onClick={() => setAnular(null)} className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex items-start gap-3.5 mb-5 pr-8">
-                <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center shrink-0 text-red-600 dark:text-red-400">
-                  <Ban className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-600 dark:text-red-400">Acción crítica</p>
-                  <h3 id="titulo-anular" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">Anular {anular.id}</h3>
-                  <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Esta acción marcará la comanda como anulada permanentemente.</p>
-                </div>
-              </div>
-
+          <ModalIntranet
+            onCerrar={() => setAnular(null)}
+            tamano="sm"
+            tono="peligro"
+            icono={Ban}
+            etiqueta="Acción crítica"
+            titulo={`Anular ${anular.id}`}
+            subtitulo="Esta acción marcará la comanda como anulada permanentemente."
+            pie={
+              <>
+                <button onClick={() => setAnular(null)} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+                <button onClick={confirmarAnular} className={BOTON_MODAL_PELIGRO}>
+                  Anular comanda
+                </button>
+              </>
+            }
+          >
               {anularError && (
                 <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
@@ -1234,41 +1215,31 @@ export default function ComandasPage() {
                 />
               </div>
 
-              <div className="flex gap-2">
-                <button onClick={() => setAnular(null)} className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={confirmarAnular} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg cursor-pointer">
-                  Anular comanda
-                </button>
-              </div>
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
 
       {/* Entregar modal */}
       <AnimatePresence>
         {entregar && (
-          <div role="dialog" aria-modal="true" aria-labelledby="titulo-entrega" className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !entregarLoading && setEntregar(null)} className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-panel rounded-3xl p-6 sm:p-7 w-full max-w-md relative z-10 shadow-2xl border border-stone-200/80 dark:border-white/10"
-            >
-              <button onClick={() => setEntregar(null)} disabled={entregarLoading} className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex items-start gap-3.5 mb-5 pr-8">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Entrega de comanda</p>
-                  <h3 id="titulo-entrega" className="font-display text-xl font-extrabold text-stone-900 dark:text-white">Confirmar entrega</h3>
-                </div>
-              </div>
+          <ModalIntranet
+            onCerrar={() => setEntregar(null)}
+            bloqueado={entregarLoading}
+            tamano="sm"
+            tono="exito"
+            icono={CheckCircle2}
+            etiqueta="Entrega de comanda"
+            titulo="Confirmar entrega"
+            pie={
+              <>
+                <button onClick={() => setEntregar(null)} disabled={entregarLoading} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+                <button onClick={confirmarEntregar} disabled={entregarLoading} className={BOTON_MODAL_EXITO}>
+                  {entregarLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Confirmar entrega
+                </button>
+              </>
+            }
+          >
               <div className="rounded-2xl bg-stone-50/70 p-4 space-y-2 dark:bg-white/5 border border-stone-100 dark:border-white/5 text-sm">
                 <div className="flex justify-between items-center"><span className="text-xs text-stone-400">Comanda</span><span className="font-bold text-brand-600 dark:text-brand-400">{entregar.id}</span></div>
                 <div className="flex justify-between items-center"><span className="text-xs text-stone-400">Cliente</span><span className="font-semibold text-stone-800 dark:text-stone-200">{entregar.cliente}</span></div>
@@ -1278,15 +1249,7 @@ export default function ComandasPage() {
               <p className="mt-4 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 Al confirmar, el estado cambiará a <strong>Entregada</strong> y se registrará la fecha y hora exacta en la trazabilidad.
               </p>
-              <div className="flex gap-2 mt-6">
-                <button onClick={() => setEntregar(null)} disabled={entregarLoading} className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors cursor-pointer">Cancelar</button>
-                <button onClick={confirmarEntregar} disabled={entregarLoading} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50 cursor-pointer">
-                  {entregarLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Confirmar entrega
-                </button>
-              </div>
-            </motion.div>
-          </div>
+          </ModalIntranet>
         )}
       </AnimatePresence>
     </div>

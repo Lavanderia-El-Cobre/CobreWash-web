@@ -161,6 +161,15 @@ html {
     inset 0 1px 0 rgba(249, 115, 22, 0.12);
 }
 
+/* Modales de la intranet: mismo vidrio, pero más opaco para leer sobre el contenido. */
+.glass-panel.modal-intranet {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.dark .glass-panel.modal-intranet {
+  background: rgba(28, 25, 23, 0.92);
+}
+
 /* Glass shell for the intranet sidebar / bars */
 .glass-shell {
   background: rgba(255, 255, 255, 0.6);

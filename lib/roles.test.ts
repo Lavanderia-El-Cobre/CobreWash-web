@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { esRolInterno, rutaPermitida, NAV_POR_ROL } from "@/lib/roles";
+import { esRolInterno, rutaPermitida, NAV_POR_ROL, LANDING_POR_ROL } from "@/lib/roles";
 
 describe("autorización por rol", () => {
   it("permite consultar avisos a ambos equipos desde la navegación y la ruta", () => {
@@ -33,6 +33,28 @@ describe("autorización por rol", () => {
     expect(rutaPermitida(undefined, "/intranet")).toBe(false);
     expect(rutaPermitida("cliente", "/intranet")).toBe(false);
     expect(rutaPermitida("admin", "/cuenta")).toBe(false);
+  });
+
+  it("da al reparto una sección propia de vehículo y entregas, sin la gestión de flota", () => {
+    for (const rol of ["repartidor", "conductor"] as const) {
+      expect(esRolInterno(rol)).toBe(true);
+      expect(LANDING_POR_ROL[rol]).toBe("/intranet/reparto");
+      expect(NAV_POR_ROL[rol].map((item) => item.href)).toEqual([
+        "/intranet/reparto", "/intranet/entregas", "/intranet/comunicacion", "/intranet/configuracion",
+      ]);
+      for (const ruta of ["/intranet/reparto", "/intranet/entregas", "/intranet/comunicacion", "/intranet/configuracion"]) {
+        expect(rutaPermitida(rol, ruta)).toBe(true);
+      }
+      for (const ruta of ["/intranet", "/intranet/vehiculos", "/intranet/comandas", "/intranet/seguimiento", "/intranet/incidencias", "/intranet/clientes"]) {
+        expect(rutaPermitida(rol, ruta)).toBe(false);
+      }
+    }
+    expect(rutaPermitida("admin", "/intranet/entregas")).toBe(true);
+    expect(rutaPermitida("admin", "/intranet/reparto")).toBe(false);
+    for (const rol of ["recepcionista", "operario", "cliente"] as const) {
+      expect(rutaPermitida(rol, "/intranet/reparto")).toBe(false);
+      expect(rutaPermitida(rol, "/intranet/entregas")).toBe(false);
+    }
   });
 
   it("restringe la gestión de vehículos exclusivamente a administración", () => {

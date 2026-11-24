@@ -1,7 +1,7 @@
 export const TITULO_MAXIMO = 120;
 export const CONTENIDO_MAXIMO = 1000;
 
-export type Destinatario = "todos" | "operario" | "recepcionista";
+export type Destinatario = "todos" | "operario" | "recepcionista" | "repartidor";
 export interface FormularioAviso {
   titulo: string;
   contenido: string;
@@ -21,7 +21,7 @@ export function validarAviso(form: FormularioAviso) {
   if (!contenido || contenido.length > CONTENIDO_MAXIMO) {
     throw new Error(`Escribe un contenido de hasta ${CONTENIDO_MAXIMO} caracteres.`);
   }
-  if (!["todos", "operario", "recepcionista"].includes(form.destinatario)) {
+  if (!["todos", "operario", "recepcionista", "repartidor"].includes(form.destinatario)) {
     throw new Error("Selecciona un destinatario válido.");
   }
   return { titulo, contenido, destinatario: form.destinatario as Destinatario };
@@ -31,6 +31,7 @@ export function etiquetaDestinatario(rol: string | null | undefined) {
   if (!rol) return "Todos";
   if (rol === "operario") return "Operarios";
   if (rol === "recepcionista") return "Recepción";
+  if (rol === "repartidor") return "Reparto";
   return rol;
 }
 
