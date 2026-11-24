@@ -4,7 +4,6 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X,
   Receipt,
   Printer,
   User,
@@ -21,6 +20,7 @@ import QrCode from "@/components/intranet/QrCode";
 import { obtenerEnlaceSeguimiento } from "@/lib/seguimiento/qr";
 import { imprimirComprobante } from "@/lib/seguimiento/imprimir";
 import FlujoProduccion from "@/components/intranet/FlujoProduccion";
+import ModalIntranet, { BOTON_MODAL_PRIMARIO } from "@/components/intranet/ModalIntranet";
 import {
   ETAPAS,
   estadoConfig,
@@ -60,46 +60,50 @@ export default function ComandaDetalle({
   const qr = obtenerEnlaceSeguimiento(comanda.codigoQr);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 16 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 16 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="glass-panel rounded-3xl p-6 sm:p-8 w-full max-w-2xl relative z-10 max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-200/80 dark:border-white/10"
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-white/5 dark:text-stone-400 dark:hover:bg-white/10 transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        {/* Header */}
-        <div className="flex items-center gap-3.5 mb-6 pr-8">
-          <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center shrink-0 text-brand-600 dark:text-brand-400">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-extrabold text-stone-900 dark:text-white font-display">
-              {comanda.id}
-            </h3>
-            <span
-              className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${sc.bg} ${sc.text}`}
+    <ModalIntranet
+      onCerrar={onClose}
+      bloqueado={comprobante}
+      tamano="lg"
+      icono={Package}
+      etiqueta="Detalle de comanda"
+      titulo={comanda.id}
+      extraCabecera={
+        <span className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${sc.bg} ${sc.text}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+          {comanda.estado}
+        </span>
+      }
+      pie={
+        <>
+          {onAnular && comanda.estado !== "Anulado" && comanda.estado !== "Entregado" && (
+            <button
+              onClick={() => onAnular(comanda)}
+              className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-600 transition-all hover:bg-red-500/20 sm:flex-none dark:text-red-400"
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-              {comanda.estado}
-            </span>
-          </div>
-        </div>
-
+              <Ban className="w-4 h-4" />
+              Anular
+            </button>
+          )}
+          {onEditar && comanda.estado === "Pendiente" && (
+            <button
+              onClick={() => onEditar(comanda)}
+              className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-stone-100 px-4 py-2.5 text-sm font-bold text-stone-700 transition-all hover:bg-stone-200 sm:flex-none dark:bg-white/5 dark:text-stone-200 dark:hover:bg-white/10"
+            >
+              <Pencil className="w-4 h-4" />
+              Editar
+            </button>
+          )}
+          <button
+            onClick={() => setComprobante(true)}
+            disabled={!qr.url}
+            className={`${BOTON_MODAL_PRIMARIO} basis-full sm:basis-auto`}
+          >
+            <Receipt className="w-4 h-4" />
+            Generar comprobante
+          </button>
+        </>
+      }
+    >
         <div className="grid sm:grid-cols-[1fr_auto] gap-6">
           {/* Left: client + detail */}
           <div className="space-y-5 min-w-0">
@@ -232,42 +236,11 @@ export default function ComandaDetalle({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-stone-100 dark:border-white/5">
-          <button
-            onClick={() => setComprobante(true)}
-            disabled={!qr.url}
-            className="flex items-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Receipt className="w-4 h-4" />
-            Generar comprobante
-          </button>
-          {onEditar && comanda.estado === "Pendiente" && (
-            <button
-              onClick={() => onEditar(comanda)}
-              className="flex items-center gap-2 bg-stone-100 dark:bg-white/5 text-stone-700 dark:text-stone-200 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-stone-200 dark:hover:bg-white/10 transition-all cursor-pointer"
-            >
-              <Pencil className="w-4 h-4" />
-              Editar
-            </button>
-          )}
-          {onAnular && comanda.estado !== "Anulado" && comanda.estado !== "Entregado" && (
-            <button
-              onClick={() => onAnular(comanda)}
-              className="flex items-center gap-2 bg-red-500/10 text-red-600 dark:text-red-400 px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-red-500/20 transition-all cursor-pointer"
-            >
-              <Ban className="w-4 h-4" />
-              Anular
-            </button>
-          )}
-        </div>
-      </motion.div>
-
       {/* Comprobante */}
       <AnimatePresence>
         {comprobante && <ComprobanteModal comanda={comanda} onClose={() => setComprobante(false)} />}
       </AnimatePresence>
-    </div>
+    </ModalIntranet>
   );
 }
 
@@ -296,7 +269,7 @@ export function ComprobanteModal({ comanda, onClose }: { comanda: Comanda; onClo
     } finally { setPreparandoImpresion(false); }
   };
   return createPortal(
-    <div className="comprobante-modal fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto p-4">
+    <div className="comprobante-modal fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
