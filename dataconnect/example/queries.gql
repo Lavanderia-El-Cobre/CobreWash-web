@@ -123,7 +123,7 @@ query GetInventario @auth(level: USER) @refresh(every: { seconds: 10 }) {
     activo
     creadoEn
   }
-  movimientoInventarios(orderBy: [{ fecha: DESC }], limit: 500) {
+  movimientoInventarios(where: { origen: { eq: REAL } }, orderBy: [{ fecha: DESC }], limit: 500) {
     id
     tipoMovimiento
     cantidad
@@ -251,6 +251,7 @@ query GetComandas(
     comandaDetalles_on_comanda {
       cantidad
       detalle
+      pesoKg
       precioUnitario
       tipoPrenda { nombre }
       tipoServicio { nombre }
@@ -327,6 +328,7 @@ query GetComandasPaginadas(
     comandaDetalles_on_comanda {
       cantidad
       detalle
+      pesoKg
       precioUnitario
       tipoPrenda { nombre }
       tipoServicio { nombre }

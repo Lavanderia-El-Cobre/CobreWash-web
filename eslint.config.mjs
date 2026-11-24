@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "src/dataconnect-generated/**",
     // Local migration/debug artifacts are not application source.
     "scratch/**",
+    // Worktrees locales: copias del repo con su propio estado.
+    ".claude/**",
   ]),
 ]);
 
