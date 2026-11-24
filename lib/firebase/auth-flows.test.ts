@@ -2,26 +2,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Auth } from "firebase/auth";
 import type { DataConnect } from "firebase/data-connect";
 import type {
+  AceptacionCondiciones,
   ClientRegistrationInput,
   ManagedUserRegistrationInput,
 } from "@/lib/auth-validation";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
 const mocks = vi.hoisted(() => ({
   createUser: vi.fn(),
   sendReset: vi.fn(),
+  sendVerification: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
   getProfile: vi.fn(),
   registerClient: vi.fn(),
+  aceptar: vi.fn(),
   createAdminUser: vi.fn(),
   createAdminClient: vi.fn(),
   updateUser: vi.fn(),
   createSecondary: vi.fn(),
+  linkFicha: vi.fn(),
 }));
 
 vi.mock("firebase/auth", () => ({
   createUserWithEmailAndPassword: mocks.createUser,
   sendPasswordResetEmail: mocks.sendReset,
+  sendEmailVerification: mocks.sendVerification,
   signInWithEmailAndPassword: mocks.signIn,
   signOut: mocks.signOut,
 }));
@@ -32,11 +38,13 @@ vi.mock("firebase/data-connect", () => ({
 
 vi.mock("@/src/dataconnect-generated", () => ({
   TipoCliente: { PARTICULAR: "PARTICULAR", HOTEL: "HOTEL" },
+  aceptarCondicionesVigentes: mocks.aceptar,
   actualizarUsuario: mocks.updateUser,
   crearClienteAdministrado: mocks.createAdminClient,
   crearUsuarioAdministrado: mocks.createAdminUser,
   getMiPerfil: mocks.getProfile,
   registrarseComoCliente: mocks.registerClient,
+  vincularMiFichaVerificada: mocks.linkFicha,
 }));
 
 vi.mock("@/lib/firebase/secondary", () => ({
@@ -44,20 +52,25 @@ vi.mock("@/lib/firebase/secondary", () => ({
 }));
 
 import {
+  aceptarCondiciones,
+  completarRegistroCliente,
   createManagedUser,
   InactiveAccountError,
   loadActiveUserProfile,
   registerPublicClient,
   requestPasswordReset,
+  requiereAceptacion,
   signInAndResolveLanding,
   toggleManagedUserActive,
   updateManagedUser,
 } from "@/lib/firebase/auth-flows";
 
-const auth = {} as Auth;
+const NUEVA = "Wed, 25 Nov 2026 12:00:00 GMT";
+const ANTIGUA = "Mon, 02 Nov 2026 12:00:00 GMT";
 const dataConnect = {} as DataConnect;
-const clientInput: ClientRegistrationInput & { autorizaDatos: boolean; versionPrivacidad: string } = {
-  autorizaDatos: true, versionPrivacidad: "2026-11-01",
+const aceptacion: AceptacionCondiciones = { aceptaTerminos: true, versionTerminos: VERSION_TERMINOS, autorizaDatos: true, versionPrivacidad: VERSION_PRIVACIDAD };
+const clientInput: ClientRegistrationInput & AceptacionCondiciones = {
+  ...aceptacion,
   nombre: " Ana ",
   apellido: " Pérez ",
   rut: "123456785",
@@ -65,17 +78,33 @@ const clientInput: ClientRegistrationInput & { autorizaDatos: boolean; versionPr
   email: " ana@example.com ",
   direccion: " ",
   tipoCliente: "PARTICULAR" as ClientRegistrationInput["tipoCliente"],
-  password: "clave1",
+  password: "clave123",
 };
 const managedInput: ManagedUserRegistrationInput = {
   ...clientInput,
   rolId: "rol-cliente",
+  informado: true,
 };
+
+function usuarioAuth(opciones: { emailVerified?: boolean; creationTime?: string; email?: string | null } = {}) {
+  const user = {
+    uid: "uid-ana",
+    email: opciones.email === undefined ? "ana@example.com" : opciones.email,
+    emailVerified: opciones.emailVerified ?? true,
+    metadata: { creationTime: opciones.creationTime ?? NUEVA },
+    reload: vi.fn().mockResolvedValue(undefined),
+    getIdToken: vi.fn().mockResolvedValue("token"),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  return user;
+}
+const authCon = (user: ReturnType<typeof usuarioAuth> | null) => ({ currentUser: user }) as unknown as Auth;
 
 describe("flujos de autenticación", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.signOut.mockResolvedValue(undefined);
+    mocks.sendVerification.mockResolvedValue(undefined);
   });
 
   it.each([
@@ -84,42 +113,60 @@ describe("flujos de autenticación", () => {
     ["operario", "/intranet/seguimiento"],
     ["cliente", "/cuenta"],
   ])("inicia sesión y resuelve la vista del rol %s", async (role, landing) => {
+    const auth = authCon(usuarioAuth());
     mocks.signIn.mockResolvedValue({});
     mocks.getProfile.mockResolvedValue({
-      data: { usuario: { activo: true, rol: { nombre: role } } },
+      data: { usuario: { activo: true, rol: { nombre: role }, clientes_on_usuario: [{ id: "f" }] } },
     });
 
     await expect(
       signInAndResolveLanding({ auth, dataConnect }, " ana@example.com ", "clave1"),
-    ).resolves.toBe(landing);
+    ).resolves.toEqual({ tipo: "landing", ruta: landing });
 
     expect(mocks.signIn).toHaveBeenCalledWith(auth, "ana@example.com", "clave1");
-    expect(mocks.getProfile).toHaveBeenCalledWith(dataConnect, {
-      fetchPolicy: "SERVER_ONLY",
-    });
+    expect(mocks.getProfile).toHaveBeenCalledWith(dataConnect, { fetchPolicy: "SERVER_ONLY" });
   });
 
-  it("usa la vista de cliente si el perfil no existe", async () => {
+  it("una cuenta nueva sin correo verificado no ingresa y recibe un nuevo enlace", async () => {
+    const user = usuarioAuth({ emailVerified: false });
+    mocks.signIn.mockResolvedValue({});
+
+    await expect(signInAndResolveLanding({ auth: authCon(user), dataConnect }, "ana@example.com", "clave1"))
+      .resolves.toEqual({ tipo: "verificar", email: "ana@example.com" });
+    expect(user.reload).toHaveBeenCalled();
+    expect(mocks.getProfile).not.toHaveBeenCalled();
+    expect(mocks.sendVerification).toHaveBeenCalledWith(user, null);
+  });
+
+  it("una cuenta anterior a la verificación obligatoria sigue ingresando", async () => {
+    const user = usuarioAuth({ emailVerified: false, creationTime: ANTIGUA });
+    mocks.signIn.mockResolvedValue({});
+    mocks.getProfile.mockResolvedValue({ data: { usuario: { activo: true, rol: { nombre: "operario" }, clientes_on_usuario: [] } } });
+
+    await expect(signInAndResolveLanding({ auth: authCon(user), dataConnect }, "a@b.cl", "clave1"))
+      .resolves.toEqual({ tipo: "landing", ruta: "/intranet/seguimiento" });
+  });
+
+  it("con correo verificado y sin perfil pide terminar el registro", async () => {
     mocks.signIn.mockResolvedValue({});
     mocks.getProfile.mockResolvedValue({ data: { usuario: null } });
 
-    await expect(signInAndResolveLanding({ auth, dataConnect }, "a@b.cl", "clave1")).resolves.toBe(
-      "/cuenta",
-    );
+    await expect(signInAndResolveLanding({ auth: authCon(usuarioAuth()), dataConnect }, "a@b.cl", "clave1"))
+      .resolves.toEqual({ tipo: "completar", email: "ana@example.com" });
   });
 
   it("cierra la sesión y rechaza una cuenta inactiva", async () => {
+    const auth = authCon(null);
     mocks.getProfile.mockResolvedValue({
-      data: { usuario: { activo: false, rol: { nombre: "admin" } } },
+      data: { usuario: { activo: false, rol: { nombre: "admin" }, clientes_on_usuario: [] } },
     });
 
-    await expect(loadActiveUserProfile({ auth, dataConnect })).rejects.toBeInstanceOf(
-      InactiveAccountError,
-    );
+    await expect(loadActiveUserProfile({ auth, dataConnect })).rejects.toBeInstanceOf(InactiveAccountError);
     expect(mocks.signOut).toHaveBeenCalledWith(auth);
   });
 
   it("solicita recuperación con el correo normalizado", async () => {
+    const auth = authCon(null);
     mocks.sendReset.mockResolvedValue(undefined);
 
     await requestPasswordReset(auth, " ana@example.com ");
@@ -131,12 +178,13 @@ describe("flujos de autenticación", () => {
 describe("registro público de clientes", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.sendVerification.mockResolvedValue(undefined);
   });
 
   it.each(["admin", "recepcionista", "operario", "conductor", "repartidor"])(
     "no crea ni Auth ni perfil si se inyecta el tipo interno %s",
     async (tipo) => {
-      await expect(registerPublicClient({ auth, dataConnect }, {
+      await expect(registerPublicClient({ auth: authCon(null), dataConnect }, {
         ...clientInput, tipoCliente: tipo as ClientRegistrationInput["tipoCliente"],
       })).rejects.toThrow("Selecciona el tipo de cliente.");
       expect(mocks.createUser).not.toHaveBeenCalled();
@@ -145,30 +193,63 @@ describe("registro público de clientes", () => {
     },
   );
 
-  it("descarta roles inyectados y solo llama a la operación de clientes", async () => {
-    mocks.createUser.mockResolvedValue({ user: { email: "ana@example.com", delete: vi.fn() } });
-    mocks.registerClient.mockResolvedValue({});
-    await registerPublicClient({ auth, dataConnect }, {
-      ...clientInput, rolId: "rol-admin", rol: "admin", activo: true,
-    } as typeof clientInput);
-    const variables = mocks.registerClient.mock.calls[0][1];
-    expect(variables).not.toHaveProperty("rolId");
-    expect(variables).not.toHaveProperty("rol");
-    expect(variables).not.toHaveProperty("activo");
-    expect(mocks.createAdminUser).not.toHaveBeenCalled();
-    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+  it("crea solo la identidad y envía la verificación: el perfil espera el correo verificado", async () => {
+    const user = usuarioAuth({ emailVerified: false });
+    const auth = authCon(null);
+    mocks.createUser.mockResolvedValue({ user });
+
+    await expect(registerPublicClient({ auth, dataConnect }, clientInput)).resolves.toEqual({ email: "ana@example.com", correoEnviado: true });
+
+    expect(mocks.createUser).toHaveBeenCalledWith(auth, "ana@example.com", "clave123");
+    expect(mocks.sendVerification).toHaveBeenCalledWith(user, null);
+    expect(mocks.registerClient).not.toHaveBeenCalled();
+    expect(user.delete).not.toHaveBeenCalled();
   });
 
-  it("crea Auth y luego Usuario+Cliente con datos normalizados", async () => {
-    const deleteUser = vi.fn();
-    mocks.createUser.mockResolvedValue({ user: { email: "ana@example.com", delete: deleteUser } });
+  it("informa si no se pudo enviar el correo sin perder la cuenta", async () => {
+    mocks.createUser.mockResolvedValue({ user: usuarioAuth({ emailVerified: false }) });
+    mocks.sendVerification.mockRejectedValue(new Error("cuota"));
+    await expect(registerPublicClient({ auth: authCon(null), dataConnect }, clientInput)).resolves.toMatchObject({ correoEnviado: false });
+  });
+
+  it("no crea una identidad Firebase sin aceptar términos ni autorizar datos de la versión vigente", async () => {
+    const auth = authCon(null);
+    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, autorizaDatos: false })).rejects.toThrow("autoriza");
+    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, versionPrivacidad: "anterior" })).rejects.toThrow("vigente");
+    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, aceptaTerminos: false })).rejects.toThrow("Términos y Condiciones");
+    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, versionTerminos: "anterior" })).rejects.toThrow("Términos y Condiciones");
+    expect(mocks.createUser).not.toHaveBeenCalled();
+  });
+
+  it("elimina la identidad si Firebase no devuelve el correo autenticado", async () => {
+    const user = usuarioAuth({ email: null });
+    mocks.createUser.mockResolvedValue({ user });
+    await expect(registerPublicClient({ auth: authCon(null), dataConnect }, clientInput)).rejects.toThrow("correo de la cuenta");
+    expect(user.delete).toHaveBeenCalledOnce();
+    expect(mocks.sendVerification).not.toHaveBeenCalled();
+  });
+});
+
+describe("término del registro con correo verificado", () => {
+  const completar = {
+    ...aceptacion, nombre: " Ana ", apellido: " Pérez ", rut: "123456785", telefono: " ", direccion: " ",
+    tipoCliente: "PARTICULAR" as ClientRegistrationInput["tipoCliente"],
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
     mocks.registerClient.mockResolvedValue({});
+    mocks.getProfile.mockResolvedValue({ data: { usuario: { activo: true, rol: { nombre: "cliente" }, clientes_on_usuario: [{ id: "f" }] } } });
+  });
 
-    await registerPublicClient({ auth, dataConnect }, clientInput);
+  it("refresca el token y crea Usuario+Cliente con la aceptación de ambas versiones", async () => {
+    const user = usuarioAuth();
+    await expect(completarRegistroCliente({ auth: authCon(user), dataConnect }, completar)).resolves.toBe("/cuenta");
 
-    expect(mocks.createUser).toHaveBeenCalledWith(auth, "ana@example.com", "clave1");
+    expect(user.getIdToken).toHaveBeenCalledWith(true);
     expect(mocks.registerClient).toHaveBeenCalledWith(dataConnect, {
-      versionPrivacidad: "2026-11-01",
+      versionPrivacidad: VERSION_PRIVACIDAD,
+      versionTerminos: VERSION_TERMINOS,
       rut: "12.345.678-5",
       nombre: "Ana",
       apellido: "Pérez",
@@ -177,108 +258,110 @@ describe("registro público de clientes", () => {
       direccion: null,
       tipoCliente: "PARTICULAR",
     });
-    expect(deleteUser).not.toHaveBeenCalled();
-  });
-  it("no crea una identidad Firebase sin autorización de datos de la versión vigente", async () => {
-    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, autorizaDatos: false })).rejects.toThrow("autoriza");
-    await expect(registerPublicClient({ auth, dataConnect }, { ...clientInput, versionPrivacidad: "anterior" })).rejects.toThrow("vigente");
-    expect(mocks.createUser).not.toHaveBeenCalled();
   });
 
-  it("envía el correo canónico de Firebase aunque la entrada use otras mayúsculas", async () => {
-    mocks.createUser.mockResolvedValue({ user: { email: "ana@example.com", delete: vi.fn() } });
-    mocks.registerClient.mockResolvedValue({});
-    await registerPublicClient({ auth, dataConnect }, { ...clientInput, email: "ANA@example.com" });
-    expect(mocks.registerClient).toHaveBeenCalledWith(dataConnect, expect.objectContaining({ email: "ana@example.com" }));
+  it("descarta roles inyectados y solo llama a la operación de clientes", async () => {
+    await completarRegistroCliente({ auth: authCon(usuarioAuth()), dataConnect }, { ...completar, rolId: "rol-admin", rol: "admin", activo: true } as typeof completar);
+    const variables = mocks.registerClient.mock.calls[0][1];
+    expect(variables).not.toHaveProperty("rolId");
+    expect(variables).not.toHaveProperty("rol");
+    expect(variables).not.toHaveProperty("activo");
+    expect(mocks.createAdminUser).not.toHaveBeenCalled();
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("no registra un perfil si Firebase no devuelve el correo autenticado", async () => {
-    const borrar = vi.fn().mockResolvedValue(undefined);
-    mocks.createUser.mockResolvedValue({ user: { email: null, delete: borrar } });
-    await expect(registerPublicClient({ auth, dataConnect }, clientInput)).rejects.toThrow("correo de la cuenta");
-    expect(mocks.registerClient).not.toHaveBeenCalled(); expect(borrar).toHaveBeenCalledOnce();
+  it("no crea el perfil si el correo aún no está verificado", async () => {
+    await expect(completarRegistroCliente({ auth: authCon(usuarioAuth({ emailVerified: false })), dataConnect }, completar))
+      .rejects.toMatchObject({ code: "auth/email-not-verified" });
+    expect(mocks.registerClient).not.toHaveBeenCalled();
   });
 
-  it("elimina la cuenta Auth si falla la transacción de Usuario+Cliente", async () => {
-    const databaseError = new Error("Data Connect no disponible");
-    const deleteUser = vi.fn().mockResolvedValue(undefined);
-    mocks.createUser.mockResolvedValue({ user: { email: "ana@example.com", delete: deleteUser } });
-    mocks.registerClient.mockRejectedValue(databaseError);
-
-    await expect(registerPublicClient({ auth, dataConnect }, clientInput)).rejects.toBe(databaseError);
-    expect(deleteUser).toHaveBeenCalledOnce();
+  it("reutiliza la ficha de recepción con el mismo RUT sin duplicarla", async () => {
+    mocks.registerClient.mockRejectedValueOnce(new Error("FICHA_RUT_EXISTENTE"));
+    await completarRegistroCliente({ auth: authCon(usuarioAuth()), dataConnect }, completar);
+    expect(mocks.registerClient).toHaveBeenLastCalledWith(dataConnect, expect.objectContaining({ crearFicha: false }));
   });
 
-  it("conserva el error original aunque también falle el rollback", async () => {
-    const databaseError = new Error("Data Connect no disponible");
-    const deleteUser = vi.fn().mockRejectedValue(new Error("falló delete"));
-    mocks.createUser.mockResolvedValue({ user: { email: "ana@example.com", delete: deleteUser } });
-    mocks.registerClient.mockRejectedValue(databaseError);
+  it("exige aceptar términos y autorizar datos", async () => {
+    await expect(completarRegistroCliente({ auth: authCon(usuarioAuth()), dataConnect }, { ...completar, aceptaTerminos: false })).rejects.toThrow("Términos");
+    expect(mocks.registerClient).not.toHaveBeenCalled();
+  });
+});
 
-    await expect(registerPublicClient({ auth, dataConnect }, clientInput)).rejects.toBe(databaseError);
+describe("aceptación de condiciones vigentes", () => {
+  beforeEach(() => { vi.resetAllMocks(); mocks.aceptar.mockResolvedValue({}); });
+
+  it("registra ambas versiones vigentes", async () => {
+    await aceptarCondiciones(dataConnect, aceptacion);
+    expect(mocks.aceptar).toHaveBeenCalledWith(dataConnect, { versionPrivacidad: VERSION_PRIVACIDAD, versionTerminos: VERSION_TERMINOS });
+  });
+
+  it("no registra nada sin las dos casillas", async () => {
+    await expect(aceptarCondiciones(dataConnect, { ...aceptacion, autorizaDatos: false })).rejects.toThrow("autoriza");
+    expect(mocks.aceptar).not.toHaveBeenCalled();
+  });
+
+  it("solo exige la aceptación a clientes con versiones distintas de las vigentes", () => {
+    const cliente = { rol: { nombre: "cliente" }, versionPrivacidad: VERSION_PRIVACIDAD, versionTerminos: VERSION_TERMINOS } as Parameters<typeof requiereAceptacion>[0];
+    expect(requiereAceptacion(cliente)).toBe(false);
+    expect(requiereAceptacion({ ...cliente!, versionTerminos: null })).toBe(true);
+    expect(requiereAceptacion({ ...cliente!, versionPrivacidad: "2026-11-01" })).toBe(true);
+    expect(requiereAceptacion({ ...cliente!, rol: { ...cliente!.rol, nombre: "operario" }, versionTerminos: null })).toBe(false);
   });
 });
 
 describe("creación de usuarios desde administración", () => {
   const secondaryAuth = {} as Auth;
   const cleanup = vi.fn();
-  const deleteUser = vi.fn();
+  let creado: ReturnType<typeof usuarioAuth>;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.createSecondary.mockReturnValue({
-      auth: secondaryAuth,
-      cleanup,
-    });
-    mocks.createUser.mockResolvedValue({ user: { uid: "nuevo-uid", delete: deleteUser } });
+    creado = { ...usuarioAuth({ emailVerified: false }), uid: "nuevo-uid" };
+    mocks.createSecondary.mockReturnValue({ auth: secondaryAuth, cleanup });
+    mocks.createUser.mockResolvedValue({ user: creado });
     mocks.createAdminUser.mockResolvedValue({});
     mocks.createAdminClient.mockResolvedValue({});
+    mocks.sendVerification.mockResolvedValue(undefined);
     cleanup.mockResolvedValue(undefined);
-    deleteUser.mockResolvedValue(undefined);
   });
 
   it("usa Auth secundario y la sesión Data Connect principal para crear clientes", async () => {
-    await createManagedUser(
-      dataConnect,
-      { ...managedInput, direccion: " Calle Uno 123 " },
-      "cliente",
-    );
+    await expect(createManagedUser(dataConnect, { ...managedInput, direccion: " Calle Uno 123 " }, "cliente"))
+      .resolves.toEqual({ verificacionEnviada: true });
 
-    expect(mocks.createUser).toHaveBeenCalledWith(
-      secondaryAuth,
-      "ana@example.com",
-      "clave1",
-    );
+    expect(mocks.createUser).toHaveBeenCalledWith(secondaryAuth, "ana@example.com", "clave123");
     expect(mocks.createAdminClient).toHaveBeenCalledWith(
       dataConnect,
-      expect.objectContaining({
-        id: "nuevo-uid",
-        direccion: "Calle Uno 123",
-        tipoCliente: "PARTICULAR",
-      }),
+      expect.objectContaining({ id: "nuevo-uid", direccion: "Calle Uno 123", tipoCliente: "PARTICULAR", email: "ana@example.com" }),
     );
+    expect(mocks.sendVerification).toHaveBeenCalledWith(creado, null);
     expect(mocks.createAdminUser).not.toHaveBeenCalled();
-    expect(deleteUser).not.toHaveBeenCalled();
+    expect(creado.delete).not.toHaveBeenCalled();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
-  it("crea solo Usuario para un rol interno", async () => {
-    await createManagedUser(
-      dataConnect,
-      { ...managedInput, rolId: "rol-operario", tipoCliente: "" },
-      "operario",
-    );
+  it("crea solo Usuario para un rol interno y envía la verificación", async () => {
+    await createManagedUser(dataConnect, { ...managedInput, rolId: "rol-operario", tipoCliente: "" }, "operario");
 
     expect(mocks.createAdminUser).toHaveBeenCalledWith(
       dataConnect,
-      expect.objectContaining({
-        id: "nuevo-uid",
-        rolId: "rol-operario",
-        email: "ana@example.com",
-      }),
+      expect.objectContaining({ id: "nuevo-uid", rolId: "rol-operario", email: "ana@example.com" }),
     );
     expect(mocks.createAdminClient).not.toHaveBeenCalled();
+    expect(mocks.sendVerification).toHaveBeenCalledOnce();
     expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("no crea la cuenta sin la confirmación del administrador", async () => {
+    await expect(createManagedUser(dataConnect, { ...managedInput, informado: false }, "operario")).rejects.toThrow("Confirma que informaste");
+    expect(mocks.createUser).not.toHaveBeenCalled();
+  });
+
+  it("la cuenta queda creada aunque falle el envío de la verificación", async () => {
+    mocks.sendVerification.mockRejectedValue(new Error("cuota"));
+    await expect(createManagedUser(dataConnect, managedInput, "cliente")).resolves.toEqual({ verificacionEnviada: false });
+    expect(creado.delete).not.toHaveBeenCalled();
   });
 
   it("elimina la cuenta Auth y el contexto secundario si falla Data Connect", async () => {
@@ -286,7 +369,7 @@ describe("creación de usuarios desde administración", () => {
     mocks.createAdminClient.mockRejectedValue(error);
 
     await expect(createManagedUser(dataConnect, managedInput, "cliente")).rejects.toBe(error);
-    expect(deleteUser).toHaveBeenCalledOnce();
+    expect(creado.delete).toHaveBeenCalledOnce();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
@@ -295,7 +378,7 @@ describe("creación de usuarios desde administración", () => {
     mocks.createUser.mockRejectedValue(error);
 
     await expect(createManagedUser(dataConnect, managedInput, "cliente")).rejects.toBe(error);
-    expect(deleteUser).not.toHaveBeenCalled();
+    expect(creado.delete).not.toHaveBeenCalled();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 });

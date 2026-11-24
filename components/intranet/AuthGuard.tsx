@@ -19,7 +19,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!usuario) {
-      router.push("/");
+      router.push("/?login=1");
       return;
     }
     // Solo los roles internos (admin, recepcionista, operario) usan el shell

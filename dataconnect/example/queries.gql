@@ -19,6 +19,8 @@ query GetMiPerfil @auth(level: USER) {
     telefono
     activo
     creadoEn
+    versionPrivacidad
+    versionTerminos
     rol {
       id
       nombre

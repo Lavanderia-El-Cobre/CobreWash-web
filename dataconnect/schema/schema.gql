@@ -100,6 +100,10 @@ type Usuario @table(name: "usuario") {
   activo: Boolean! @default(value: true)
   versionPrivacidad: String @col(dataType: "varchar(30)")
   autorizadaEn: Timestamp
+  # Aceptación de los Términos y Condiciones por el propio titular de la cuenta.
+  # Nulo en cuentas creadas por el personal hasta que el cliente las acepte.
+  versionTerminos: String @col(dataType: "varchar(30)")
+  terminosAceptadosEn: Timestamp
   creadoEn: Timestamp! @default(expr: "request.time")
   actualizadoEn: Timestamp! @default(expr: "request.time")
 }

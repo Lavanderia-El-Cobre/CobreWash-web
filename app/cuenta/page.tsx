@@ -17,6 +17,8 @@ import { ESTADOS_PUBLICOS } from "@/lib/seguimiento/publico";
 import GlassSelect from "@/components/ui/GlassSelect";
 import DetallePedido from "@/components/portal/DetallePedido";
 import DescargarMisDatos from "@/components/privacidad/DescargarMisDatos";
+import AceptarCondicionesPendientes from "@/components/privacidad/AceptarCondicionesPendientes";
+import { requiereAceptacion } from "@/lib/firebase/auth-flows";
 
 const campo = "w-full rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-3 text-sm font-medium text-stone-900 placeholder:font-normal placeholder:text-stone-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10";
 const boton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-4 py-3 text-sm font-bold text-white shadow-premium transition-shadow hover:shadow-lg disabled:opacity-50";
@@ -34,7 +36,8 @@ export default function CuentaPage() {
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [errorAccion, setErrorAccion] = useState("");
-  const { pedidos, total, cargando, error, actualizar } = usePedidosCliente(clienteActivo ? usuario.id : null, estado, pagina, vista);
+  const pendienteAceptar = requiereAceptacion(usuario);
+  const { pedidos, total, cargando, error, actualizar } = usePedidosCliente(clienteActivo && !pendienteAceptar ? usuario.id : null, estado, pagina, vista);
 
   useEffect(() => {
     if (loading) return;
@@ -68,6 +71,7 @@ export default function CuentaPage() {
   }
 
   if (loading || !usuario || !clienteActivo) return <main className="flex min-h-screen items-center justify-center gap-3 text-sm text-stone-500"><Loader2 aria-label="Cargando cuenta" className="h-5 w-5 animate-spin text-brand-600" />Preparando tu cuenta…</main>;
+  if (pendienteAceptar) return <AceptarCondicionesPendientes nombre={usuario.nombre} primeraVez={!usuario.versionTerminos && !usuario.versionPrivacidad} onSalir={() => { void signOut(auth).finally(() => router.replace("/")); }} />;
   const perfil = usuario.clientes_on_usuario[0];
   return <main className="relative isolate min-h-screen overflow-hidden pb-16 text-stone-900">
     <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[700px] bg-gradient-to-b from-brand-50/80 via-copper-50/40 to-transparent" />

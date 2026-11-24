@@ -11,6 +11,9 @@ import { formatChileanPhone, formatRut, getChileanPhoneType, isValidChileanPhone
 import { ComandaEstado, TipoCliente } from "@/src/dataconnect-generated";
 import { executeMutation, executeQuery, mutationRef, queryRef } from "firebase/data-connect";
 import GlassSelect from "@/components/ui/GlassSelect";
+import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
+import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
+import { mapAuthError } from "@/lib/firebase/errors";
 
 const clp = (n: number) => `$${n.toLocaleString("es-CL")}`;
 
@@ -45,8 +48,6 @@ type ClienteForm = {
   direccion: string;
 };
 
-type CrearFichaVariables = Omit<ClienteForm, "id">;
-type CrearFichaData = { cliente_insert: { id: string } };
 type EditarFichaVariables = ClienteForm & { id: string };
 type EditarFichaData = { cliente_update?: { id: string } | null };
 
@@ -67,6 +68,7 @@ export default function ClientesPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ClienteForm | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [informado, setInformado] = useState(false);
   const solicitudActual = useRef(0);
 
   const cargarClientes = useCallback(async (silencioso = false) => {
@@ -149,8 +151,16 @@ export default function ClientesPage() {
       setNotice("Ingresa un celular o teléfono fijo chileno válido.");
       return;
     }
+    if (!form.id && !form.email.trim()) {
+      setNotice("Ingresa el correo del cliente: se usa para crear su cuenta.");
+      return;
+    }
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
       setNotice("Ingresa un correo válido.");
+      return;
+    }
+    if (!form.id && !informado) {
+      setNotice("Confirma que informaste al cliente sobre su cuenta.");
       return;
     }
 
@@ -171,19 +181,22 @@ export default function ClientesPage() {
           { id: form.id, ...datos },
         ));
       } else {
-        await executeMutation(mutationRef<CrearFichaData, CrearFichaVariables>(
-          dataConnect,
-          "CrearClienteComanda",
-          datos,
-        ));
+        const resultado = await registrarClienteConCuenta(dataConnect, { ...datos, telefono: datos.telefono || undefined, direccion: datos.direccion || undefined });
+        await cargarClientes(true);
+        setNotice(avisoClienteConCuenta(resultado, datos.email));
+        setForm(null);
+        setInformado(false);
+        return;
       }
       await cargarClientes(true);
-      setNotice(form.id ? "Ficha actualizada correctamente." : "Cliente registrado correctamente.");
+      setNotice("Ficha actualizada correctamente.");
       setForm(null);
     } catch (error) {
       registrarError("No se pudo guardar la ficha:", error);
+      const code = (error as { code?: string } | null)?.code;
       setNotice(String(error).includes("ALREADY_EXISTS")
-        ? "Ya existe un cliente registrado con ese RUT."
+        ? "Ya existe un cliente o una cuenta registrada con ese RUT o correo."
+        : code?.startsWith("auth/") ? mapAuthError(error)
         : "No se pudo guardar la ficha del cliente.");
     } finally {
       setSaving(false);
@@ -307,9 +320,10 @@ export default function ClientesPage() {
                     hint={form.telefono ? (getChileanPhoneType(form.telefono) || "Número chileno incompleto") : "Celular o teléfono fijo"}
                     valid={form.telefono ? isValidChileanPhone(form.telefono) : undefined}
                   />
-                  <Field label="Correo" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
+                  <Field label={form.id ? "Correo" : "Correo (obligatorio)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
                 </div>
                 <Field label="Dirección" value={form.direccion} onChange={(direccion) => setForm({ ...form, direccion })} placeholder="Av. Balmaceda 1234, Calama" />
+                {!form.id && <ConfirmacionCuentaCliente marcada={informado} onChange={setInformado} disabled={saving} />}
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -322,7 +336,7 @@ export default function ClientesPage() {
                   </button>
                   <button
                     onClick={guardar}
-                    disabled={saving || !form.nombre.trim()}
+                    disabled={saving || !form.nombre.trim() || (!form.id && (!form.email.trim() || !informado))}
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-2.5 text-sm font-bold text-white shadow-premium hover:shadow-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {saving && <Loader2 className="h-4 w-4 animate-spin" />}

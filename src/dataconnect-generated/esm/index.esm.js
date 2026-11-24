@@ -657,6 +657,30 @@ export function crearClienteAdministrado(dcOrVars, vars) {
   return executeMutation(crearClienteAdministradoRef(dcInstance, inputVars));
 }
 
+export const aceptarCondicionesVigentesRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'AceptarCondicionesVigentes', inputVars);
+}
+aceptarCondicionesVigentesRef.operationName = 'AceptarCondicionesVigentes';
+
+export function aceptarCondicionesVigentes(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(aceptarCondicionesVigentesRef(dcInstance, inputVars));
+}
+
+export const crearClienteConCuentaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'CrearClienteConCuenta', inputVars);
+}
+crearClienteConCuentaRef.operationName = 'CrearClienteConCuenta';
+
+export function crearClienteConCuenta(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(crearClienteConCuentaRef(dcInstance, inputVars));
+}
+
 export const actualizarUsuarioRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();

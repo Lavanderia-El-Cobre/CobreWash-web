@@ -84,7 +84,7 @@ await check("registro crea perfil de cliente y distingue empresa de particular",
  const mutations=await readFile("dataconnect/example/mutations.gql","utf8");
  for (const tipoCliente of ["HOTEL","PARTICULAR"]) {
  const nuevo="registro-"+tipoCliente;
- await execute(mutations,"RegistrarseComoCliente",{versionPrivacidad:"2026-11-01",rut:tipoCliente === "HOTEL" ? "12.345.678-5" : "11.111.111-1",nombre:"Registro",apellido:"Prueba",email:nuevo+"@example.test",tipoCliente},{uid:nuevo,email:nuevo+"@example.test"});
+ await execute(mutations,"RegistrarseComoCliente",{versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24",rut:tipoCliente === "HOTEL" ? "12.345.678-5" : "11.111.111-1",nombre:"Registro",apellido:"Prueba",email:nuevo+"@example.test",tipoCliente},{uid:nuevo,email:nuevo+"@example.test",verified:true});
  const data=await execute(await readFile("dataconnect/example/queries.gql","utf8"),"GetMiPerfil",{}, {uid:nuevo});
  assert.equal(data.usuario.rol.nombre,"cliente"); assert.equal(data.usuario.clientes_on_usuario[0].tipoCliente,tipoCliente);
  }
@@ -94,10 +94,10 @@ await check("el servidor impone cliente aunque se envíe el ID de un rol interno
  const queries=await readFile("dataconnect/example/queries.gql","utf8");
  for(const [indice,dv] of [[1,"3"],[2,"1"],[3,"K"],[5,"6"],[6,"4"]]) {
   const nuevo=`registro-rol-${indice}`;
-  await execute(mutations,"RegistrarseComoCliente",{versionPrivacidad:"2026-11-01",
+  await execute(mutations,"RegistrarseComoCliente",{versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24",
    rolId:`00000000-0000-4000-8000-00000000000${indice}`,
    rut:`20.000.00${indice}-${dv}`,nombre:"Registro",apellido:"Prueba",email:`${nuevo}@example.test`,tipoCliente:"PARTICULAR",
-  },{uid:nuevo,email:`${nuevo}@example.test`});
+  },{uid:nuevo,email:`${nuevo}@example.test`,verified:true});
   const data=await execute(queries,"GetMiPerfil",{},{uid:nuevo});
   assert.equal(data.usuario.rol.nombre,"cliente");
  }
@@ -141,14 +141,47 @@ await check("activos e historial filtran todos los registros antes de paginar, s
 });
 await check("un correo ajeno no puede reservarse durante el registro de otra identidad", async () => {
  const mutations=await readFile("dataconnect/example/mutations.gql","utf8");
- const a={uid:"registro-correo-a",email:"registro-a@example.test"};
- const b={uid:"registro-correo-b",email:"registro-b@example.test"};
- const datos={versionPrivacidad:"2026-11-01",rut:"20.000.010-2",nombre:"Prueba",apellido:"Correo",email:b.email,tipoCliente:"PARTICULAR"};
+ const a={uid:"registro-correo-a",email:"registro-a@example.test",verified:true};
+ const b={uid:"registro-correo-b",email:"registro-b@example.test",verified:true};
+ const datos={versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24",rut:"20.000.010-2",nombre:"Prueba",apellido:"Correo",email:b.email,tipoCliente:"PARTICULAR"};
  await assert.rejects(execute(mutations,"RegistrarseComoCliente",datos,a),/correo debe coincidir/);
  const rechazado=await execute('query Perfil($id:String!){usuario(id:$id){id}}',"Perfil",{id:a.uid});
  assert.equal(rechazado.usuario,null);
  await execute(mutations,"RegistrarseComoCliente",{...datos,rut:"20.000.011-0"},b);
  const perfil=await execute(await readFile("dataconnect/example/queries.gql","utf8"),"GetMiPerfil",{},b);
  assert.equal(perfil.usuario.email,b.email);
+});
+await check("la cuenta solo se termina de crear con el correo verificado y términos y aviso vigentes", async () => {
+ const mutations=await readFile("dataconnect/example/mutations.gql","utf8");
+ const usuario={uid:"registro-verificacion",email:"registro-verificacion@example.test"};
+ const datos={versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24",rut:"20.000.012-9",nombre:"Prueba",apellido:"Verificacion",email:usuario.email,tipoCliente:"PARTICULAR"};
+ await assert.rejects(execute(mutations,"RegistrarseComoCliente",datos,{...usuario,verified:false}),/CORREO_NO_VERIFICADO/);
+ await assert.rejects(execute(mutations,"RegistrarseComoCliente",{...datos,versionTerminos:null},{...usuario,verified:true}),/términos/);
+ await assert.rejects(execute(mutations,"RegistrarseComoCliente",{...datos,versionPrivacidad:"2026-11-01"},{...usuario,verified:true}),/términos/);
+ assert.equal((await execute('query Perfil($id:String!){usuario(id:$id){id}}',"Perfil",{id:usuario.uid})).usuario,null);
+ await execute(mutations,"RegistrarseComoCliente",datos,{...usuario,verified:true});
+ const d=await execute('query Perfil($id:String!){usuario(id:$id){versionPrivacidad versionTerminos autorizadaEn terminosAceptadosEn}}',"Perfil",{id:usuario.uid});
+ assert.equal(d.usuario.versionPrivacidad,"2026-11-24"); assert.equal(d.usuario.versionTerminos,"2026-11-24");
+ assert(d.usuario.autorizadaEn); assert(d.usuario.terminosAceptadosEn);
+});
+await check("el titular acepta por sí mismo los términos y el aviso vigentes", async () => {
+ const mutations=await readFile("dataconnect/example/mutations.gql","utf8");
+ await assert.rejects(execute(mutations,"AceptarCondicionesVigentes",{versionPrivacidad:"2026-11-01",versionTerminos:"2026-11-24"},verified));
+ await assert.rejects(execute(mutations,"AceptarCondicionesVigentes",{versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24"},"sin-perfil"));
+ await assert.rejects(execute(mutations,"AceptarCondicionesVigentes",{versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24"},"test-inactivo"));
+ await execute(mutations,"AceptarCondicionesVigentes",{versionPrivacidad:"2026-11-24",versionTerminos:"2026-11-24"},verified);
+ const d=await execute(await readFile("dataconnect/example/queries.gql","utf8"),"GetMiPerfil",{},verified);
+ assert.equal(d.usuario.versionPrivacidad,"2026-11-24"); assert.equal(d.usuario.versionTerminos,"2026-11-24");
+});
+await check("recepción y administración crean clientes con cuenta asociada; otros roles no", async () => {
+ const mutations=await readFile("dataconnect/example/mutations.gql","utf8");
+ const datos=(n)=>({usuarioId:`cuenta-recepcion-${n}`,nombreUsuario:"Cliente",apellidoUsuario:"Recepcion",nombre:"Cliente Recepcion",tipoCliente:"PARTICULAR",rut:`20.000.02${n}-${["0","9","7","5"][n]}`,email:`recepcion-${n}@example.test`});
+ for (const [n,rol] of [[0,"test-cliente"],[1,"test-operario"],[2,null]]) await assert.rejects(execute(mutations,"CrearClienteConCuenta",datos(n),rol));
+ await assert.rejects(execute(mutations,"CrearClienteConCuenta",{...datos(3),email:"sin-arroba"},"test-recepcion"),/correo/);
+ const creado=await execute(mutations,"CrearClienteConCuenta",datos(3),"test-recepcion");
+ const d=await execute('query C($id:UUID!){cliente(id:$id){usuarioId email usuario{rol{nombre} email versionTerminos}}}',"C",{id:creado.cliente_insert.id});
+ assert.equal(d.cliente.usuarioId,"cuenta-recepcion-3"); assert.equal(d.cliente.usuario.rol.nombre,"cliente");
+ assert.equal(d.cliente.usuario.email,"recepcion-3@example.test"); assert.equal(d.cliente.usuario.versionTerminos,null);
+ await assert.rejects(execute(mutations,"CrearClienteConCuenta",{...datos(3),rut:"20.000.030-0",email:"otra@example.test"},"test-admin"),/existe/);
 });
 console.log(`${checks} pruebas de integración del portal completadas.`);

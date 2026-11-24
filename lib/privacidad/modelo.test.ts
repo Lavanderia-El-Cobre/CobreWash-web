@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { objetivoAtencion, validarGestionDerecho, validarSolicitudDerecho } from "./modelo";
+import { objetivoAtencion, validarGestionDerecho, validarSolicitudDerecho, VERSION_PRIVACIDAD } from "./modelo";
 import { configuracionLegal } from "./configuracion";
 const solicitud = { id: "10000000-0000-4000-8000-000000000001", secreto: "a".repeat(64), nombre: " Ana ", email: " ANA@example.test ", derecho: "ACCESO" };
 afterEach(() => vi.unstubAllEnvs());
@@ -33,11 +33,11 @@ describe("solicitudes de datos", () => {
 });
 describe("publicación del aviso", () => {
   it("no publica si faltan datos aunque se marque aprobada la versión", () => {
-    vi.stubEnv("LEGAL_RUT", ""); vi.stubEnv("LEGAL_AVISO_APROBADO_VERSION", "2026-11-01");
+    vi.stubEnv("LEGAL_RUT", ""); vi.stubEnv("LEGAL_AVISO_APROBADO_VERSION", VERSION_PRIVACIDAD);
     expect(configuracionLegal().publicada).toBe(false);
   });
   it("exige identidad válida, condiciones y aprobación de la versión actual", () => {
-    for (const [k,v] of Object.entries({ LEGAL_RAZON_SOCIAL: "Empresa de prueba", LEGAL_RUT: "12.345.678-5", LEGAL_DOMICILIO: "Domicilio de prueba", LEGAL_REPRESENTANTE: "Representante", LEGAL_EMAIL_DERECHOS: "privacidad@example.test", LEGAL_CONSERVACION: "Condiciones aprobadas de prueba", LEGAL_PROVEEDORES_TRANSFERENCIAS: "Condiciones de prueba", LEGAL_AVISO_APROBADO_VERSION: "2026-11-01" })) vi.stubEnv(k,v);
+    for (const [k,v] of Object.entries({ LEGAL_RAZON_SOCIAL: "Empresa de prueba", LEGAL_RUT: "12.345.678-5", LEGAL_DOMICILIO: "Domicilio de prueba", LEGAL_REPRESENTANTE: "Representante", LEGAL_EMAIL_DERECHOS: "privacidad@example.test", LEGAL_CONSERVACION: "Condiciones aprobadas de prueba", LEGAL_PROVEEDORES_TRANSFERENCIAS: "Condiciones de prueba", LEGAL_AVISO_APROBADO_VERSION: VERSION_PRIVACIDAD })) vi.stubEnv(k,v);
     expect(configuracionLegal().publicada).toBe(true);
     vi.stubEnv("LEGAL_EMAIL_DERECHOS", ""); expect(configuracionLegal().publicada).toBe(true);
     vi.stubEnv("LEGAL_EMAIL_DERECHOS", "no-es-correo"); expect(configuracionLegal().publicada).toBe(false);

@@ -44,6 +44,8 @@ import {
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import GlassSelect from "@/components/ui/GlassSelect";
+import Link from "next/link";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
 type Usuario = GetUsuariosData["usuarios"][number];
 type RolOpcion = GetRolesData["rols"][number];
@@ -78,6 +80,7 @@ const emptyForm: FormState = {
   direccion: "",
   tipoCliente: "",
   password: "",
+  informado: false,
 };
 
 type Modal = { mode: "crear" } | { mode: "editar"; usuario: Usuario } | null;
@@ -95,6 +98,7 @@ export default function UsuariosPage() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [aviso, setAviso] = useState("");
 
   const rutDigits = cleanRut(form.rut);
   const rutTouched = rutDigits.length > 0;
@@ -178,9 +182,12 @@ export default function UsuariosPage() {
 
     setSaving(true);
     try {
-      await createManagedUser(dataConnect, form, selectedRole?.nombre ?? "");
+      const { verificacionEnviada } = await createManagedUser(dataConnect, form, selectedRole?.nombre ?? "");
       await cargarUsuarios();
       setModal(null);
+      setAviso(verificacionEnviada
+        ? `Cuenta creada. Enviamos a ${form.email.trim()} un enlace para verificar el correo; podrá ingresar después de confirmarlo.`
+        : `Cuenta creada, pero no se pudo enviar la verificación a ${form.email.trim()}. Se reenviará cuando intente iniciar sesión.`);
     } catch (err) {
       setFormError(mapAuthError(err));
     } finally {
@@ -251,6 +258,11 @@ export default function UsuariosPage() {
             {usuarios.length} cuentas registradas · {activeCount} activas
           </p>
         </div>
+        {aviso && (
+          <p role="status" className="flex-1 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs font-semibold text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">
+            {aviso} <button type="button" onClick={() => setAviso("")} className="ml-2 underline">Cerrar</button>
+          </p>
+        )}
         <button
           onClick={openCrear}
           className="flex items-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all self-start sm:self-auto cursor-pointer"
@@ -624,9 +636,29 @@ export default function UsuariosPage() {
                   </Field>
                 )}
 
+                {modal.mode === "crear" && (
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 p-3 text-xs leading-relaxed text-stone-600 dark:border-white/10 dark:bg-white/5 dark:text-stone-300">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={form.informado === true}
+                      onChange={(e) => setForm({ ...form, informado: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+                    />
+                    <span>
+                      Confirmo que informé a la persona de los{" "}
+                      <Link href="/terminos" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-700 underline dark:text-brand-400">Términos y Condiciones</Link>{" "}
+                      (v{VERSION_TERMINOS}) y del{" "}
+                      <Link href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-700 underline dark:text-brand-400">Aviso de Privacidad</Link>{" "}
+                      (v{VERSION_PRIVACIDAD}), y que recibirá un correo para verificar su cuenta antes de ingresar.
+                      {selectedRole?.nombre === "cliente" && " Al ingresar por primera vez, el cliente deberá aceptarlos personalmente."}
+                    </span>
+                  </label>
+                )}
+
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || (modal.mode === "crear" && form.informado !== true)}
                   className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg disabled:opacity-50 transition-all duration-200 cursor-pointer"
                 >
                   {saving ? (

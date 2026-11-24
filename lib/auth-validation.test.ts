@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 import {
+  validateClientCompletion,
   validateLogin,
   validateManagedUserRegistration,
   validateManagedUserUpdate,
@@ -37,7 +39,8 @@ describe("validación del registro público de clientes", () => {
   const validRegistration: PublicClientRegistrationInput = {
     ...validClient,
     confirmPassword: "clave123",
-    autorizaDatos: true, versionPrivacidad: "2026-11-01",
+    aceptaTerminos: true, versionTerminos: VERSION_TERMINOS,
+    autorizaDatos: true, versionPrivacidad: VERSION_PRIVACIDAD,
   };
 
   it("exige los datos personales y credenciales obligatorios", () => {
@@ -68,6 +71,21 @@ describe("validación del registro público de clientes", () => {
     expect(validatePublicClientRegistration({ ...validRegistration, autorizaDatos: false })).toContain("autoriza");
     expect(validatePublicClientRegistration({ ...validRegistration, versionPrivacidad: "anterior" })).toContain("vigente");
   });
+  it("exige aceptar los términos vigentes por separado de la autorización de datos", () => {
+    expect(validatePublicClientRegistration({ ...validRegistration, aceptaTerminos: false })).toContain("Términos y Condiciones");
+    expect(validatePublicClientRegistration({ ...validRegistration, versionTerminos: "anterior" })).toContain("Términos y Condiciones");
+  });
+  it("valida los datos para terminar un registro con correo verificado", () => {
+    const completar = {
+      nombre: validRegistration.nombre, apellido: validRegistration.apellido, rut: validRegistration.rut,
+      telefono: validRegistration.telefono, direccion: validRegistration.direccion, tipoCliente: validRegistration.tipoCliente,
+      aceptaTerminos: true, versionTerminos: VERSION_TERMINOS, autorizaDatos: true, versionPrivacidad: VERSION_PRIVACIDAD,
+    };
+    expect(validateClientCompletion(completar)).toBeNull();
+    expect(validateClientCompletion({ ...completar, rut: "12.345.678-9" })).toBe("El RUT ingresado no es válido.");
+    expect(validateClientCompletion({ ...completar, aceptaTerminos: false })).toContain("Términos y Condiciones");
+    expect(validateClientCompletion({ ...completar, nombre: " " })).toBe("Completa tu nombre, apellido y RUT.");
+  });
 
   it.each(["admin", "recepcionista", "operario", "conductor", "repartidor"])(
     "rechaza %s como tipo de cuenta en el registro público",
@@ -84,7 +102,12 @@ describe("validación de usuarios creados por administración", () => {
   const validManagedUser: ManagedUserRegistrationInput = {
     ...validClient,
     rolId: "rol-cliente",
+    informado: true,
   };
+
+  it("exige confirmar que se informó a la persona de los términos y el aviso", () => {
+    expect(validateManagedUserRegistration({ ...validManagedUser, informado: false }, "operario")).toContain("Confirma que informaste");
+  });
 
   it("exige tipo de cliente solo para el rol cliente", () => {
     expect(validateManagedUserRegistration({ ...validManagedUser, tipoCliente: "" }, "cliente")).toBe(
