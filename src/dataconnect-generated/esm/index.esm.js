@@ -282,6 +282,19 @@ export function actualizarEstadoSolicitudContacto(dcOrVars, vars) {
   return executeMutation(actualizarEstadoSolicitudContactoRef(dcInstance, inputVars));
 }
 
+export const getComandasParaEntregaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetComandasParaEntrega', inputVars);
+}
+getComandasParaEntregaRef.operationName = 'GetComandasParaEntrega';
+
+export function getComandasParaEntrega(dcOrVars, varsOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
+  return executeQuery(getComandasParaEntregaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
 export const getInspeccionParaEvidenciasRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();
@@ -847,6 +860,18 @@ entregarComandaRef.operationName = 'EntregarComanda';
 export function entregarComanda(dcOrVars, vars) {
   const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
   return executeMutation(entregarComandaRef(dcInstance, inputVars));
+}
+
+export const reportarProblemaEntregaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'ReportarProblemaEntrega', inputVars);
+}
+reportarProblemaEntregaRef.operationName = 'ReportarProblemaEntrega';
+
+export function reportarProblemaEntrega(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(reportarProblemaEntregaRef(dcInstance, inputVars));
 }
 
 export const editarComandaRef = (dcOrVars, vars) => {
@@ -1603,4 +1628,17 @@ export function getHistorialVehiculos(dcOrVars, varsOrOptions, options) {
 
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
   return executeQuery(getHistorialVehiculosRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const getPanelRepartidorRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetPanelRepartidor', inputVars);
+}
+getPanelRepartidorRef.operationName = 'GetPanelRepartidor';
+
+export function getPanelRepartidor(dcOrVars, varsOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
+  return executeQuery(getPanelRepartidorRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }

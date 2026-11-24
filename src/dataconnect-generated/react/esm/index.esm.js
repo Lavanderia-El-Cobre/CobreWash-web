@@ -1,4 +1,4 @@
-import { agregarComentarioComandaRef, resolverMiIncidenciaRef, autoAsignarComandaOperarioRef, getComandaDetalleOperarioRef, getMisComandasAsignadasRef, getInsumosOperarioRef, crearAvisoRef, getAvisosAdministracionRef, getAvisosParaEquipoRef, getSolicitudContactoConfirmadaRef, prepararLimiteContactoRef, getLimiteContactoRef, registrarSolicitudContactoRef, getSolicitudesContactoRef, actualizarEstadoSolicitudContactoRef, getInspeccionParaEvidenciasRef, getMovimientoFlotaPorInspeccionRef, registrarEvidenciaGuardadaRef, vincularMiFichaVerificadaRef, autorizarModuloIaRef, getPanelIaRef, getHistorialAjustesIaRef, guardarTasaConsumoRef, eliminarTasaConsumoRef, guardarConfiguracionIaRef, registrarConteoFisicoIaRef, getInsumosImportacionIaRef, getRegistrosExistentesIaRef, getDatosEntrenamientoIaRef, getTasasSimulacionIaRef, borrarSimulacionIaRef, borrarSimulacionesIaRef, getModeloComandaIaRef, registrarConteoInventarioRef, getMiConteoInventarioRef, getMisConteosInventarioRef, getConteosInventarioRef, aprobarConteoInventarioRef, rechazarConteoInventarioRef, getStockInventarioRef, getHistorialInventarioRef, registrarseRef, crearUsuarioAdministradoRef, registrarseComoClienteRef, crearClienteAdministradoRef, aceptarCondicionesVigentesRef, crearClienteConCuentaRef, actualizarUsuarioRef, crearVehiculoRef, actualizarVehiculoRef, crearSalidaVehiculoRef, registrarInspeccionAntesRef, iniciarSalidaVehiculoRef, registrarInspeccionDespuesRef, agregarFotoInspeccionVehiculoRef, crearClienteComandaRef, editarFichaClienteRef, crearComandaRef, agregarComandaDetalleRef, anularComandaRef, entregarComandaRef, editarComandaRef, eliminarDetallesComandaRef, crearTipoPrendaRef, crearTipoServicioRef, crearInsumoRef, actualizarInsumoRef, registrarEntradaInventarioRef, registrarSalidaInventarioRef, getMisComandasRef, vincularMiComandaRef, autorizarGestionPrivacidadRef, getComprobanteDerechoRef, recibirSolicitudDerechoRef, listarSolicitudesDerechoRef, gestionarSolicitudDerechoRef, contarLimitesContactoVencidosRef, purgarLimitesContactoRef, asociarFlujoComandaPendienteRef, configurarEtapaProduccionRef, configurarLimitesEtapasRef, completarEtapaComandaRef, registrarIncidenciaComandaRef, actualizarEstadoIncidenciaRef, reasignarOperarioEtapaRef, getEtapasProduccionRef, getSeguimientoProduccionRef, getPanelProduccionRef, getComandasParaAlertasRef, getIncidenciasRef, getMiComandaGuardadaRef, getRolesRef, getMiPerfilRef, getUsuariosRef, getComandaPorQrRef, getInsumoPorQrRef, getInventarioRef, getVehiculosRef, getMisSalidasVehiculoRef, getComandasPaginadasRef, getComandasActivasCountRef, getComandaDetalleRef, getCatalogosComandaRef, diagnosticoComandasRef, getFichasClientesRef, getReporteVolumenRef, getReporteCuentasRef, getDetalleReporteCuentasRef, getFiltrosReportesRef, getReporteServiciosRef, getDetalleReporteServiciosRef, getSeguimientoPublicoPorQrRef, getSeguimientoPublicoPorNumeroRef, getComandaOperativaPorQrRef, registrarVehiculoFlotaRef, editarVehiculoFlotaRef, registrarSalidaFlotaRef, registrarRetornoFlotaRef, adjuntarFotoInspeccionFlotaRef, getFlotaVehiculosRef, getHistorialVehiculosRef, connectorConfig } from '../../esm/index.esm.js';
+import { agregarComentarioComandaRef, resolverMiIncidenciaRef, autoAsignarComandaOperarioRef, getComandaDetalleOperarioRef, getMisComandasAsignadasRef, getInsumosOperarioRef, crearAvisoRef, getAvisosAdministracionRef, getAvisosParaEquipoRef, getSolicitudContactoConfirmadaRef, prepararLimiteContactoRef, getLimiteContactoRef, registrarSolicitudContactoRef, getSolicitudesContactoRef, actualizarEstadoSolicitudContactoRef, getComandasParaEntregaRef, getInspeccionParaEvidenciasRef, getMovimientoFlotaPorInspeccionRef, registrarEvidenciaGuardadaRef, vincularMiFichaVerificadaRef, autorizarModuloIaRef, getPanelIaRef, getHistorialAjustesIaRef, guardarTasaConsumoRef, eliminarTasaConsumoRef, guardarConfiguracionIaRef, registrarConteoFisicoIaRef, getInsumosImportacionIaRef, getRegistrosExistentesIaRef, getDatosEntrenamientoIaRef, getTasasSimulacionIaRef, borrarSimulacionIaRef, borrarSimulacionesIaRef, getModeloComandaIaRef, registrarConteoInventarioRef, getMiConteoInventarioRef, getMisConteosInventarioRef, getConteosInventarioRef, aprobarConteoInventarioRef, rechazarConteoInventarioRef, getStockInventarioRef, getHistorialInventarioRef, registrarseRef, crearUsuarioAdministradoRef, registrarseComoClienteRef, crearClienteAdministradoRef, aceptarCondicionesVigentesRef, crearClienteConCuentaRef, actualizarUsuarioRef, crearVehiculoRef, actualizarVehiculoRef, crearSalidaVehiculoRef, registrarInspeccionAntesRef, iniciarSalidaVehiculoRef, registrarInspeccionDespuesRef, agregarFotoInspeccionVehiculoRef, crearClienteComandaRef, editarFichaClienteRef, crearComandaRef, agregarComandaDetalleRef, anularComandaRef, entregarComandaRef, reportarProblemaEntregaRef, editarComandaRef, eliminarDetallesComandaRef, crearTipoPrendaRef, crearTipoServicioRef, crearInsumoRef, actualizarInsumoRef, registrarEntradaInventarioRef, registrarSalidaInventarioRef, getMisComandasRef, vincularMiComandaRef, autorizarGestionPrivacidadRef, getComprobanteDerechoRef, recibirSolicitudDerechoRef, listarSolicitudesDerechoRef, gestionarSolicitudDerechoRef, contarLimitesContactoVencidosRef, purgarLimitesContactoRef, asociarFlujoComandaPendienteRef, configurarEtapaProduccionRef, configurarLimitesEtapasRef, completarEtapaComandaRef, registrarIncidenciaComandaRef, actualizarEstadoIncidenciaRef, reasignarOperarioEtapaRef, getEtapasProduccionRef, getSeguimientoProduccionRef, getPanelProduccionRef, getComandasParaAlertasRef, getIncidenciasRef, getMiComandaGuardadaRef, getRolesRef, getMiPerfilRef, getUsuariosRef, getComandaPorQrRef, getInsumoPorQrRef, getInventarioRef, getVehiculosRef, getMisSalidasVehiculoRef, getComandasPaginadasRef, getComandasActivasCountRef, getComandaDetalleRef, getCatalogosComandaRef, diagnosticoComandasRef, getFichasClientesRef, getReporteVolumenRef, getReporteCuentasRef, getDetalleReporteCuentasRef, getFiltrosReportesRef, getReporteServiciosRef, getDetalleReporteServiciosRef, getSeguimientoPublicoPorQrRef, getSeguimientoPublicoPorNumeroRef, getComandaOperativaPorQrRef, registrarVehiculoFlotaRef, editarVehiculoFlotaRef, registrarSalidaFlotaRef, registrarRetornoFlotaRef, adjuntarFotoInspeccionFlotaRef, getFlotaVehiculosRef, getHistorialVehiculosRef, getPanelRepartidorRef, connectorConfig } from '../../esm/index.esm.js';
 import { validateArgs, CallerSdkTypeEnum } from 'firebase/data-connect';
 import { useDataConnectQuery, useDataConnectMutation, validateReactArgs } from '@tanstack-query-firebase/react/data-connect';
 
@@ -106,6 +106,12 @@ export function useActualizarEstadoSolicitudContacto(dcOrOptions, options) {
   return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
 }
 
+
+export function useGetComandasParaEntrega(dcOrVars, varsOrOptions, options) {
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateReactArgs(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
+  const ref = getComandasParaEntregaRef(dcInstance, inputVars);
+  return useDataConnectQuery(ref, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
 
 export function useGetInspeccionParaEvidencias(dcOrVars, varsOrOptions, options) {
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateReactArgs(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
@@ -440,6 +446,14 @@ export function useEntregarComanda(dcOrOptions, options) {
   const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
   function refFactory(vars) {
     return entregarComandaRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+export function useReportarProblemaEntrega(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return reportarProblemaEntregaRef(dcInstance, vars);
   }
   return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
 }
@@ -850,5 +864,11 @@ export function useGetFlotaVehiculos(dcOrVars, varsOrOptions, options) {
 export function useGetHistorialVehiculos(dcOrVars, varsOrOptions, options) {
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateReactArgs(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
   const ref = getHistorialVehiculosRef(dcInstance, inputVars);
+  return useDataConnectQuery(ref, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+export function useGetPanelRepartidor(dcOrVars, varsOrOptions, options) {
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateReactArgs(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
+  const ref = getPanelRepartidorRef(dcInstance, inputVars);
   return useDataConnectQuery(ref, inputOpts, CallerSdkTypeEnum.GeneratedReact);
 }

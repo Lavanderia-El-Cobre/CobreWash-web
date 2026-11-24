@@ -12,7 +12,7 @@ import CambiarContrasena from "@/components/intranet/CambiarContrasena";
 
 type Tab = "apariencia" | "perfil" | "seguridad" | "limites";
 export default function ConfiguracionPage() {
-  const permitido = useRoleGuard(["admin", "recepcionista", "operario"]);
+  const permitido = useRoleGuard(["admin", "recepcionista", "operario", "repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();
   const { theme, setTheme } = useTheme();
   const router = useRouter();

@@ -41,6 +41,15 @@ export function mapearErrorVehiculos(error: unknown): string {
   if (/No se puede desactivar un vehículo con una salida en curso/i.test(msg)) {
     return "No se puede desactivar un vehículo mientras tiene una salida en curso.";
   }
+  if (/Ya tienes un vehículo en ruta/i.test(msg)) {
+    return "Ya tienes un vehículo en ruta: registra su regreso antes de tomar otro.";
+  }
+  if (/no está registrada a tu nombre|no pertenece a tu salida/i.test(msg)) {
+    return "Esa salida no está registrada a tu nombre.";
+  }
+  if (/no existe o ya fue finalizada/i.test(msg)) {
+    return "La salida ya fue cerrada. Actualiza la vista para ver su estado.";
+  }
   if (/NO_APTO/i.test(msg)) {
     return "No se puede autorizar la salida de un vehículo calificado como NO APTO.";
   }
@@ -53,7 +62,7 @@ export function mapearErrorVehiculos(error: unknown): string {
   if (/inactivo/i.test(msg)) {
     return "El vehículo o conductor seleccionado se encuentra inactivo.";
   }
-  if (/Solo administradores|No autorizado/i.test(msg)) {
+  if (/Solo administradores|Solo administración|No autorizado/i.test(msg)) {
     return "No tienes permisos para ejecutar esta operación.";
   }
   return "No fue posible guardar los cambios. Verifica los datos e intenta nuevamente.";

@@ -15,7 +15,7 @@ import {
 } from "@/lib/avisos/modelo";
 
 export default function ComunicacionPage() {
-  const permitido = useRoleGuard(["admin", "operario", "recepcionista"]);
+  const permitido = useRoleGuard(["admin", "operario", "recepcionista", "repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();
   const esAdmin = usuario?.rol.nombre === "admin";
 
@@ -211,6 +211,7 @@ export default function ComunicacionPage() {
                       { value: "todos", label: "Todos los equipos" },
                       { value: "operario", label: "Solo Operarios" },
                       { value: "recepcionista", label: "Solo Recepción" },
+                      { value: "repartidor", label: "Solo Reparto" },
                     ]}
                   />
                 </div>

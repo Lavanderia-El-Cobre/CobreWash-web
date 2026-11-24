@@ -8,7 +8,7 @@ mutation CrearAviso($titulo: String!, $contenido: String!, $rolDestinatarioId: U
       rol { nombre @check(expr: "this == 'admin'", message: "Solo administración puede publicar avisos") }
     }
     destinatario: rol(first: { where: { id: { eq: $rolDestinatarioId } } })
-      @check(expr: "vars.rolDestinatarioId == null || (this != null && this.nombre in ['operario', 'recepcionista'])", message: "Destinatario inválido") {
+      @check(expr: "vars.rolDestinatarioId == null || (this != null && this.nombre in ['operario', 'recepcionista', 'repartidor'])", message: "Destinatario inválido") {
       nombre
     }
   }

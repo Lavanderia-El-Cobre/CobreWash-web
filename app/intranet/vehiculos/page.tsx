@@ -35,13 +35,11 @@ import {
 import { consultarFlotaCompleta } from "@/lib/vehiculos/consultar";
 import AdjuntarEvidencia from "@/components/intranet/AdjuntarEvidencia";
 import FotoEvidencia from "@/components/intranet/FotoEvidencia";
-import { subirEvidencia } from "@/lib/vehiculos/evidencias";
-import { normalizarCodigoQr } from "@/lib/seguimiento/qr";
+import { confirmarMovimientoFlota, MENSAJE_FOTOS_PENDIENTES, subirEvidenciasInspeccion } from "@/lib/vehiculos/movimientos";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
 import { useUsuarioActualContext } from "@/components/intranet/AuthGuard";
 import { dataConnect } from "@/lib/firebase/client";
 import {
-  getMovimientoFlotaPorInspeccion,
   editarVehiculoFlota,
   EstadoVehiculo,
   registrarRetornoFlota,
@@ -601,8 +599,7 @@ export default function VehiculosPage() {
     setFormError("");
     let movimientoGuardado = salidaConfirmada;
     try {
-      const previa = await getMovimientoFlotaPorInspeccion(dataConnect, { id: operacionSalida.current.inspeccionId }, { fetchPolicy: "SERVER_ONLY" });
-      const resultado = previa.data.inspeccionVehiculo ? { data: { inspeccion: { id: previa.data.inspeccionVehiculo.id } } } : await registrarSalidaFlota(dataConnect, {
+      const inspeccionId = await confirmarMovimientoFlota(operacionSalida.current.inspeccionId, () => registrarSalidaFlota(dataConnect, {
         ...operacionSalida.current,
         vehiculoId: formSalida.vehiculoId,
         repartidorId: formSalida.repartidorId,
@@ -611,16 +608,13 @@ export default function VehiculosPage() {
         observaciones: formSalida.observaciones.trim() || null,
         observacionesInspeccion:
           formSalida.observacionesInspeccion.trim() || null,
-      });
+      }));
 
       movimientoGuardado = true;
       setSalidaConfirmada(true);
-      const inspeccionId = normalizarCodigoQr(resultado.data.inspeccion.id);
-      for (let i = 0; i < formSalida.fotos.length; i++) {
-        const foto = formSalida.fotos[i];
-        const rutaFinal = await subirEvidencia(inspeccionId, foto, i + 1);
+      await subirEvidenciasInspeccion(inspeccionId, formSalida.fotos, (foto, rutaFinal) => {
         if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      }
+      });
 
       const patente = itemVehiculo?.vehiculo.patente ?? "Vehículo";
       setNotice({
@@ -630,7 +624,7 @@ export default function VehiculosPage() {
       setFormSalida(null);
       await cargarFlota(true);
     } catch (error) {
-      setFormError(movimientoGuardado ? "El movimiento ya se guardó. Solo quedan fotografías pendientes: reintenta aquí o adjúntalas desde el historial. " + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
+      setFormError(movimientoGuardado ? MENSAJE_FOTOS_PENDIENTES + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
     } finally {
       setSaving(false);
     }
@@ -657,8 +651,7 @@ export default function VehiculosPage() {
     setFormError("");
     let movimientoGuardado = retornoConfirmado;
     try {
-      const previa = await getMovimientoFlotaPorInspeccion(dataConnect, { id: operacionRetorno.current.inspeccionId }, { fetchPolicy: "SERVER_ONLY" });
-      const resultado = previa.data.inspeccionVehiculo ? { data: { inspeccion: { id: previa.data.inspeccionVehiculo.id } } } : await registrarRetornoFlota(dataConnect, {
+      const inspeccionId = await confirmarMovimientoFlota(operacionRetorno.current.inspeccionId, () => registrarRetornoFlota(dataConnect, {
         ...operacionRetorno.current,
         salidaId: formRetorno.salidaId,
         kilometraje: kmNum,
@@ -666,16 +659,13 @@ export default function VehiculosPage() {
         observacionesRetorno: formRetorno.observacionesRetorno.trim() || null,
         observacionesInspeccion:
           formRetorno.observacionesInspeccion.trim() || null,
-      });
+      }));
 
       movimientoGuardado = true;
       setRetornoConfirmado(true);
-      const inspeccionId = normalizarCodigoQr(resultado.data.inspeccion.id);
-      for (let i = 0; i < formRetorno.fotos.length; i++) {
-        const foto = formRetorno.fotos[i];
-        const rutaFinal = await subirEvidencia(inspeccionId, foto, i + 1);
+      await subirEvidenciasInspeccion(inspeccionId, formRetorno.fotos, (foto, rutaFinal) => {
         if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      }
+      });
 
       const recorridos = Math.max(
         0,
@@ -688,7 +678,7 @@ export default function VehiculosPage() {
       setFormRetorno(null);
       await cargarFlota(true);
     } catch (error) {
-      setFormError(movimientoGuardado ? "El movimiento ya se guardó. Solo quedan fotografías pendientes: reintenta aquí o adjúntalas desde el historial. " + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
+      setFormError(movimientoGuardado ? MENSAJE_FOTOS_PENDIENTES + (error instanceof Error ? error.message : "") : mapearErrorVehiculos(error));
     } finally {
       setSaving(false);
     }

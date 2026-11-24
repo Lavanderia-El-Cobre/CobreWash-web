@@ -90,6 +90,8 @@ mutation EditarVehiculoFlota(
 }
 
 # RF-VE02: Registra la salida a terreno de un vehículo junto con su inspección inicial (ANTES).
+# La administración puede asignar cualquier conductor; un repartidor solo puede
+# registrar la salida a su propio nombre y con un solo vehículo en ruta a la vez.
 mutation RegistrarSalidaFlota(
   $salidaId: UUID = null
   $inspeccionId: UUID = null
@@ -112,7 +114,10 @@ mutation RegistrarSalidaFlota(
     usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden registrar salidas de flota")
+        nombre @check(
+          expr: "this == 'admin' || (this in ['repartidor', 'conductor'] && vars.repartidorId == auth.uid)"
+          message: "Solo administración o el propio repartidor pueden registrar la salida"
+        )
       }
     }
     vehiculo(id: $vehiculoId) @check(expr: "this != null", message: "Vehículo no encontrado") {
@@ -141,6 +146,11 @@ mutation RegistrarSalidaFlota(
       @check(expr: "this == null", message: "El vehículo ya tiene una salida activa") { id }
     previas: inspeccionVehiculos(where: { salida: { vehiculoId: { eq: $vehiculoId } } }, orderBy: [{ kilometraje: DESC }], limit: 1)
       @check(expr: "this.all(i, i.kilometraje <= vars.kilometraje)", message: "El kilometraje no puede ser menor al último registrado") { kilometraje }
+    propias: salidaVehiculos(where: { repartidorId: { eq: $repartidorId }, estado: { in: [PROGRAMADA, EN_SERVICIO] } }, limit: 1)
+      @check(
+        expr: "response.query.usuario.rol.nombre == 'admin' || this.size() == 0"
+        message: "Ya tienes un vehículo en ruta: registra su regreso antes de tomar otro"
+      ) { id }
   }
   salida: salidaVehiculo_insert(data: {
     id_expr: "vars.salidaId != null ? vars.salidaId : uuidV4()"
@@ -177,14 +187,17 @@ mutation RegistrarRetornoFlota(
     usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden registrar el regreso de vehículos")
+        nombre @check(
+          expr: "this in ['admin', 'repartidor', 'conductor']"
+          message: "Solo administración o el repartidor asignado pueden registrar el regreso"
+        )
       }
     }
     salidaActual: salidaVehiculo(first: { where: {
       id: { eq: $salidaId }
       estado: { eq: EN_SERVICIO }
     } }) @check(expr: "this != null", message: "La salida no existe o ya fue finalizada") {
-      id vehiculoId
+      id vehiculoId repartidorId
     }
     inspeccionAntes: inspeccionVehiculo(first: { where: {
       salidaId: { eq: $salidaId }
@@ -195,6 +208,14 @@ mutation RegistrarRetornoFlota(
         message: "El kilometraje de retorno no puede ser menor al kilometraje de salida"
       )
     }
+  }
+  # Un repartidor solo cierra las salidas registradas a su nombre.
+  propiedad: query @redact
+    @check(
+      expr: "response.query.usuario.rol.nombre == 'admin' || response.query.salidaActual.repartidorId == auth.uid"
+      message: "La salida no está registrada a tu nombre"
+    ) {
+    usuario(id_expr: "auth.uid") { id }
   }
   bloqueo: vehiculo_update(first: { where: { id: { eq_expr: "response.query.salidaActual.vehiculoId" } } }, data: { revision_update: { inc: 1 } })
   inspeccion: inspeccionVehiculo_insert(data: {
