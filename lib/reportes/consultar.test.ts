@@ -167,6 +167,24 @@ describe("reportes completos", () => {
       { fetchPolicy: "SERVER_ONLY" },
     );
   });
+  it.each(["cliente", "servicio", "volumen"] as const)(
+    "omite los filtros vacíos en la vista %s en vez de enviarlos como null",
+    async (vista) => {
+      mocks.servicios.mockReset().mockResolvedValue({ data: { servicios: [] } });
+      mocks.detalleServicios.mockReset().mockResolvedValue({ data: { detalles: [] } });
+      mocks.volumen.mockReset().mockResolvedValue({ data: { comandas: [] } });
+      await consultarReporte(vista, { ...filtros, servicioId: "" });
+      const llamadas = [mocks.cuentas, mocks.detalle, mocks.servicios, mocks.detalleServicios, mocks.volumen]
+        .flatMap((m) => m.mock.calls.map((c) => c[1] as Record<string, unknown>));
+      expect(llamadas.length).toBeGreaterThan(0);
+      for (const variables of llamadas) {
+        const enviado = JSON.parse(JSON.stringify(variables));
+        expect(enviado).not.toHaveProperty("clienteId");
+        expect(enviado).not.toHaveProperty("empresa");
+        expect(enviado).not.toHaveProperty("servicioId");
+      }
+    },
+  );
   it("recupera todas las páginas y propaga errores de páginas posteriores", async () => {
     const consulta = vi
       .fn()
