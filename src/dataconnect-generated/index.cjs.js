@@ -1,5 +1,14 @@
 const { queryRef, executeQuery, validateArgsWithOptions, mutationRef, executeMutation, validateArgs } = require('firebase/data-connect');
 
+const ClaseMovimiento = {
+  COMPRA: "COMPRA",
+  AJUSTE_CONTEO: "AJUSTE_CONTEO",
+  STOCK_INICIAL: "STOCK_INICIAL",
+  CONSUMO: "CONSUMO",
+  OTRO: "OTRO",
+}
+exports.ClaseMovimiento = ClaseMovimiento;
+
 const ComandaEstado = {
   PENDIENTE: "PENDIENTE",
   EN_PROCESO: "EN_PROCESO",
@@ -54,6 +63,12 @@ const MomentoInspeccion = {
   DESPUES: "DESPUES",
 }
 exports.MomentoInspeccion = MomentoInspeccion;
+
+const OrigenDato = {
+  REAL: "REAL",
+  SIMULADO: "SIMULADO",
+}
+exports.OrigenDato = OrigenDato;
 
 const SalidaVehiculoEstado = {
   PROGRAMADA: "PROGRAMADA",
@@ -368,6 +383,210 @@ exports.vincularMiFichaVerificadaRef = vincularMiFichaVerificadaRef;
 exports.vincularMiFichaVerificada = function vincularMiFichaVerificada(dc) {
   const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dc, undefined);
   return executeMutation(vincularMiFichaVerificadaRef(dcInstance, inputVars));
+}
+;
+
+const autorizarModuloIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'AutorizarModuloIa');
+}
+autorizarModuloIaRef.operationName = 'AutorizarModuloIa';
+exports.autorizarModuloIaRef = autorizarModuloIaRef;
+
+exports.autorizarModuloIa = function autorizarModuloIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(autorizarModuloIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getPanelIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetPanelIa');
+}
+getPanelIaRef.operationName = 'GetPanelIa';
+exports.getPanelIaRef = getPanelIaRef;
+
+exports.getPanelIa = function getPanelIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getPanelIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getHistorialAjustesIaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetHistorialAjustesIa', inputVars);
+}
+getHistorialAjustesIaRef.operationName = 'GetHistorialAjustesIa';
+exports.getHistorialAjustesIaRef = getHistorialAjustesIaRef;
+
+exports.getHistorialAjustesIa = function getHistorialAjustesIa(dcOrVars, varsOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, false);
+  return executeQuery(getHistorialAjustesIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const guardarTasaConsumoRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'GuardarTasaConsumo', inputVars);
+}
+guardarTasaConsumoRef.operationName = 'GuardarTasaConsumo';
+exports.guardarTasaConsumoRef = guardarTasaConsumoRef;
+
+exports.guardarTasaConsumo = function guardarTasaConsumo(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(guardarTasaConsumoRef(dcInstance, inputVars));
+}
+;
+
+const eliminarTasaConsumoRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'EliminarTasaConsumo', inputVars);
+}
+eliminarTasaConsumoRef.operationName = 'EliminarTasaConsumo';
+exports.eliminarTasaConsumoRef = eliminarTasaConsumoRef;
+
+exports.eliminarTasaConsumo = function eliminarTasaConsumo(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(eliminarTasaConsumoRef(dcInstance, inputVars));
+}
+;
+
+const guardarConfiguracionIaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'GuardarConfiguracionIa', inputVars);
+}
+guardarConfiguracionIaRef.operationName = 'GuardarConfiguracionIa';
+exports.guardarConfiguracionIaRef = guardarConfiguracionIaRef;
+
+exports.guardarConfiguracionIa = function guardarConfiguracionIa(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(guardarConfiguracionIaRef(dcInstance, inputVars));
+}
+;
+
+const registrarConteoFisicoIaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'RegistrarConteoFisicoIa', inputVars);
+}
+registrarConteoFisicoIaRef.operationName = 'RegistrarConteoFisicoIa';
+exports.registrarConteoFisicoIaRef = registrarConteoFisicoIaRef;
+
+exports.registrarConteoFisicoIa = function registrarConteoFisicoIa(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(registrarConteoFisicoIaRef(dcInstance, inputVars));
+}
+;
+
+const getInsumosImportacionIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetInsumosImportacionIa');
+}
+getInsumosImportacionIaRef.operationName = 'GetInsumosImportacionIa';
+exports.getInsumosImportacionIaRef = getInsumosImportacionIaRef;
+
+exports.getInsumosImportacionIa = function getInsumosImportacionIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getInsumosImportacionIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getRegistrosExistentesIaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetRegistrosExistentesIa', inputVars);
+}
+getRegistrosExistentesIaRef.operationName = 'GetRegistrosExistentesIa';
+exports.getRegistrosExistentesIaRef = getRegistrosExistentesIaRef;
+
+exports.getRegistrosExistentesIa = function getRegistrosExistentesIa(dcOrVars, varsOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrVars, varsOrOptions, options, true, true);
+  return executeQuery(getRegistrosExistentesIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getDatosEntrenamientoIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetDatosEntrenamientoIa');
+}
+getDatosEntrenamientoIaRef.operationName = 'GetDatosEntrenamientoIa';
+exports.getDatosEntrenamientoIaRef = getDatosEntrenamientoIaRef;
+
+exports.getDatosEntrenamientoIa = function getDatosEntrenamientoIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getDatosEntrenamientoIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const getTasasSimulacionIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetTasasSimulacionIa');
+}
+getTasasSimulacionIaRef.operationName = 'GetTasasSimulacionIa';
+exports.getTasasSimulacionIaRef = getTasasSimulacionIaRef;
+
+exports.getTasasSimulacionIa = function getTasasSimulacionIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getTasasSimulacionIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const borrarSimulacionIaRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'BorrarSimulacionIa', inputVars);
+}
+borrarSimulacionIaRef.operationName = 'BorrarSimulacionIa';
+exports.borrarSimulacionIaRef = borrarSimulacionIaRef;
+
+exports.borrarSimulacionIa = function borrarSimulacionIa(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(borrarSimulacionIaRef(dcInstance, inputVars));
+}
+;
+
+const borrarSimulacionesIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'BorrarSimulacionesIa');
+}
+borrarSimulacionesIaRef.operationName = 'BorrarSimulacionesIa';
+exports.borrarSimulacionesIaRef = borrarSimulacionesIaRef;
+
+exports.borrarSimulacionesIa = function borrarSimulacionesIa(dc) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dc, undefined);
+  return executeMutation(borrarSimulacionesIaRef(dcInstance, inputVars));
+}
+;
+
+const getModeloComandaIaRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetModeloComandaIa');
+}
+getModeloComandaIaRef.operationName = 'GetModeloComandaIa';
+exports.getModeloComandaIaRef = getModeloComandaIaRef;
+
+exports.getModeloComandaIa = function getModeloComandaIa(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getModeloComandaIaRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
 ;
 

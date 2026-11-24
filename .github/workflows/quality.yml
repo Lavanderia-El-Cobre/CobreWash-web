@@ -59,6 +59,9 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Check coverage of critical modules
+        run: pnpm test:coverage
+
       - name: Run ESLint
         run: pnpm lint
 
@@ -72,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [production, vehiculos, inventario, reportes, avisos, portal, estabilizacion, privacidad]
+        suite: [production, vehiculos, inventario, reportes, avisos, portal, estabilizacion, privacidad, ia]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
