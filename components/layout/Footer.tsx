@@ -157,7 +157,7 @@ export default async function Footer() {
               <div><dt className="font-semibold text-stone-850">Domicilio legal</dt><dd className="break-words">{legal.domicilio}</dd></div>
               <div><dt className="font-semibold text-stone-850">Representante legal</dt><dd className="break-words">{legal.representante}</dd></div>
             </dl>
-          ) : <p>La identificación legal del responsable está pendiente de completar. Puedes revisar la <Link href="/terminos" className="font-semibold text-brand-700 underline">información del portal</Link>.</p>}
+          ) : <p>La identificación legal del responsable está pendiente de completar. Puedes revisar los <Link href="/terminos" className="font-semibold text-brand-700 underline">términos y condiciones</Link>.</p>}
           <p className="mt-4">Para solicitudes sobre tus datos personales, utiliza el <Link href="/privacidad/derechos" className="font-semibold text-brand-700 underline">formulario de derechos</Link>. No necesitas una cuenta.</p>
           {legal.email && <p className="mt-2 break-words">Contacto adicional de privacidad: <a href={`mailto:${legal.email}`} className="font-semibold text-brand-700 underline">{legal.email}</a>.</p>}
         </section>
@@ -171,7 +171,7 @@ export default async function Footer() {
             <a href="https://github.com/CobreTech" target="_blank" rel="noopener noreferrer" className="hover:text-brand-650 underline">Desarrollado por CobreTech</a>
             <Link href="/privacidad" className="hover:text-brand-650 underline">Privacidad</Link>
             <Link href="/privacidad/derechos" className="hover:text-brand-650 underline">Mis datos personales</Link>
-            <Link href="/terminos" className="hover:text-brand-650 underline">Información del portal</Link>
+            <Link href="/terminos" className="hover:text-brand-650 underline">Términos y condiciones</Link>
             <a
               href="https://maps.google.com/?q=Avenida+Balmaceda+1276,+Calama"
               target="_blank"
