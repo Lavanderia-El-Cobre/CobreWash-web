@@ -8,7 +8,7 @@ import QrPedido from "./QrPedido";
 const props = { codigoQr: "12345678-1234-4234-8234-123456789abc", numeroComanda: "ELCOBRE-14r3" };
 beforeEach(() => {
   mocks.exportar.mockReset().mockResolvedValue(undefined);
-  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://lavanderia-elcobre.vercel.app");
+  vi.stubEnv("NEXT_PUBLIC_SEGUIMIENTO_BASE_URL", "https://www.lavanderiaelcobrespa.com");
 });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
 it.each([['Descargar imagen', 'png'], ['Descargar PDF', 'pdf']])("%s exporta el QR visible y el número de la comanda", async (boton, formato) => {

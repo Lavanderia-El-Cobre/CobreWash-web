@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Lavandería El Cobre | Servicio Industrial y Doméstico en Calama",
     description: "Servicios de lavandería industrial y de hogar con maquinaria de última tecnología y servicio de retiro/entrega a domicilio.",
-    url: "https://lavanderiaelcobrespa.com",
+    url: "https://www.lavanderiaelcobrespa.com",
     siteName: "Lavandería El Cobre",
     locale: "es_CL",
     type: "website",
@@ -39,6 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={`${outfit.variable} ${inter.variable} h-full antialiased`}
     >

@@ -9,10 +9,10 @@ export const metadata = { title: "Privacidad y Tratamiento de Datos | Lavanderí
 export default function PrivacidadPage() {
   const c = configuracionLegal();
   const razonSocial = c.razonSocial || "Lavandería El Cobre SpA";
-  const rut = c.rut || "77.654.321-7";
+  const rut = c.rut || "RUT pendiente de publicación";
   const domicilio = c.domicilio || "Avenida Balmaceda 1276 - 1364, Calama, Región de Antofagasta, Chile";
-  const representante = c.representante || "Administración General / Oficial de Cumplimiento";
-  const email = c.email || "privacidad@lavanderiaelcobre.cl";
+  const representante = c.representante || "Representación legal pendiente de publicación";
+  const email = c.email || "ventas@lavanderiaelcobrespa.com";
 
   return (
     <PaginaLegal
@@ -53,6 +53,12 @@ export default function PrivacidadPage() {
             <strong>Cuentas de clientes y acceso al portal:</strong> Nombre completo, correo electrónico, RUT, credenciales de acceso seguras gestionadas criptográficamente y, si el usuario decide registrarlos para facilitar el servicio, número de teléfono y dirección de retiro/entrega. El suministro del nombre, correo y RUT es obligatorio para la contratación formal del servicio y la emisión obligatoria de la boleta o factura respectiva; los datos de teléfono o domicilio son facultativos.
           </li>
           <li>
+            <strong>Datos registrados en nuestra recepción:</strong> Cuando dejas prendas en nuestro local, el personal registra tu nombre o razón social, RUT, correo electrónico, teléfono y dirección de retiro o entrega. Si eres trabajador de una empresa cliente, la empresa puede entregarnos tu nombre para identificar tus prendas. Con tu correo creamos una cuenta asociada a tu ficha y te enviamos un enlace para activarla; la cuenta no se usa hasta que la actives y aceptes personalmente los Términos y Condiciones y este aviso.
+          </li>
+          <li>
+            <strong>Verificación del correo electrónico:</strong> Las cuentas nuevas se terminan de crear solo después de que el titular confirma su correo mediante un enlace. Registramos la versión del aviso y de los términos aceptados y la fecha de aceptación.
+          </li>
+          <li>
             <strong>Formularios de cotización y contacto:</strong> Nombre, correo electrónico, requerimiento o consulta sobre el servicio textil, y opcionalmente número telefónico de contacto. Estos datos se usan exclusivamente para elaborar y remitir la cotización solicitada.
           </li>
           <li>
@@ -73,20 +79,20 @@ export default function PrivacidadPage() {
       {/* 3. Finalidades y Bases de Licitud */}
       <SeccionLegal titulo="3. Finalidades Específicas y Bases de Licitud" icon={FileCheck2}>
         <p>
-          Todo tratamiento de datos personales realizado por Lavandería El Cobre se encuentra legitimado por una base legal específica conforme al Artículo 13 de la Ley N° 21.719:
+          Las siguientes bases de licitud corresponden a los artículos 12 y 13 de la Ley N° 19.628, en su texto reformado por la Ley N° 21.719, cuyas modificaciones entran en vigor el 1 de diciembre de 2026:
         </p>
         <ul className="list-disc space-y-2 pl-5 text-sm text-stone-600">
           <li>
-            <strong>Ejecución del contrato de servicio (Art. 13 letra b):</strong> Procesamiento de las órdenes de lavado industrial y doméstico, seguimiento en línea del avance de prendas, coordinación de entrega y gestión de la cuenta del usuario.
+            <strong>Ejecución del contrato de servicio (Art. 13 letra c):</strong> Procesamiento de las órdenes de lavado industrial y doméstico, seguimiento en línea del avance de prendas, coordinación de entrega, creación y activación de la cuenta asociada a la ficha de cliente, verificación del correo electrónico y envío de comunicaciones necesarias sobre los pedidos.
           </li>
           <li>
-            <strong>Cumplimiento de obligaciones legales y tributarias (Art. 13 letra c):</strong> Emisión de boletas y facturas electrónicas exigidas por el Servicio de Impuestos Internos (SII) y conservación contable según el Código de Comercio y Código Tributario.
+            <strong>Cumplimiento de obligaciones legales y tributarias (Art. 13 letra b):</strong> Emisión de boletas y facturas electrónicas exigidas por el Servicio de Impuestos Internos (SII) y conservación contable según el Código de Comercio y Código Tributario.
           </li>
           <li>
-            <strong>Consentimiento del titular (Art. 12):</strong> Elaboración y respuesta a solicitudes de cotización o consultas comerciales iniciadas voluntariamente por el usuario. El titular puede revocar este consentimiento en cualquier momento sin efectos retroactivos.
+            <strong>Consentimiento del titular (Art. 12):</strong> Uso del portal de clientes para consultar el historial de pedidos y elaboración y respuesta a solicitudes de cotización o consultas comerciales iniciadas voluntariamente por el usuario. El titular puede revocar este consentimiento en cualquier momento sin efectos retroactivos.
           </li>
           <li>
-            <strong>Interés legítimo en seguridad técnica (Art. 13 letra e):</strong> Prevención de fraude, protección contra ataques de fuerza bruta cibernética y rate-limiting de nuestros servidores mediante el uso de contadores seudonimizados y códigos hash temporales.
+            <strong>Interés legítimo en seguridad técnica (Art. 13 letra d):</strong> Prevención de fraude, protección contra ataques de fuerza bruta cibernética y rate-limiting de nuestros servidores mediante el uso de contadores seudonimizados y códigos hash temporales.
           </li>
         </ul>
         <p>

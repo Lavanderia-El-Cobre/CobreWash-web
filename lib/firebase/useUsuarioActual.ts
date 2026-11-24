@@ -7,6 +7,7 @@ import {
   loadActiveUserProfile,
   type ActiveUserProfile,
 } from "@/lib/firebase/auth-flows";
+import { requiereVerificacion } from "@/lib/firebase/verificacion";
 
 export type UsuarioActual = ActiveUserProfile;
 
@@ -20,7 +21,8 @@ export function useUsuarioActual() {
     const actualizar = (user: typeof auth.currentUser) => {
       const solicitud = ++version;
       setUsuario(null);
-      if (!user) {
+      // Una cuenta nueva sin correo verificado no ingresa: termina su alta en el inicio.
+      if (!user || requiereVerificacion(user)) {
         setUsuario(null);
         setLoading(false);
         return;

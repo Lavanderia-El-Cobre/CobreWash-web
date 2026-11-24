@@ -1,0 +1,43 @@
+# Operaciones de servidor del módulo IA. Viven en este conector porque el
+# generador del SDK web aún no admite entradas _Data; /api/ia/* las ejecuta con
+# el SDK Admin después de verificar que quien llama es administrador.
+# @allow limita los campos escribibles a los que arma lib/ia y el tamaño de cada
+# lista (CSV de hasta 2.000 filas; simulaciones de hasta 52 semanas).
+
+# Conteos y compras históricos: quedan en el registro pero no cambian el stock actual.
+mutation ImportarConteosIa(
+  $conteos: [ConteoInventario_Data!]! @allow(fields: "id insumoId cantidadContada stockSistema revisionStock registradoPorId estado resueltoPorId resueltoEn motivoResolucion origen fechaConteo", maxCount: 2000)
+) @auth(level: NO_ACCESS) @transaction {
+  conteoInventario_insertMany(data: $conteos)
+}
+
+mutation ImportarComprasIa(
+  $compras: [MovimientoInventario_Data!]! @allow(fields: "id insumoId usuarioId tipoMovimiento cantidad motivo fecha clase origen", maxCount: 2000)
+) @auth(level: NO_ACCESS) @transaction {
+  movimientoInventario_insertMany(data: $compras)
+}
+
+# Guarda un recálculo: el nuevo ajuste queda como único vigente y las tasas
+# actuales se reemplazan en la misma transacción. Nunca toca el stock.
+mutation GuardarAjusteIa(
+  $modelo: ModeloIa_Data! @allow(fields: "id nombre version fechaEntrenamiento activo mae mape precisionEstimada desviacionRelativa observaciones lambda margenSeguridad incluyeSimulado tasasJson ejecutadoPorId")
+  $tasas: [TasaConsumo_Data!]! @allow(fields: "tipoServicioId insumoId tasaInicial tasaActual unidad fuente actualizadoPorId actualizadoEn", maxCount: 5000)
+) @auth(level: NO_ACCESS) @transaction {
+  modeloIa_updateMany(where: { activo: { eq: true } }, data: { activo: false })
+  modeloIa_insert(data: $modelo)
+  tasaConsumo_upsertMany(data: $tasas)
+}
+
+# Guarda un lote simulado completo o nada. Todo queda con origen SIMULADO y
+# ligado al lote, sin tocar el stock real.
+mutation GuardarSimulacionIa(
+  $simulacion: SimulacionIa_Data! @allow(fields: "id semanas creadoPorId parametrosJson tasasVerdaderasJson")
+  $produccion: [ProduccionSimulada_Data!]! @allow(fields: "id simulacionId tipoServicioId fecha kg", maxCount: 10000)
+  $conteos: [ConteoInventario_Data!]! @allow(fields: "id insumoId cantidadContada stockSistema revisionStock registradoPorId estado resueltoPorId resueltoEn motivoResolucion fechaConteo origen simulacionId", maxCount: 10000)
+  $compras: [MovimientoInventario_Data!]! @allow(fields: "id insumoId usuarioId tipoMovimiento cantidad motivo fecha clase origen simulacionId", maxCount: 10000)
+) @auth(level: NO_ACCESS) @transaction {
+  simulacionIa_insert(data: $simulacion)
+  produccionSimulada_insertMany(data: $produccion)
+  conteoInventario_insertMany(data: $conteos)
+  movimientoInventario_insertMany(data: $compras)
+}

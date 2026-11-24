@@ -1,6 +1,6 @@
 import { TipoCliente } from "@/src/dataconnect-generated";
 import { isValidRut, validatePassword } from "@/lib/validators";
-import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
+import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
 export interface ClientRegistrationInput {
   nombre: string;
@@ -13,14 +13,25 @@ export interface ClientRegistrationInput {
   password: string;
 }
 
-export interface PublicClientRegistrationInput extends ClientRegistrationInput {
-  confirmPassword: string;
+/** Aceptación del titular: términos y autorización de datos, cada uno por separado. */
+export interface AceptacionCondiciones {
+  aceptaTerminos: boolean;
+  versionTerminos: string;
   autorizaDatos: boolean;
   versionPrivacidad: string;
 }
 
+export interface PublicClientRegistrationInput extends ClientRegistrationInput, AceptacionCondiciones {
+  confirmPassword: string;
+}
+
+/** Datos para terminar un registro cuyo correo ya fue verificado. */
+export type ClientCompletionInput = Omit<ClientRegistrationInput, "email" | "password"> & AceptacionCondiciones;
+
 export interface ManagedUserRegistrationInput extends ClientRegistrationInput {
   rolId: string;
+  /** El administrador confirma que informó a la persona de los términos y del aviso. */
+  informado?: boolean;
 }
 
 export function isPublicClientType(value: unknown): value is TipoCliente {
@@ -37,6 +48,19 @@ export function validateLogin(email: string, password: string): string | null {
 export function validatePasswordReset(email: string): string | null {
   if (!email.trim()) return "Por favor ingresa tu correo electrónico.";
   return null;
+}
+
+export function validateAceptacion(input: AceptacionCondiciones): string | null {
+  if (!input.aceptaTerminos || input.versionTerminos !== VERSION_TERMINOS) return "Lee y acepta los Términos y Condiciones vigentes para crear tu cuenta.";
+  if (!input.autorizaDatos || input.versionPrivacidad !== VERSION_PRIVACIDAD) return "Lee el aviso vigente y autoriza el tratamiento para crear tu cuenta.";
+  return null;
+}
+
+export function validateClientCompletion(input: ClientCompletionInput): string | null {
+  if (!input.nombre.trim() || !input.apellido.trim() || !input.rut.trim()) return "Completa tu nombre, apellido y RUT.";
+  if (!isPublicClientType(input.tipoCliente)) return "Selecciona el tipo de cliente.";
+  if (!isValidRut(input.rut)) return "El RUT ingresado no es válido.";
+  return validateAceptacion(input);
 }
 
 export function validatePublicClientRegistration(
@@ -59,9 +83,7 @@ export function validatePublicClientRegistration(
   if (!passwordCheck.valid) return passwordCheck.message;
   if (input.password !== input.confirmPassword) return "Las contraseñas no coinciden.";
 
-  if (!input.autorizaDatos || input.versionPrivacidad !== VERSION_PRIVACIDAD) return "Lee el aviso vigente y autoriza el tratamiento para crear tu cuenta.";
-
-  return null;
+  return validateAceptacion(input);
 }
 
 export function validateManagedUserRegistration(
@@ -83,6 +105,7 @@ export function validateManagedUserRegistration(
   const passwordCheck = validatePassword(input.password);
   if (!passwordCheck.valid) return passwordCheck.message;
   if (roleName === "cliente" && !input.tipoCliente) return "Selecciona el tipo de cliente.";
+  if (input.informado !== true) return "Confirma que informaste a la persona de los Términos y Condiciones y del Aviso de Privacidad.";
 
   return null;
 }

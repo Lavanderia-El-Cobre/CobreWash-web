@@ -66,14 +66,14 @@ await check('el contador de contactos también limita peticiones simultáneas',a
 await check('registro conserva RUT y ficha anterior solo se vincula con correo verificado coincidente',async()=>{
  const cliente=randomUUID(); const rut='11.111.111-1';
  await execute('mutation Cliente($id:UUID!,$rut:String!){cliente_insert(data:{id:$id,rut:$rut,nombre:"Anterior",email:"anterior@example.test"})}','Cliente',{id:cliente,rut});
- const args={versionPrivacidad:'2026-11-01',rut,nombre:'Registro',apellido:'Prueba',email:'anterior@example.test',tipoCliente:'PARTICULAR',crearFicha:false};
- await execute(registro,'RegistrarseComoCliente',args,{uid:'nuevo-con-anterior',email:args.email});
+ const args={versionPrivacidad:'2026-11-24',versionTerminos:'2026-11-24',rut,nombre:'Registro',apellido:'Prueba',email:'anterior@example.test',tipoCliente:'PARTICULAR',crearFicha:false};
+ await execute(registro,'RegistrarseComoCliente',args,{uid:'nuevo-con-anterior',email:args.email,verified:true});
  const usuario={uid:'nuevo-con-anterior',email:'anterior@example.test',verified:false};
  await assert.rejects(execute(ficha,'VincularMiFichaVerificada',{},usuario));
  await assert.rejects(execute(ficha,'VincularMiFichaVerificada',{},{...usuario,verified:true,email:'otra@example.test'}));
  await execute(ficha,'VincularMiFichaVerificada',{},{...usuario,verified:true});
  const d=await execute('query Cliente($rut:String!){clientes(where:{rut:{eq:$rut}}){id usuarioId}}','Cliente',{rut});assert.equal(d.clientes.length,1);assert.equal(d.clientes[0].usuarioId,usuario.uid);
- await execute(registro,'RegistrarseComoCliente',{...args,rut:'12.345.678-5',email:'nuevo@example.test',crearFicha:true},{uid:'cliente-nuevo-rut',email:'nuevo@example.test'});
+ await execute(registro,'RegistrarseComoCliente',{...args,rut:'12.345.678-5',email:'nuevo@example.test',crearFicha:true},{uid:'cliente-nuevo-rut',email:'nuevo@example.test',verified:true});
  const nueva=await execute('query Ficha($rut:String!){cliente(first:{where:{rut:{eq:$rut}}}){usuarioId}}','Ficha',{rut:'12.345.678-5'});assert.equal(nueva.cliente.usuarioId,'cliente-nuevo-rut');
 });
 await check('las reservas de fotos limitan también peticiones concurrentes y no publican archivos pendientes',async()=>{

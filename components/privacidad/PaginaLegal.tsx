@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 const enlaces = [
   { href: "/privacidad", label: "Privacidad" },
   { href: "/privacidad/derechos", label: "Mis datos personales" },
-  { href: "/terminos", label: "Información del portal" },
+  { href: "/terminos", label: "Términos y condiciones" },
 ];
 
 export default function PaginaLegal({ titulo, descripcion, actual, detalle, children }: {

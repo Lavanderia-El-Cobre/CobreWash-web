@@ -1,5 +1,5 @@
 // Comprobación sin sesión ni escrituras: distingue rutas ausentes de datos legales pendientes.
-const origen = new URL(process.argv[2] || 'https://lavanderia-elcobre.vercel.app');
+const origen = new URL(process.argv[2] || 'https://www.lavanderiaelcobrespa.com');
 if (origen.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(origen.hostname))
   throw new Error('La publicación debe usar HTTPS.');
 const rutas = [
