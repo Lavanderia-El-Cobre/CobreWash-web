@@ -1,4 +1,5 @@
 import { serviciosAdmin } from "@/lib/firebase/admin";
+import { verificarSesionAdmin } from "@/lib/firebase/sesion-admin";
 import { ErrorPrivacidad, errorPrivacidad, responder } from "@/lib/privacidad/servidor";
 import type { GetMiPerfilData } from "@/src/dataconnect-generated";
 
@@ -8,9 +9,10 @@ export async function GET(request: Request) {
     const bearer = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
     if (!bearer) throw new ErrorPrivacidad(401, "Inicia sesión para descargar tus datos.");
     const { auth, db } = serviciosAdmin();
-    let token;
-    try { token = await auth.verifyIdToken(bearer, true); }
-    catch { throw new ErrorPrivacidad(401, "La sesión venció."); }
+    const token = await verificarSesionAdmin(auth, bearer, {
+      sesionVencida: () => new ErrorPrivacidad(401, "La sesión venció."),
+      servidor: () => new ErrorPrivacidad(503, "La descarga no está disponible en este momento. Intenta más tarde o utiliza el canal de derechos."),
+    });
     if (token.email_verified !== true) throw new ErrorPrivacidad(403, "Verifica el correo de tu cuenta o utiliza el canal de derechos.");
     const { data } = await db.executeQuery<GetMiPerfilData, Record<string, never>>("GetMiPerfil", {}, { impersonate: { authClaims: token } });
     const perfil = data.usuario;

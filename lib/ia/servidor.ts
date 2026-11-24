@@ -1,4 +1,5 @@
 import { serviciosAdmin } from "@/lib/firebase/admin";
+import { verificarSesionAdmin } from "@/lib/firebase/sesion-admin";
 
 /** Error con código HTTP y mensaje apto para mostrar al administrador. */
 export class ErrorIa extends Error {
@@ -21,9 +22,10 @@ export async function autorizarAdminIa(request: Request) {
   const bearer = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
   if (!bearer) throw new ErrorIa(401, "Inicia sesión.");
   const admin = serviciosAdmin();
-  let token;
-  try { token = await admin.auth.verifyIdToken(bearer, true); }
-  catch { throw new ErrorIa(401, "La sesión venció. Vuelve a iniciar sesión."); }
+  const token = await verificarSesionAdmin(admin.auth, bearer, {
+    sesionVencida: () => new ErrorIa(401, "La sesión venció. Vuelve a iniciar sesión."),
+    servidor: () => new ErrorIa(503, "El servidor no pudo validar la sesión con Firebase. Revisa las credenciales de administración del despliegue."),
+  });
   try { await admin.db.executeQuery("AutorizarModuloIa", {}, { impersonate: { authClaims: token } }); }
   catch { throw new ErrorIa(403, "Solo un administrador activo puede usar el módulo IA."); }
   return { ...admin, uid: token.uid };

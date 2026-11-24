@@ -1,5 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { serviciosAdmin } from "@/lib/firebase/admin";
+import { verificarSesionAdmin } from "@/lib/firebase/sesion-admin";
 import { ErrorOrigenSolicitud, origenSolicitud } from "@/lib/solicitudes/origen";
 
 export class ErrorPrivacidad extends Error {
@@ -44,9 +45,11 @@ export async function limitarDerechos(request: Request, db: ReturnType<typeof se
 export async function autorizarAdministrador(request: Request) {
   const bearer = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
   if (!bearer) throw new ErrorPrivacidad(401, "Inicia sesión.");
-  const admin = serviciosAdmin(); let token;
-  try { token = await admin.auth.verifyIdToken(bearer, true); }
-  catch { throw new ErrorPrivacidad(401, "La sesión venció."); }
+  const admin = serviciosAdmin();
+  const token = await verificarSesionAdmin(admin.auth, bearer, {
+    sesionVencida: () => new ErrorPrivacidad(401, "La sesión venció."),
+    servidor: () => new ErrorPrivacidad(503, "El servidor no pudo validar la sesión con Firebase. Revisa las credenciales de administración del despliegue."),
+  });
   try { await admin.db.executeQuery("AutorizarGestionPrivacidad", {}, { impersonate: { authClaims: token } }); }
   catch { throw new ErrorPrivacidad(403, "Solo un administrador activo puede gestionar datos personales."); }
   return { ...admin, uid: token.uid };

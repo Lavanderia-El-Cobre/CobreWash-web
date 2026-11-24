@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { serviciosAdmin } from "@/lib/firebase/admin";
+import { verificarSesionAdmin } from "@/lib/firebase/sesion-admin";
 
 export const MAX_FOTO_BYTES = 3 * 1024 * 1024;
 export const UUID_FOTO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -12,9 +13,10 @@ export async function autorizarInspeccion(request: Request, inspeccionId: string
   const bearer = request.headers.get("authorization")?.match(/^Bearer (\S+)$/)?.[1];
   if (!bearer) throw new ErrorEvidencia(401, "Inicia sesión nuevamente.");
   const admin = serviciosAdmin();
-  let token;
-  try { token = await admin.auth.verifyIdToken(bearer, true); }
-  catch { throw new ErrorEvidencia(401, "La sesión venció. Inicia sesión nuevamente."); }
+  const token = await verificarSesionAdmin(admin.auth, bearer, {
+    sesionVencida: () => new ErrorEvidencia(401, "La sesión venció. Inicia sesión nuevamente."),
+    servidor: () => new ErrorEvidencia(503, "El servidor no pudo validar la sesión. Intenta más tarde."),
+  });
   try {
     await admin.db.executeQuery("GetInspeccionParaEvidencias", { id: inspeccionId }, { impersonate: { authClaims: token } });
   } catch { throw new ErrorEvidencia(403, "No tienes permiso para consultar o adjuntar evidencia en esta inspección."); }
