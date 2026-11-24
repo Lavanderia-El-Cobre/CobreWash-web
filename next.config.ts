@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 
+// subscribe() de Data Connect abre un WebSocket (wss://) para las consultas en
+// tiempo real; https://*.googleapis.com no lo cubre en connect-src.
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob: https://*.googleusercontent.com;
   font-src 'self' data:;
-  connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;
+  connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://firebasedataconnect.googleapis.com;
   frame-ancestors 'none';
   base-uri 'self';
   form-action 'self';
