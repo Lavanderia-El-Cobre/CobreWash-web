@@ -160,3 +160,29 @@ it("sin sesión, «Iniciar sesión» abre el modal", async () => {
   expect(screen.getByPlaceholderText("correo@ejemplo.com")).toBeTruthy();
   expect(m.push).not.toHaveBeenCalled();
 });
+
+it("tras varias contraseñas incorrectas avisa los intentos restantes y bloquea el ingreso", async () => {
+  const datos = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => datos.get(k) ?? null,
+    setItem: (k: string, v: string) => { datos.set(k, v); },
+    removeItem: (k: string) => { datos.delete(k); },
+  });
+  m.ingresar.mockRejectedValue({ code: "auth/invalid-credential" });
+  await abrir("/?login=1");
+  escribir("correo@ejemplo.com", "ana@example.com");
+  const intentar = async () => {
+    fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "incorrecta" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Ingresar|Espera/ })); });
+  };
+  for (let i = 0; i < 3; i++) await intentar();
+  expect(screen.getByRole("alert").textContent).toContain("quedan 2 intentos");
+  await intentar();
+  expect(screen.getByRole("alert").textContent).toContain("queda 1 intento");
+  await intentar();
+  expect(screen.getByRole("alert").textContent).toContain("bloqueado por varios intentos fallidos");
+  const boton = screen.getByRole("button", { name: /Espera/ }) as HTMLButtonElement;
+  expect(boton.disabled).toBe(true);
+  expect(m.ingresar).toHaveBeenCalledTimes(5);
+  expect(JSON.stringify([...datos.values()])).not.toContain("ana@example.com");
+});

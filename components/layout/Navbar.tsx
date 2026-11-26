@@ -32,6 +32,9 @@ import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 import { enviarVerificacion } from "@/lib/firebase/verificacion";
 import { leerRegistroPendiente } from "@/lib/registro-pendiente";
 import { cerrarSesionRecordadaVencida, DIAS_SESION_RECORDADA } from "@/lib/firebase/sesion-recordada";
+import { esCredencialInvalida, estadoIntentos, formatoEspera, limpiarIntentosIngreso, registrarFalloIngreso } from "@/lib/firebase/intentos-ingreso";
+
+const MENSAJE_BLOQUEO = "Por seguridad, el ingreso quedó bloqueado por varios intentos fallidos. Espera a que termine la cuenta regresiva o restablece tu contraseña con «¿Olvidaste tu contraseña?».";
 
 const tipoClienteOptions = [
   { value: TipoCliente.PARTICULAR, label: "Particular" },
@@ -80,6 +83,9 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   const [authPassword, setAuthPassword] = useState("");
   const [recordarSesion, setRecordarSesion] = useState(false);
   const [comprobandoSesion, setComprobandoSesion] = useState(false);
+  // Bloqueo progresivo tras contraseñas incorrectas (ver intentos-ingreso.ts).
+  const [bloqueoIngreso, setBloqueoIngreso] = useState<number | null>(() => estadoIntentos().bloqueadoHasta);
+  const [reloj, setReloj] = useState(() => Date.now());
   const [authName, setAuthName] = useState("");
   const [authConfirmPass, setAuthConfirmPass] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -135,6 +141,18 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     return () => { vigente = false; window.clearTimeout(timeoutId); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cuenta regresiva del bloqueo por intentos fallidos.
+  useEffect(() => {
+    if (!bloqueoIngreso) return;
+    const intervalo = window.setInterval(() => {
+      const ahora = Date.now();
+      setReloj(ahora);
+      if (ahora >= bloqueoIngreso) { setBloqueoIngreso(null); setAuthError(""); }
+    }, 1000);
+    return () => window.clearInterval(intervalo);
+  }, [bloqueoIngreso]);
+  const esperaIngreso = bloqueoIngreso && bloqueoIngreso > reloj ? bloqueoIngreso - reloj : 0;
 
   // Lock body scroll when the modal is open
   useEffect(() => {
@@ -303,17 +321,34 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         setAuthError(validationError);
         return;
       }
+      const vigente = estadoIntentos();
+      if (vigente.bloqueadoHasta) {
+        setBloqueoIngreso(vigente.bloqueadoHasta);
+        setReloj(Date.now());
+        setAuthError(MENSAJE_BLOQUEO);
+        return;
+      }
       setAuthLoading(true);
       try {
         // Cada rol es redirigido a su vista; una cuenta sin verificar o sin
         // perfil continúa en el paso que le falta.
         const resultado = await signInAndResolveLanding({ auth, dataConnect }, authEmail, authPassword, recordarSesion);
+        limpiarIntentosIngreso();
         setAuthLoading(false);
         setAuthPassword("");
         await continuarIngreso(resultado);
       } catch (err) {
         setAuthLoading(false);
-        setAuthError(mapAuthError(err));
+        setAuthPassword("");
+        // La contraseña fue correcta aunque después fallara otro paso (p. ej. cuenta inactiva).
+        if (auth.currentUser) { limpiarIntentosIngreso(); setAuthError(mapAuthError(err)); return; }
+        const intento = registrarFalloIngreso(err);
+        setReloj(Date.now());
+        setBloqueoIngreso(intento.bloqueadoHasta);
+        if (intento.bloqueadoHasta) setAuthError(MENSAJE_BLOQUEO);
+        else if (esCredencialInvalida(err) && intento.restantes > 0 && intento.restantes <= 2) {
+          setAuthError(`Correo o contraseña incorrectos. Te ${intento.restantes === 1 ? "queda 1 intento" : `quedan ${intento.restantes} intentos`} antes de un bloqueo temporal.`);
+        } else setAuthError(mapAuthError(err));
       }
     } else if (authView === "register") {
       const registration = {
@@ -876,14 +911,14 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                       {/* Submit Button */}
                       <button
                         type="submit"
-                        disabled={authLoading || ((authView === "register" || authView === "completar") && (!avisoPublicado || !autorizaDatos || !aceptaTerminos))}
+                        disabled={authLoading || (authView === "login" && esperaIngreso > 0) || ((authView === "register" || authView === "completar") && (!avisoPublicado || !autorizaDatos || !aceptaTerminos))}
                         className="w-full flex items-center justify-center gap-2 bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg disabled:opacity-50 transition-all duration-200 hover:scale-[1.01] cursor-pointer"
                       >
                         {authLoading ? (
                           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <>
-                            {authView === "login" && "Ingresar"}
+                            {authView === "login" && (esperaIngreso > 0 ? <><Lock className="w-4 h-4" />Espera {formatoEspera(esperaIngreso)}</> : "Ingresar")}
                             {authView === "register" && "Registrarse"}
                             {authView === "forgot" && "Enviar Instrucciones"}
                             {authView === "verificar" && "Ya verifiqué mi correo"}
