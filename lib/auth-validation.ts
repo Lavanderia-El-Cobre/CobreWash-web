@@ -29,7 +29,8 @@ export interface PublicClientRegistrationInput extends ClientRegistrationInput, 
 /** Datos para terminar un registro cuyo correo ya fue verificado. */
 export type ClientCompletionInput = Omit<ClientRegistrationInput, "email" | "password"> & AceptacionCondiciones;
 
-export interface ManagedUserRegistrationInput extends ClientRegistrationInput {
+/** Alta desde administración: sin contraseña, la persona la crea con el enlace de su correo. */
+export interface ManagedUserRegistrationInput extends Omit<ClientRegistrationInput, "password"> {
   rolId: string;
   /** El administrador confirma que informó a la persona de los términos y del aviso. */
   informado?: boolean;
@@ -100,17 +101,15 @@ export function validateManagedUserRegistration(
     !input.nombre.trim() ||
     !input.apellido.trim() ||
     !input.rut.trim() ||
-    !input.email.trim() ||
-    !input.password.trim()
+    !input.email.trim()
   ) {
     return "Todos los campos son obligatorios.";
   }
   if (!isValidRut(input.rut)) return "El RUT ingresado no es válido.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email.trim())) return "Ingresa un correo válido: ahí llegará el enlace para crear la contraseña.";
   const telefono = validarTelefono(input.telefono);
   if (telefono) return telefono;
 
-  const passwordCheck = validatePassword(input.password);
-  if (!passwordCheck.valid) return passwordCheck.message;
   if (roleName === "cliente" && !input.tipoCliente) return "Selecciona el tipo de cliente.";
   if (input.informado !== true) return "Confirma que informaste a la persona de los Términos y Condiciones y del Aviso de Privacidad.";
 
