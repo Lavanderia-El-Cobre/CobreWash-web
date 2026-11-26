@@ -265,7 +265,7 @@ await check("edición atómica preserva prendas y monto si falla una clave forá
   const v = variables();
   await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
   const anterior = await read(v.id);
-  const cambios = { id: v.id, version: anterior.actualizadoEn, empresa: "Cambio", detalles: [{ ...detail, comandaId: v.id, cantidad: 3, subtotal: 3000 }] };
+  const cambios = { id: v.id, version: anterior.actualizadoEn, empresa: "Cambio", modalidadCobro: "PRENDA", detalles: [{ ...detail, comandaId: v.id, cantidad: 3, subtotal: 3000 }] };
   await assert.rejects(execute(mutation, "EditarComandaConDetalles", { ...cambios, detalles: [...cambios.detalles, { ...detail, tipoPrendaId: randomUUID() }] }, "test-recepcion"));
   assert.deepEqual(await read(v.id), anterior);
   for (const user of [null, "sin-perfil", "test-inactivo", "test-cliente", "test-operario"]) await assert.rejects(execute(mutation, "EditarComandaConDetalles", cambios, user));
@@ -293,12 +293,23 @@ await check("editar una comanda la puede pasar a cobro por kg y recalcula el tot
   const c = await read(v.id);
   assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.precioKg, 2500); assert.equal(c.valorTotal, 8325);
 });
+await check("editar sin modalidad de cobro (app antigua) se rechaza y no altera una comanda por kg", async () => {
+  const v = variablesKg();
+  await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
+  const anterior = await read(v.id);
+  // Lo que envía la app móvil instalada: sin modalidadCobro, precioKg ni pesoKg.
+  const lineaApp = { comandaId: v.id, tipoPrendaId: detail.tipoPrendaId, tipoServicioId: detail.tipoServicioId, cantidad: 2, precioUnitario: 2500, subtotal: 5000 };
+  await assert.rejects(execute(mutation, "EditarComandaConDetalles", { id: v.id, version: anterior.actualizadoEn, detalles: [lineaApp] }, "test-recepcion"));
+  const c = await read(v.id);
+  assert.deepEqual(c, anterior);
+  assert.equal(c.modalidadCobro, "KILO"); assert.equal(c.valorTotal, 8325);
+});
 await check("dos editores simultáneos no mezclan las prendas ni pierden cambios confirmados", async () => {
   const v = variables();
   await execute(mutation, "CrearComandaConFlujo", v, "test-recepcion");
   const original = await read(v.id);
   const resultados = await Promise.allSettled([3, 4].map(cantidad => execute(mutation, "EditarComandaConDetalles", {
-    id: v.id, version: original.actualizadoEn, detalles: [{ ...detail, comandaId: v.id, cantidad, subtotal: cantidad * 1000 }],
+    id: v.id, version: original.actualizadoEn, modalidadCobro: "PRENDA", detalles: [{ ...detail, comandaId: v.id, cantidad, subtotal: cantidad * 1000 }],
   }, "test-recepcion")));
   assert.equal(resultados.filter(r => r.status === "fulfilled").length, 1);
   const c = await read(v.id);

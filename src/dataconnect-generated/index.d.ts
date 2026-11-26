@@ -338,6 +338,25 @@ export interface CompletarEtapaComandaData {
   notificacion?: number | null;
 }
 
+export interface CompletarEtapaComandaMovilData {
+  comandaEtapa_update?: ComandaEtapa_Key | null;
+  siguiente: number;
+  comanda_update?: Comanda_Key | null;
+  comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+  notificacion?: number | null;
+  operacion: OperacionMovil_Key;
+}
+
+export interface CompletarEtapaComandaMovilVariables {
+  comandaId: UUIDString;
+  etapaId: UUIDString;
+  orden: number;
+  estadoComanda: ComandaEstado;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
+}
+
 export interface CompletarEtapaComandaVariables {
   comandaId: UUIDString;
   etapaId: UUIDString;
@@ -626,6 +645,23 @@ export interface EntregarComandaData {
   comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
   problemasResueltos: number;
   comandaNotificacion_insert: ComandaNotificacion_Key;
+}
+
+export interface EntregarComandaMovilData {
+  comanda_update?: Comanda_Key | null;
+  entrega: number;
+  comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+  problemasResueltos: number;
+  comandaNotificacion_insert: ComandaNotificacion_Key;
+  operacion: OperacionMovil_Key;
+}
+
+export interface EntregarComandaMovilVariables {
+  id: UUIDString;
+  detalle?: string | null;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
 }
 
 export interface EntregarComandaVariables {
@@ -2611,6 +2647,11 @@ export interface MovimientoInventario_Key {
   __typename?: 'MovimientoInventario_Key';
 }
 
+export interface OperacionMovil_Key {
+  id: UUIDString;
+  __typename?: 'OperacionMovil_Key';
+}
+
 export interface PrediccionInsumo_Key {
   id: UUIDString;
   __typename?: 'PrediccionInsumo_Key';
@@ -2698,6 +2739,21 @@ export interface RegistrarConteoInventarioData {
   conteoInventario_insert: ConteoInventario_Key;
 }
 
+export interface RegistrarConteoInventarioMovilData {
+  conteoInventario_insert: ConteoInventario_Key;
+  operacion: OperacionMovil_Key;
+}
+
+export interface RegistrarConteoInventarioMovilVariables {
+  id: UUIDString;
+  insumoId: UUIDString;
+  cantidad: number;
+  revisionStock: number;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
+}
+
 export interface RegistrarConteoInventarioVariables {
   id: UUIDString;
   insumoId: UUIDString;
@@ -2731,6 +2787,20 @@ export interface RegistrarEvidenciaGuardadaVariables {
 
 export interface RegistrarIncidenciaComandaData {
   incidenciaComanda_insert: IncidenciaComanda_Key;
+}
+
+export interface RegistrarIncidenciaComandaMovilData {
+  incidenciaComanda_insert: IncidenciaComanda_Key;
+  operacion: OperacionMovil_Key;
+}
+
+export interface RegistrarIncidenciaComandaMovilVariables {
+  comandaId: UUIDString;
+  motivo: string;
+  descripcion?: string | null;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
 }
 
 export interface RegistrarIncidenciaComandaVariables {
@@ -2769,6 +2839,25 @@ export interface RegistrarRetornoFlotaData {
   salidaVehiculo_update?: SalidaVehiculo_Key | null;
 }
 
+export interface RegistrarRetornoFlotaMovilData {
+  bloqueo?: Vehiculo_Key | null;
+  inspeccion: InspeccionVehiculo_Key;
+  salidaVehiculo_update?: SalidaVehiculo_Key | null;
+  operacion: OperacionMovil_Key;
+}
+
+export interface RegistrarRetornoFlotaMovilVariables {
+  inspeccionId?: UUIDString | null;
+  salidaId: UUIDString;
+  kilometraje: number;
+  estadoVehiculo: EstadoVehiculo;
+  observacionesRetorno?: string | null;
+  observacionesInspeccion?: string | null;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
+}
+
 export interface RegistrarRetornoFlotaVariables {
   inspeccionId?: UUIDString | null;
   salidaId: UUIDString;
@@ -2782,6 +2871,27 @@ export interface RegistrarSalidaFlotaData {
   bloqueo?: Vehiculo_Key | null;
   salida: SalidaVehiculo_Key;
   inspeccion: InspeccionVehiculo_Key;
+}
+
+export interface RegistrarSalidaFlotaMovilData {
+  bloqueo?: Vehiculo_Key | null;
+  salida: SalidaVehiculo_Key;
+  inspeccion: InspeccionVehiculo_Key;
+  operacion: OperacionMovil_Key;
+}
+
+export interface RegistrarSalidaFlotaMovilVariables {
+  salidaId?: UUIDString | null;
+  inspeccionId?: UUIDString | null;
+  vehiculoId: UUIDString;
+  repartidorId: string;
+  kilometraje: number;
+  estadoVehiculo: EstadoVehiculo;
+  observaciones?: string | null;
+  observacionesInspeccion?: string | null;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
 }
 
 export interface RegistrarSalidaFlotaVariables {
@@ -2870,6 +2980,22 @@ export interface ReportarProblemaEntregaData {
   bloqueo?: Comanda_Key | null;
   incidenciaComanda_insert: IncidenciaComanda_Key;
   comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+}
+
+export interface ReportarProblemaEntregaMovilData {
+  bloqueo?: Comanda_Key | null;
+  incidenciaComanda_insert: IncidenciaComanda_Key;
+  comandaHistorialEstado_insert: ComandaHistorialEstado_Key;
+  operacion: OperacionMovil_Key;
+}
+
+export interface ReportarProblemaEntregaMovilVariables {
+  comandaId: UUIDString;
+  motivo: string;
+  detalle?: string | null;
+  idOperacion: UUIDString;
+  ocurridoEn: TimestampString;
+  relojDudoso?: boolean;
 }
 
 export interface ReportarProblemaEntregaVariables {
@@ -3452,6 +3578,90 @@ export const getHistorialInventarioRef: GetHistorialInventarioRef;
 
 export function getHistorialInventario(vars?: GetHistorialInventarioVariables, options?: ExecuteQueryOptions): QueryPromise<GetHistorialInventarioData, GetHistorialInventarioVariables>;
 export function getHistorialInventario(dc: DataConnect, vars?: GetHistorialInventarioVariables, options?: ExecuteQueryOptions): QueryPromise<GetHistorialInventarioData, GetHistorialInventarioVariables>;
+
+interface CompletarEtapaComandaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CompletarEtapaComandaMovilVariables): MutationRef<CompletarEtapaComandaMovilData, CompletarEtapaComandaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CompletarEtapaComandaMovilVariables): MutationRef<CompletarEtapaComandaMovilData, CompletarEtapaComandaMovilVariables>;
+  operationName: string;
+}
+export const completarEtapaComandaMovilRef: CompletarEtapaComandaMovilRef;
+
+export function completarEtapaComandaMovil(vars: CompletarEtapaComandaMovilVariables): MutationPromise<CompletarEtapaComandaMovilData, CompletarEtapaComandaMovilVariables>;
+export function completarEtapaComandaMovil(dc: DataConnect, vars: CompletarEtapaComandaMovilVariables): MutationPromise<CompletarEtapaComandaMovilData, CompletarEtapaComandaMovilVariables>;
+
+interface RegistrarIncidenciaComandaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RegistrarIncidenciaComandaMovilVariables): MutationRef<RegistrarIncidenciaComandaMovilData, RegistrarIncidenciaComandaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: RegistrarIncidenciaComandaMovilVariables): MutationRef<RegistrarIncidenciaComandaMovilData, RegistrarIncidenciaComandaMovilVariables>;
+  operationName: string;
+}
+export const registrarIncidenciaComandaMovilRef: RegistrarIncidenciaComandaMovilRef;
+
+export function registrarIncidenciaComandaMovil(vars: RegistrarIncidenciaComandaMovilVariables): MutationPromise<RegistrarIncidenciaComandaMovilData, RegistrarIncidenciaComandaMovilVariables>;
+export function registrarIncidenciaComandaMovil(dc: DataConnect, vars: RegistrarIncidenciaComandaMovilVariables): MutationPromise<RegistrarIncidenciaComandaMovilData, RegistrarIncidenciaComandaMovilVariables>;
+
+interface EntregarComandaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: EntregarComandaMovilVariables): MutationRef<EntregarComandaMovilData, EntregarComandaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: EntregarComandaMovilVariables): MutationRef<EntregarComandaMovilData, EntregarComandaMovilVariables>;
+  operationName: string;
+}
+export const entregarComandaMovilRef: EntregarComandaMovilRef;
+
+export function entregarComandaMovil(vars: EntregarComandaMovilVariables): MutationPromise<EntregarComandaMovilData, EntregarComandaMovilVariables>;
+export function entregarComandaMovil(dc: DataConnect, vars: EntregarComandaMovilVariables): MutationPromise<EntregarComandaMovilData, EntregarComandaMovilVariables>;
+
+interface ReportarProblemaEntregaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ReportarProblemaEntregaMovilVariables): MutationRef<ReportarProblemaEntregaMovilData, ReportarProblemaEntregaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ReportarProblemaEntregaMovilVariables): MutationRef<ReportarProblemaEntregaMovilData, ReportarProblemaEntregaMovilVariables>;
+  operationName: string;
+}
+export const reportarProblemaEntregaMovilRef: ReportarProblemaEntregaMovilRef;
+
+export function reportarProblemaEntregaMovil(vars: ReportarProblemaEntregaMovilVariables): MutationPromise<ReportarProblemaEntregaMovilData, ReportarProblemaEntregaMovilVariables>;
+export function reportarProblemaEntregaMovil(dc: DataConnect, vars: ReportarProblemaEntregaMovilVariables): MutationPromise<ReportarProblemaEntregaMovilData, ReportarProblemaEntregaMovilVariables>;
+
+interface RegistrarSalidaFlotaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RegistrarSalidaFlotaMovilVariables): MutationRef<RegistrarSalidaFlotaMovilData, RegistrarSalidaFlotaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: RegistrarSalidaFlotaMovilVariables): MutationRef<RegistrarSalidaFlotaMovilData, RegistrarSalidaFlotaMovilVariables>;
+  operationName: string;
+}
+export const registrarSalidaFlotaMovilRef: RegistrarSalidaFlotaMovilRef;
+
+export function registrarSalidaFlotaMovil(vars: RegistrarSalidaFlotaMovilVariables): MutationPromise<RegistrarSalidaFlotaMovilData, RegistrarSalidaFlotaMovilVariables>;
+export function registrarSalidaFlotaMovil(dc: DataConnect, vars: RegistrarSalidaFlotaMovilVariables): MutationPromise<RegistrarSalidaFlotaMovilData, RegistrarSalidaFlotaMovilVariables>;
+
+interface RegistrarRetornoFlotaMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RegistrarRetornoFlotaMovilVariables): MutationRef<RegistrarRetornoFlotaMovilData, RegistrarRetornoFlotaMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: RegistrarRetornoFlotaMovilVariables): MutationRef<RegistrarRetornoFlotaMovilData, RegistrarRetornoFlotaMovilVariables>;
+  operationName: string;
+}
+export const registrarRetornoFlotaMovilRef: RegistrarRetornoFlotaMovilRef;
+
+export function registrarRetornoFlotaMovil(vars: RegistrarRetornoFlotaMovilVariables): MutationPromise<RegistrarRetornoFlotaMovilData, RegistrarRetornoFlotaMovilVariables>;
+export function registrarRetornoFlotaMovil(dc: DataConnect, vars: RegistrarRetornoFlotaMovilVariables): MutationPromise<RegistrarRetornoFlotaMovilData, RegistrarRetornoFlotaMovilVariables>;
+
+interface RegistrarConteoInventarioMovilRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RegistrarConteoInventarioMovilVariables): MutationRef<RegistrarConteoInventarioMovilData, RegistrarConteoInventarioMovilVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: RegistrarConteoInventarioMovilVariables): MutationRef<RegistrarConteoInventarioMovilData, RegistrarConteoInventarioMovilVariables>;
+  operationName: string;
+}
+export const registrarConteoInventarioMovilRef: RegistrarConteoInventarioMovilRef;
+
+export function registrarConteoInventarioMovil(vars: RegistrarConteoInventarioMovilVariables): MutationPromise<RegistrarConteoInventarioMovilData, RegistrarConteoInventarioMovilVariables>;
+export function registrarConteoInventarioMovil(dc: DataConnect, vars: RegistrarConteoInventarioMovilVariables): MutationPromise<RegistrarConteoInventarioMovilData, RegistrarConteoInventarioMovilVariables>;
 
 interface RegistrarseRef {
   /* Allow users to create refs without passing in DataConnect */

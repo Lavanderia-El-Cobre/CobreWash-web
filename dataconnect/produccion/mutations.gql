@@ -100,13 +100,17 @@ mutation CrearComandaConFlujo(
 
 # Reemplazo atómico: un fallo conserva cabecera, total y prendas originales.
 # La versión impide guardar encima de cambios que el formulario aún no ha leído.
+# $modalidadCobro es obligatoria y sin valor por defecto: un cliente que no la
+# envía (la app móvil anterior al cobro por kg) es rechazado antes de tocar la
+# comanda, en vez de convertir en silencio una comanda KILO en PRENDA y borrar
+# los pesos de sus prendas.
 mutation EditarComandaConDetalles(
   $id: UUID!
   $version: Timestamp!
   $empresa: String
   $proyecto: String
   $observaciones: String
-  $modalidadCobro: UnidadCobro! = PRENDA
+  $modalidadCobro: UnidadCobro!
   $precioKg: Float
   $detalles: [ComandaDetalle_Data!]! @allow(fields: "comandaId tipoPrendaId tipoServicioId cantidad detalle pesoKg precioUnitario subtotal", maxCount: 100)
 ) @auth(level: USER) @transaction {

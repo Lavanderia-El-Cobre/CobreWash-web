@@ -23,7 +23,9 @@
     "test:privacidad": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-privacidad.mjs\"",
     "test:production": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-production.mjs\"",
     "dataconnect:compile:web": "node scripts/prepare-production-test.mjs --sdk && firebase dataconnect:sdk:generate --config scratch/production-test/firebase.json && node scripts/normalize-generated.mjs",
-    "test:estabilizacion": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-estabilizacion.mjs\""
+    "test:estabilizacion": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-estabilizacion.mjs\"",
+    "test:movil": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-movil.mjs\"",
+    "dataconnect:movil": "node scripts/generar-mutaciones-movil.mjs"
   },
   "dependencies": {
     "@dataconnect/generated": "link:src/dataconnect-generated",
@@ -34,7 +36,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.51.0",
-    "next": "^16.4.1",
+    "next": "^16.4.6",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -48,7 +50,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitest/coverage-v8": "4.1.12",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.1",
+    "eslint-config-next": "^16.4.6",
     "firebase-tools": "15.34.1",
     "jsdom": "^30.1.1",
     "jsqr": "^1.4.0",

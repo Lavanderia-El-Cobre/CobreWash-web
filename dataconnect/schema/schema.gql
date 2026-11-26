@@ -488,3 +488,19 @@ type FotoInspeccionVehiculo @table(name: "foto_inspeccion_vehiculo") {
   guardada: Boolean! @default(value: true)
   creadoEn: Timestamp! @default(expr: "request.time")
 }
+
+# Acción registrada desde la app móvil, posiblemente sin conexión y enviada después.
+# El id lo genera el dispositivo una vez por acción: un reintento con el mismo id se
+# rechaza ("OPERACION_YA_APLICADA") en vez de duplicar datos. Guarda por separado la
+# hora en que ocurrió la acción en el teléfono y la hora en que llegó al servidor.
+type OperacionMovil @table(name: "operacion_movil") {
+  id: UUID!
+  usuario: Usuario!
+  tipo: String! @col(dataType: "varchar(40)")
+  # Comanda, salida o conteo al que afectó la acción.
+  entidadId: UUID!
+  ocurridoEn: Timestamp!
+  recibidoEn: Timestamp! @default(expr: "request.time")
+  # El reloj del teléfono no se pudo contrastar con el del servidor.
+  relojDudoso: Boolean! @default(value: false)
+}
