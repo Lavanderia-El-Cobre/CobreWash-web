@@ -16,6 +16,7 @@ const inter = Inter({
   display: "swap",
 });
 
+/** Metadatos SEO y Open Graph por defecto del sitio público de Lavandería El Cobre. */
 export const metadata: Metadata = {
   title: "Lavandería El Cobre | Servicio Industrial y Doméstico en Calama",
   description: "Lavandería El Cobre en Calama ofrece servicios de lavandería industrial, corporativa, doméstica y particular con retiro y entrega a domicilio. ¡Cuidado premium para tus prendas!",
@@ -31,6 +32,11 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Layout raíz de Next.js App Router.
+ * Configura las fuentes globales (`Outfit` e `Inter`), el idioma del documento
+ * y la inicialización temprana del tema oscuro para la intranet.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,10 +46,13 @@ export default function RootLayout({
     <html
       lang="es"
       data-scroll-behavior="smooth"
+      // Necesario porque el script `beforeInteractive` puede agregar la clase `.dark`
+      // antes de la hidratación de React, generando una diferencia esperada en `<html>`.
       suppressHydrationWarning
       className={`${outfit.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#fdfcfb]">
+        {/* Se ejecuta antes de hidratar para aplicar el tema guardado de la intranet sin parpadeo (FOUC). */}
         <Script id="intranet-theme" strategy="beforeInteractive">{INICIALIZAR_TEMA_INTRANET}</Script>
         {children}
       </body>

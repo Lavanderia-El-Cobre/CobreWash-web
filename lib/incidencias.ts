@@ -1,3 +1,4 @@
+/** Catálogo predefinido de motivos al registrar una incidencia operativa en planta o recepción. */
 export const MOTIVOS_INCIDENCIA = [
   "Prenda dañada",
   "Mancha persistente",
@@ -7,4 +8,5 @@ export const MOTIVOS_INCIDENCIA = [
   "Otro",
 ] as const;
 
+/** Unión de los motivos válidos para clasificar una incidencia operativa. */
 export type MotivoIncidencia = (typeof MOTIVOS_INCIDENCIA)[number];

@@ -1,5 +1,9 @@
 import { ArrowUpRight, MapPin, PackageCheck, Shirt, Truck } from "lucide-react";
 
+/**
+ * Sección institucional «Nosotros» de la página de inicio.
+ * Presenta el propósito de Lavandería El Cobre y resume el acompañamiento del pedido.
+ */
 export default function About() {
   return <section id="nosotros" className="relative overflow-hidden bg-stone-50/60 py-20 sm:py-24">
     <div className="pointer-events-none absolute -left-32 top-0 h-96 w-96 rounded-full bg-brand-100/40 blur-3xl" />

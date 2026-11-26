@@ -59,6 +59,7 @@ function apilar(id: string) {
 const ENFOCABLES =
   'a[href], button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
+// Suscripción vacía para detectar hidratación en cliente con `useSyncExternalStore`.
 const suscribirse = () => () => {};
 
 type Props = {
@@ -125,6 +126,7 @@ function PanelModal({
   const reducir = useReducedMotion();
   const cerrar = useRef(onCerrar);
   const bloqueadoRef = useRef(bloqueado);
+  // Sincroniza callbacks y bloqueo en refs para no reiniciar la pila ni el focus trap al re-renderizar.
   useEffect(() => {
     cerrar.current = onCerrar;
     bloqueadoRef.current = bloqueado;

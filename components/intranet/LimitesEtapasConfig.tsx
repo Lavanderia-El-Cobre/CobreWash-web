@@ -8,11 +8,18 @@ import { convertirLimiteMin, limiteEtapaMin, LIMITES_ETAPAS } from "@/lib/produc
 import GlassSelect from "@/components/ui/GlassSelect";
 
 type Limite = { nombre: string; valor: string; unidad: "minutos" | "horas" };
+
+// Muestra en horas solo múltiplos exactos desde 2 h (120 min) para mantener legible la edición.
 function presentar(nombre: string, minutos: number): Limite {
   return { nombre, valor: String(minutos >= 120 && minutos % 60 === 0 ? minutos / 60 : minutos), unidad: minutos >= 120 && minutos % 60 === 0 ? "horas" : "minutos" };
 }
 const iniciales = () => LIMITES_ETAPAS.map((e) => presentar(e.nombre, e.minutos));
 
+/**
+ * Formulario de configuración de tiempos límite por etapa de producción (recepción,
+ * lavado, secado, planchado y entrega). Los cambios se persisten en bloque y solo
+ * aplican a comandas creadas con posterioridad.
+ */
 export default function LimitesEtapasConfig() {
   const [limites, setLimites] = useState<Limite[]>(iniciales);
   const [cargando, setCargando] = useState(true);
@@ -28,6 +35,7 @@ export default function LimitesEtapasConfig() {
       try {
         const res = await getEtapasProduccion(dataConnect, { fetchPolicy: "SERVER_ONLY" });
         const etapas = res.data.etapaProduccions;
+        // La mutación espera las 5 etapas fijas en orden 1..5; si falta alguna se bloquea la edición.
         if (etapas.length !== 5 || etapas.some((e, i) => e.orden !== i + 1)) throw new Error("Catálogo incompleto");
         if (vigente) {
           setLimites(etapas.map((e) => presentar(e.nombre, limiteEtapaMin(e.orden, e.tiempoEstimadoMin)!)));

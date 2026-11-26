@@ -3,15 +3,29 @@ import { leerCsv, type TipoCsv } from "@/lib/ia/csv";
 import { rangoFilas, registrosParaGuardar, separarRepetidas, type RegistrosExistentes } from "@/lib/ia/importacion";
 import { autorizarAdminIa, ErrorIa, errorIa, leerJson, responder } from "@/lib/ia/servidor";
 
+// Requiere runtime Node.js para `node:crypto` y Firebase Admin SDK.
 export const runtime = "nodejs";
 
 /** Un CSV de 2.000 filas ocupa bastante menos que esto. */
 const LIMITE_BYTES = 400_000;
 
 /**
- * Importa conteos o compras históricos desde un CSV. El servidor vuelve a
- * validar el archivo completo (no confía en la vista previa del navegador) y
- * guarda todo o nada.
+ * Importa conteos o compras históricas de insumos desde un CSV.
+ * Revalida el archivo completo en el servidor contra el catálogo vigente (sin
+ * confiar en la vista previa del navegador) y persiste en bloque todo o nada.
+ *
+ * - **Contrato HTTP**: `POST /api/ia/importar` con JSON
+ *   `{ tipo: "conteos" | "compras", texto: string }` (límite `LIMITE_BYTES`).
+ * - **Autenticación y roles**: solo administrador activo (`autorizarAdminIa`).
+ * - **Validaciones e idempotencia**: rechaza cualquier fila con errores de
+ *   formato/insumo y bloquea la carga si existen filas ya registradas en el
+ *   rango de fechas para evitar duplicaciones.
+ * - **Respuestas**:
+ *   - `200`: `{ guardadas }` con la cantidad de registros insertados.
+ *   - `400`: tipo inválido, texto vacío, sin filas o filas con errores (incluye detalle).
+ *   - `401` / `403`: sesión ausente, vencida o sin rol administrador activo.
+ *   - `409`: existen filas repetidas respecto a los registros almacenados (incluye detalle).
+ *   - `500` / `503`: error interno o de disponibilidad del backend.
  */
 export async function POST(request: Request) {
   try {

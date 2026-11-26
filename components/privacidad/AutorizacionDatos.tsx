@@ -3,6 +3,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
 import { ShieldCheck, Clock3, ArrowUpRight } from "lucide-react";
+/**
+ * Verifica en tiempo de ejecución (sin caché) si el aviso de privacidad publicado por el
+ * servidor coincide con `VERSION_PRIVACIDAD`. Impide recoger consentimientos mientras
+ * la identificación legal del responsable no esté completa.
+ */
 export function useAvisoPublicado() {
   const [publicado, setPublicado] = useState(false);
   useEffect(() => {
@@ -14,6 +19,16 @@ export function useAvisoPublicado() {
   }, []);
   return publicado;
 }
+
+/**
+ * Bloque de consentimiento expreso para tratamiento de datos personales.
+ * Muestra el resumen según finalidad y bloquea la casilla con un aviso si la política vigente aún no está publicada.
+ *
+ * @param props.finalidad - Define el texto informativo y el alcance de la autorización (`cuenta` o `cotizacion`).
+ * @param props.aceptada - Estado actual de la casilla de autorización.
+ * @param props.onChange - Notifica cambios de la casilla al formulario padre.
+ * @param props.publicada - Indica si el aviso legal vigente está publicado (normalmente desde `useAvisoPublicado`).
+ */
 export default function AutorizacionDatos({ finalidad, aceptada, onChange, publicada }: { finalidad: "cuenta" | "cotizacion"; aceptada: boolean; onChange: (valor: boolean) => void; publicada: boolean }) {
   return <div className="space-y-3 rounded-2xl border border-brand-100/80 bg-brand-50/40 p-4 text-xs leading-relaxed text-stone-600 sm:p-5">
     <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-brand-700"><ShieldCheck className="h-4 w-4" />Tus datos personales</div>

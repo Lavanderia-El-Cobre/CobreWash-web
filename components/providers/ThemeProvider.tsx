@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+/** Preferencia de tema admitida en la intranet (`system` sigue el esquema del sistema operativo). */
 export type Theme = "light" | "dark" | "system";
 
 const STORAGE_KEY = "intranet-theme";
@@ -22,6 +23,10 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", resolveIsDark(theme));
 }
 
+/**
+ * Proveedor de tema claro/oscuro exclusivo para las vistas de intranet.
+ * Persiste la preferencia en `localStorage` y sincroniza la clase `.dark` en `<html>`.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(
     () => (typeof window === "undefined" ? "system" : (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system")
@@ -40,6 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Reacciona en vivo a cambios de tema del SO únicamente cuando el usuario mantiene `"system"`.
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemChange = () => {
@@ -59,6 +65,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
+/**
+ * Devuelve el tema activo de la intranet y su función actualizadora.
+ * Debe utilizarse dentro de `ThemeProvider`.
+ */
 export function useTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme debe usarse dentro de ThemeProvider");

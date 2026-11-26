@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
-// subscribe() de Data Connect abre un WebSocket (wss://) para las consultas en
-// tiempo real; https://*.googleapis.com no lo cubre en connect-src.
+/**
+ * Política de seguridad de contenidos (CSP) aplicada a todas las rutas.
+ *
+ * `subscribe()` de Data Connect abre un WebSocket (`wss://`) para las consultas
+ * en tiempo real; `https://*.googleapis.com` no lo cubre en `connect-src`.
+ */
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
@@ -14,6 +18,10 @@ const cspHeader = `
   form-action 'self';
 `.replace(/\s{2,}/g, " ").trim();
 
+/**
+ * Configuración de Next.js con cabeceras globales de endurecimiento HTTP.
+ * `camera=(self)` permanece habilitada para el escaneo de códigos QR y la captura fotográfica.
+ */
 const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: [

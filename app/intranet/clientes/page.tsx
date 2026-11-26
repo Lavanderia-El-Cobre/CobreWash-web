@@ -64,6 +64,12 @@ const FORM_VACIO: ClienteForm = {
   direccion: "",
 };
 
+/**
+ * Gestión comercial de fichas de clientes (`/intranet/clientes`).
+ * Accesible para `admin` y `recepcionista`. Permite listar, buscar, editar y registrar
+ * clientes (con o sin creación de cuenta de acceso a la plataforma) junto con sus métricas
+ * acumuladas de comandas, prendas y facturación.
+ */
 export default function ClientesPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const [clientes, setClientes] = useState<ClienteFirebase[]>([]);
@@ -75,6 +81,7 @@ export default function ClientesPage() {
   const [informado, setInformado] = useState(false);
   // Ficha nueva con cuenta en la plataforma: exige correo y la confirmación.
   const [conCuenta, setConCuenta] = useState(false);
+  // Contador monotónico para descartar respuestas fuera de orden entre polling y acciones manuales.
   const solicitudActual = useRef(0);
 
   const cargarClientes = useCallback(async (silencioso = false) => {
@@ -119,6 +126,7 @@ export default function ClientesPage() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  // Prendas y facturado excluyen comandas anuladas; el total de comandas conserva el histórico completo.
   const fichas = useMemo(() => clientes.map((cliente) => {
     const activas = cliente.comandas_on_cliente.filter((c) => c.estado !== ComandaEstado.ANULADA);
     return {

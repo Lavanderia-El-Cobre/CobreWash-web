@@ -5,10 +5,15 @@ import Image from "next/image";
 import { ArrowRight, Archive, ShieldCheck, Clock, MapPinHouse, Shirt } from "lucide-react";
 import { motion, useScroll, useTransform } from "framer-motion";
 
+/**
+ * Cabecera principal (`#inicio`) de la página de inicio.
+ * Usa Framer Motion en cliente para las animaciones de entrada y el desvanecimiento de las ondas al hacer scroll.
+ */
 export default function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
 
+  // Desvanece y desplaza las ondas decorativas inferiores durante los primeros 320 px de scroll.
   const waveOpacity = useTransform(scrollY, [0, 320], [1, 0]);
   const waveY = useTransform(scrollY, [0, 320], [0, 80]);
   const waveScrollX = useTransform(scrollY, [0, 320], [0, 60]);
@@ -19,7 +24,6 @@ export default function Hero() {
       ref={containerRef}
       className="relative overflow-hidden bg-gradient-light min-h-screen lg:h-screen lg:min-h-0 lg:max-h-screen lg:overflow-hidden flex items-start lg:items-center pt-28 pb-16 sm:pt-32 lg:pt-0 lg:pb-0"
     >
-      {/* Decorative background grid and blurs */}
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_40%,#000_70%,transparent_100%)] opacity-60" />
       <div className="absolute top-20 right-10 -z-10 w-72 h-72 rounded-full bg-brand-100/50 blur-3xl" />
       <div className="absolute bottom-20 left-10 -z-10 w-96 h-96 rounded-full bg-copper-100/40 blur-3xl" />
@@ -27,9 +31,7 @@ export default function Hero() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           
-          {/* Text content (7 columns on desktop) */}
           <div className="lg:col-span-7 space-y-8 text-left">
-            {/* Top Badge */}
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -40,7 +42,6 @@ export default function Hero() {
               <span>El mejor servicio de lavandería en Calama</span>
             </motion.div>
 
-            {/* Main Heading */}
             <div className="space-y-4">
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
@@ -61,7 +62,6 @@ export default function Hero() {
               </motion.p>
             </div>
 
-            {/* CTAs */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -83,7 +83,6 @@ export default function Hero() {
               </a>
             </motion.div>
 
-            {/* Trust highlights */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -120,7 +119,7 @@ export default function Hero() {
             </motion.div>
           </div>
 
-          {/* Interactive Image Frame - HIDDEN ON MOBILE (5 columns on desktop) */}
+          {/* Composición visual oculta en móvil para priorizar el mensaje y los CTA sobre el pliegue */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -129,7 +128,6 @@ export default function Hero() {
           >
             <div className="relative w-full max-w-sm lg:max-w-md aspect-[4/3] sm:aspect-[16/11] lg:aspect-[4/5] max-h-[38vh] lg:max-h-[50vh] flex items-center justify-center">
               
-              {/* Floating Badge 1 (Top-Left): 100% Calameño */}
               <motion.div
                 animate={{ y: [-6, 6, -6] }}
                 transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
@@ -142,7 +140,6 @@ export default function Hero() {
                 </div>
               </motion.div>
 
-              {/* Floating Badge 2 (Bottom-Right): Seguro & Confiable */}
               <motion.div
                 animate={{ y: [6, -6, 6] }}
                 transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }}
@@ -155,7 +152,6 @@ export default function Hero() {
                 </div>
               </motion.div>
 
-              {/* Float wrapper for transparent machine/clothes image */}
               <motion.div
                 animate={{ y: [0, -12, 0] }}
                 transition={{
@@ -181,7 +177,7 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Layered scroll-animated & infinite-moving SVG waves - HIDDEN ON MOBILE */}
+      {/* Ondas SVG en bucle continuo: cada capa mide 200% de ancho y se traslada 50% para empatar sin saltos */}
       <motion.div
         style={{ opacity: waveOpacity, y: waveY, x: waveScrollX }}
         className="hidden lg:block absolute bottom-0 left-0 right-0 z-20 pointer-events-none w-full overflow-hidden h-[165px] xl:h-[185px] hero-waves"

@@ -1,5 +1,17 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- La regresión verifica las entradas CommonJS de Firebase Admin. */
-// Ejecutar con --no-experimental-require-module, como el runtime que fallaba.
+/**
+ * Prueba de regresión del runtime CommonJS de Firebase Admin y `jwks-rsa`.
+ *
+ * Verifica que los submódulos `auth`, `storage` y `data-connect` de `firebase-admin`
+ * carguen sin requerir `require(ESM)` y que `jwks-rsa` resuelva y verifique correctamente
+ * firmas RSA-SHA256 y `passportJwtSecret` (rechazando firmas alteradas, claves desconocidas
+ * y tokens malformados).
+ *
+ * Invocación:
+ *   node --no-experimental-require-module scripts/verificar-firebase-runtime.cjs
+ *
+ * Variables de entorno requeridas: ninguna (genera un par de claves RSA efímero en memoria).
+ */
 const assert = require('node:assert/strict');
 const { generateKeyPairSync, sign, verify } = require('node:crypto');
 const { createRequire } = require('node:module');
@@ -7,6 +19,7 @@ const { createRequire } = require('node:module');
 require('firebase-admin/auth');
 require('firebase-admin/storage');
 require('firebase-admin/data-connect');
+// Resuelve `jwks-rsa` desde el árbol exacto de dependencias que carga `firebase-admin/auth`.
 const firebaseRequire = createRequire(require.resolve('firebase-admin/auth'));
 const jwks = firebaseRequire('jwks-rsa');
 

@@ -1,8 +1,24 @@
+/**
+ * Suite principal de integración contra el emulador aislado de Data Connect para producción,
+ * comandas, entregas, incidencias, reasignaciones, inventario y alertas.
+ *
+ * Valida creación y edición atómica de comandas (por prenda y por kilo) con rollback y control
+ * de concurrencia optimista, avance secuencial de 5 etapas con snapshot estable, seguimiento
+ * público y operativo por QR, entregas y problemas de reparto, gestión de incidencias y
+ * reasignaciones, entradas/salidas de inventario sin stock negativo, configuración de tiempos
+ * límite y normalización segura de códigos `ELCOBRE`.
+ *
+ * Invocación:
+ *   node scripts/test-production.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-// Esta suite solo acepta el emulador local de un proyecto demo.
+// Guardia de seguridad: esta suite solo acepta el emulador local de un proyecto demo.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = "http://" + host + "/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql";
@@ -14,6 +30,10 @@ const trackingQueries = await readFile("dataconnect/example/seguimiento-queries.
 const legacy = await readFile("dataconnect/example/mutations.gql", "utf8");
 const deliveries = await readFile("dataconnect/example/entregas.gql", "utf8");
 let count = 0;
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string = UID autenticado).
+ */
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user, firebase: { sign_in_provider: "password" } } } : undefined;
   const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, operationName, variables, extensions: { impersonate } }) });

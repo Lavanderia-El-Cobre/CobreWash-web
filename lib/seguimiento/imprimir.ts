@@ -1,6 +1,13 @@
 let limpiarImpresionAnterior: (() => void) | null = null;
 
-/** El tamaño CSS es una solicitud; la impresora puede exigir su papel habitual. */
+/**
+ * Inyecta dinámicamente una regla `@page` ajustada a las dimensiones medidas del
+ * comprobante y abre el diálogo de impresión del navegador, limpiando la hoja de
+ * estilos al cerrar (`afterprint`). El tamaño CSS es una sugerencia; la impresora
+ * puede exigir su papel habitual.
+ *
+ * @param ticket - Elemento DOM del comprobante visible a medir e imprimir.
+ */
 export function imprimirComprobante(ticket: HTMLElement) {
   const ancho = ticket.offsetWidth;
   const alto = Math.max(ticket.offsetHeight, ticket.scrollHeight) + 1;

@@ -34,10 +34,12 @@ export interface PaisTelefono {
   ejemplo: string;
 }
 
+/** Identificador del país seleccionado por defecto en los formularios (Chile celular). */
 export const PAIS_TELEFONO_PREDETERMINADO = "CL";
 
 const ocho = { largos: [8], grupos: { 8: [4, 4] } };
 
+/** Catálogo de países y formatos telefónicos admitidos (Chile celular/fijo y Latinoamérica). */
 export const PAISES_TELEFONO: PaisTelefono[] = [
   { id: "CL", nombre: "Chile", etiqueta: "Chile · celular", bandera: "🇨🇱", codigo: "56", prefijo: "9", largos: [8], grupos: { 8: [4, 4] }, ejemplo: "1234 5678" },
   { id: "CL-FIJO", nombre: "Chile", etiqueta: "Chile · teléfono fijo", bandera: "🇨🇱", codigo: "56", largos: [9], grupos: {}, ejemplo: "55 234 5678" },
@@ -66,6 +68,7 @@ const POR_ID = new Map(PAISES_TELEFONO.map((pais) => [pais.id, pais]));
 // Códigos más largos primero: ninguno de tres dígitos (50x, 59x) empieza como uno de dos.
 const CODIGOS = [...new Set(PAISES_TELEFONO.map((pais) => pais.codigo))].sort((a, b) => b.length - a.length);
 
+/** Obtiene la configuración telefónica para `id`, o Chile celular como respaldo si no existe. */
 export function obtenerPaisTelefono(id: string): PaisTelefono {
   return POR_ID.get(id) ?? POR_ID.get(PAIS_TELEFONO_PREDETERMINADO)!;
 }
@@ -113,6 +116,7 @@ export function formatearTelefono(paisId: string, nacional: string): string {
   return `${prefijoVisible(pais)} ${formatearNacional(pais, digitos)}`;
 }
 
+/** Resultado de analizar un número guardado para separarlo en país y dígitos nacionales. */
 export interface TelefonoDetectado {
   pais: PaisTelefono;
   /** Dígitos que escribe la persona (sin código de país ni prefijo fijo). */
@@ -235,6 +239,7 @@ function normalizarDigitos(valor: string): string {
   return soloDigitos(formatearTelefono(pais.id, nacional));
 }
 
+/** Indica si el valor contiene un número no vacío que cumple el formato del país detectado. */
 export function esTelefonoValido(valor: string): boolean {
   return Boolean(valor.trim()) && validarTelefono(valor) === null;
 }

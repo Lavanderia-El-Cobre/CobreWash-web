@@ -45,6 +45,12 @@ type Accion =
   | { tipo: "entregar"; comanda: ComandaParaEntrega; detalle: string }
   | { tipo: "problema"; comanda: ComandaParaEntrega; motivo: string; detalle: string };
 
+/**
+ * Módulo de despacho y entregas a clientes (`/intranet/entregas`).
+ * Accesible para `admin`, `repartidor` y `conductor`. Lista las comandas finalizadas
+ * pendientes de despacho para confirmar entrega con detalle o reportar incidencias
+ * (dejando la comanda pendiente para seguimiento), además del historial de entregas propias.
+ */
 export default function EntregasPage() {
   const permitido = useRoleGuard(["admin", "repartidor", "conductor"]);
   const [comandas, setComandas] = useState<ComandaParaEntrega[]>([]);
@@ -60,6 +66,7 @@ export default function EntregasPage() {
   const [aviso, setAviso] = useState("");
   const [ahora, setAhora] = useState(() => Date.now());
   const solicitud = useRef(0);
+  // Mantiene cuántas páginas acumulativas están visibles para conservarlas durante los refrescos automáticos.
   const paginas = useRef(1);
 
   const cargar = useCallback(async (silencioso = false, totalPaginas = paginas.current) => {

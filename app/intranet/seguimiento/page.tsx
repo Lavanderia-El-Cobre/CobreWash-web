@@ -22,11 +22,22 @@ import { ComandaEstado, getSeguimientoProduccion, getEtapasProduccion, configura
 const PAGE_SIZE = 20;
 type EtapaCatalogo = GetEtapasProduccionData["etapaProduccions"][number];
 const inputStyle = "mt-1.5 w-full rounded-xl border border-stone-200/80 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-850 outline-none transition-colors focus:border-brand-500/50 focus:bg-white dark:border-white/10 dark:bg-stone-800/50 dark:text-stone-100 dark:focus:bg-stone-900";
+/**
+ * Tablero de seguimiento de producción por etapas (`/intranet/seguimiento`).
+ * Accesible para `admin`, `recepcionista` y `operario` con acciones acotadas por rol:
+ * - `admin` y `recepcionista` pueden asociar el flujo a comandas pendientes sin etapas.
+ * - `admin` y `operario` pueden completar etapas secuenciales.
+ * - `operario` puede reportar incidencias de producción.
+ * - `admin` puede configurar el catálogo de 5 etapas y reasignar operarios.
+ *
+ * Envuelve el contenido en `<Suspense>` por requisito de `useSearchParams` en Next.js.
+ */
 export default function SeguimientoPage() {
   return <Suspense fallback={<div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin" /></div>}><SeguimientoRuta /></Suspense>;
 }
 function SeguimientoRuta() {
   const params = useSearchParams();
+  // `key={params.toString()}` reinicia el filtro y la comanda expandida al navegar desde alertas con query params.
   return <SeguimientoContenido key={params.toString()} buscarInicial={params.get("buscar") ?? ""} comandaInicial={params.get("comanda")} />;
 }
 function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial: string; comandaInicial: string | null }) {
@@ -53,6 +64,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
   const [descripcionIncidencia, setDescripcionIncidencia] = useState("");
   const [reasignacion, setReasignacion] = useState<AsignacionOperario | null>(null);
   const solicitud = useRef(0);
+  // Bloquea acciones de mutación simultáneas (asociar, completar, reasignar, incidencias) sobre las comandas.
   const operacion = useRef(false);
   const cargar = useCallback(async (silencioso = false) => {
     if (!permitido) return;
@@ -100,6 +112,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
     if (operacion.current) return;
     operacion.current = true; setBusy(comandaId); setError(""); setNotice("");
     try {
+      // Al completar la etapa 4 (Planchado) la comanda queda FINALIZADA (lista); la etapa 5 (Entrega) la marca ENTREGADA.
       await completarEtapaComanda(dataConnect, {
         comandaId,
         etapaId: etapa.id,

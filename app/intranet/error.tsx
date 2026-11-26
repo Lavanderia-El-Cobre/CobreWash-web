@@ -1,3 +1,4 @@
+// Next.js exige que los Error Boundaries sean Client Components.
 "use client";
 
 import { registrarError } from "@/lib/registro-seguro";
@@ -5,6 +6,13 @@ import { registrarError } from "@/lib/registro-seguro";
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
+/**
+ * Límite de error para todo el segmento `/intranet`.
+ * Captura fallos inesperados de renderizado o carga en vistas internas,
+ * los registra mediante el logger seguro y permite reintentar sin recargar la página.
+ *
+ * @param props - Propiedades inyectadas por Next.js (`error` capturado y función `reset` para reintentar).
+ */
 export default function IntranetError({
   error,
   reset,

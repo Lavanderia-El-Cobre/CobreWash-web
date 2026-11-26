@@ -74,6 +74,11 @@ function mensajeError(error: unknown) {
   return "No fue posible guardar el cambio. Intenta nuevamente.";
 }
 
+/**
+ * Gestión de bodega e inventario de insumos (`/intranet/inventario`).
+ * Reservado al rol `admin`. Permite administrar el catálogo de insumos, registrar entradas
+ * y salidas de stock, imprimir etiquetas QR, realizar conteos físicos y auditar movimientos.
+ */
 export default function InventarioPage() {
   const permitido = useRoleGuard(["admin"]);
   const [insumos, setInsumos] = useState<Insumo[]>([]);
@@ -85,6 +90,7 @@ export default function InventarioPage() {
   const [form, setForm] = useState<InsumoForm | null>(null);
   const [movimiento, setMovimiento] = useState<MovimientoForm | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // Conjunto de insumos ya alertados: notifica solo cuando un insumo recién cae en stock bajo o crítico.
   const alertasPrevias = useRef<Set<string> | null>(null);
   const solicitudActual = useRef(0);
 
@@ -126,6 +132,7 @@ export default function InventarioPage() {
     }
   }, [aplicarDatos]);
 
+  // Suscripción en tiempo real a Data Connect con respaldo de recarga ante corte, foco o regreso de pestaña.
   useEffect(() => {
     if (!permitido) return;
     const query = getStockInventarioRef(dataConnect);
@@ -302,6 +309,7 @@ export default function InventarioPage() {
 
       {etiqueta && <QrInsumo insumo={etiqueta} cerrar={() => setEtiqueta(null)} />}
 
+      {/* La firma `revision` sincroniza conteos e historial solo cuando cambia el stock de algún insumo. */}
       <ConteosInventario revision={insumos.map(i => `${i.id}:${i.revisionStock}`).join("|")} alGuardar={() => { void cargarInventario(true); }} />
       <HistorialInventario insumos={insumos} revision={insumos.map(i => `${i.id}:${i.revisionStock}`).join("|")} />
 

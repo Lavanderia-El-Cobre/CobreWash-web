@@ -1,4 +1,5 @@
 "use client";
+// Client Component: lee parámetros de búsqueda (`?qr=`, `?codigo=`), anima resultados y mantiene polling cada 30 s.
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -11,6 +12,11 @@ import QrPedido from "@/components/seguimiento/QrPedido";
 import { useSeguimientoPublico } from "@/lib/seguimiento/useSeguimientoPublico";
 import { presentarPedido, fechaSeguimiento } from "@/lib/seguimiento/publico";
 
+/**
+ * Contenido interactivo del seguimiento público de comandas.
+ * Permite buscar por número de comanda o cargar automáticamente un pedido al
+ * llegar desde un enlace con `?qr=` o `?codigo=` sin requerir inicio de sesión.
+ */
 function SeguimientoContent() {
   const searchParams = useSearchParams();
   const qrParametro = searchParams.get("qr");
@@ -19,6 +25,7 @@ function SeguimientoContent() {
   const { pedido, error, buscando, consultado, consulta, ejecutar, actualizar } = useSeguimientoPublico();
   const vista = pedido ? presentarPedido(pedido) : null;
 
+  // Si la URL incluye ambos parámetros, prioriza el QR del comprobante por sobre el número manual.
   useEffect(() => {
     if (qrParametro !== null) void ejecutar({ tipo: "qr", valor: qrParametro });
     else if (codigoParametro !== null) void ejecutar({ tipo: "numero", valor: codigoParametro });
@@ -79,6 +86,11 @@ function SeguimientoContent() {
   </>;
 }
 
+/**
+ * Página pública de seguimiento de pedidos (`/seguimiento`).
+ * Envuelve `SeguimientoContent` en `<Suspense>` según requiere Next.js App Router
+ * cuando un componente cliente consume `useSearchParams()`.
+ */
 export default function SeguimientoPublicoPage() {
   return <Suspense fallback={<p className="flex min-h-screen items-center justify-center gap-2 text-sm text-stone-500"><Loader2 className="h-5 w-5 animate-spin text-brand-600" />Cargando seguimiento…</p>}><SeguimientoContent /></Suspense>;
 }

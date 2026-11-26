@@ -162,6 +162,13 @@ function leerArchivoComoDataUrl(file: File): Promise<string> {
   });
 }
 
+/**
+ * Control administrativo de la flota de vehículos (`/intranet/vehiculos`).
+ * Reservado al rol `admin`. Organiza tres vistas con refresco automático cada 30 s:
+ * - Catálogo de Flota (alta, edición y activación/desactivación impidiendo bajar unidades en ruta).
+ * - Monitor en Ruta (seguimiento en vivo con alerta por demora y cierre de retorno).
+ * - Historial e Inspecciones (auditoría comparativa ANTES/DESPUÉS con evidencia fotográfica y exportación CSV).
+ */
 export default function VehiculosPage() {
   const permitido = useRoleGuard(["admin"]);
   const usuarioActual = useUsuarioActualContext();
@@ -170,6 +177,7 @@ export default function VehiculosPage() {
   const [salidas, setSalidas] = useState<SalidaFlota[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Idempotencia en dos fases: si la salida/retorno ya se guardó y falla Storage, bloquea campos para reintentar solo fotos.
   const [salidaConfirmada, setSalidaConfirmada] = useState(false);
   const [retornoConfirmado, setRetornoConfirmado] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -181,7 +189,6 @@ export default function VehiculosPage() {
   const [filtrosHistorial, setFiltrosHistorial] =
     useState<FiltrosHistorialVehiculo>(FILTROS_HISTORIAL_VACIOS);
 
-  // Modales RF-VE01, RF-VE02, RF-VE03, RF-VE04
   const [formVehiculo, setFormVehiculo] = useState<VehiculoFormState | null>(
     null,
   );
@@ -716,7 +723,6 @@ export default function VehiculosPage() {
 
   return (
     <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
-      {/* Notificación flotante unificada con el resto de vistas */}
       <AnimatePresence>
         {notice && (
           <motion.div
@@ -740,7 +746,6 @@ export default function VehiculosPage() {
         )}
       </AnimatePresence>
 
-      {/* Encabezado principal */}
       <EncabezadoSeccion
         antetitulo="Flota y reparto · Conectado"
         titulo="Control de Vehículos"
@@ -766,7 +771,6 @@ export default function VehiculosPage() {
         </>}
       />
 
-      {/* Tarjetas de KPIs de Flota con glass-panel y bordes definidos */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           {
@@ -829,7 +833,6 @@ export default function VehiculosPage() {
         ))}
       </div>
 
-      {/* Pestañas de navegación de vista con el mismo estilo de píldoras de Usuarios/Inventario */}
       <div className="flex flex-wrap items-center gap-2">
         {[
           {
@@ -880,7 +883,6 @@ export default function VehiculosPage() {
         })}
       </div>
 
-      {/* VISTA 1: CATÁLOGO DE FLOTA */}
       {tab === "flota" && (
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1116,7 +1118,6 @@ export default function VehiculosPage() {
         </>
       )}
 
-      {/* VISTA 2: MONITOR EN VIVO DE VEHÍCULOS EN RUTA (RF-VE02 / RF-VE03) */}
       {tab === "en-ruta" && (
         <div className="space-y-4">
           {salidasEnCurso.length === 0 ? (
@@ -1242,10 +1243,8 @@ export default function VehiculosPage() {
         </div>
       )}
 
-      {/* VISTA 3: HISTORIAL Y AUDITORÍA DE INSPECCIONES (RF-VE04) */}
       {tab === "historial" && (
         <div className="space-y-4">
-          {/* Resumen rápido del historial filtrado */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="glass-panel rounded-2xl border border-stone-200/80 p-4 dark:border-white/10">
               <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
@@ -1273,7 +1272,6 @@ export default function VehiculosPage() {
             </div>
           </div>
 
-          {/* Contenedor glass-panel de filtros + tabla igual que Inventario */}
           <section className="glass-panel overflow-hidden rounded-2xl border border-stone-200/80 dark:border-white/10">
             <div className="flex flex-col gap-4 border-b border-stone-100 px-5 py-4 dark:border-white/5 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex items-center gap-2.5">
@@ -1511,7 +1509,6 @@ export default function VehiculosPage() {
         </div>
       )}
 
-      {/* Modal de Registro / Edición de Vehículo (RF-VE01) — Estilo glass-panel unificado */}
       <AnimatePresence>
         {formVehiculo && (
           <ModalIntranet
@@ -1686,7 +1683,6 @@ export default function VehiculosPage() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Registro de Salida (RF-VE02) — Estilo glass-panel + subida real de fotos */}
       <AnimatePresence>
         {formSalida && (
           <ModalIntranet
@@ -1843,7 +1839,6 @@ export default function VehiculosPage() {
                 />
               </div>
 
-              {/* Zona de adjunto de fotografías de salida */}
               <div className="rounded-2xl border border-stone-200/80 bg-stone-50/70 p-4 dark:border-white/10 dark:bg-white/5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -1957,7 +1952,6 @@ export default function VehiculosPage() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Registro de Regreso (RF-VE03) — Estilo glass-panel + subida real de fotos */}
       <AnimatePresence>
         {formRetorno && (
           <ModalIntranet
@@ -2061,7 +2055,6 @@ export default function VehiculosPage() {
                 />
               </div>
 
-              {/* Zona de adjunto de fotografías de retorno */}
               <div className="rounded-2xl border border-stone-200/80 bg-stone-50/70 p-4 dark:border-white/10 dark:bg-white/5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -2175,7 +2168,6 @@ export default function VehiculosPage() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Detalle y Auditoría Comparativa de Inspección (RF-VE04) */}
       <AnimatePresence>
         {salidaDetalle && (
           <ModalIntranet
@@ -2195,6 +2187,8 @@ export default function VehiculosPage() {
                   salidaDetalle,
                   "DESPUES",
                 );
+                // Las rutas definitivas en Storage (`vehiculos/inspecciones/`) se resuelven vía `FotoEvidencia`;
+                // solo se usan vistas previas directas para archivos recién subidos en esta sesión o URLs directas.
                 const resolverPreview = (ruta: string) => {
                   if (ruta.startsWith("vehiculos/inspecciones/")) return null;
                   if (previewsLocales[ruta]) return previewsLocales[ruta];
@@ -2221,7 +2215,6 @@ export default function VehiculosPage() {
                     )}
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {/* Columna Inspección ANTES */}
                       <div className="rounded-2xl border border-stone-200/80 bg-stone-50/50 p-4 dark:border-white/10 dark:bg-white/5">
                         <div className="flex items-center justify-between">
                           <h3 className="font-display text-sm font-extrabold text-stone-900 dark:text-stone-100">
@@ -2304,7 +2297,6 @@ export default function VehiculosPage() {
                         )}
                       </div>
 
-                      {/* Columna Inspección DESPUES */}
                       <div className="rounded-2xl border border-stone-200/80 bg-stone-50/50 p-4 dark:border-white/10 dark:bg-white/5">
                         <div className="flex items-center justify-between">
                           <h3 className="font-display text-sm font-extrabold text-stone-900 dark:text-stone-100">

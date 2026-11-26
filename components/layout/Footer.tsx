@@ -5,7 +5,7 @@ import { Phone, Mail, MapPin, ExternalLink, ShieldCheck, Clock } from "lucide-re
 import { configuracionLegal } from "@/lib/privacidad/configuracion";
 import { formatRut } from "@/lib/validators";
 
-// Inline Custom SVG Icons for Facebook and LinkedIn to bypass missing brand icons in certain lucide-react versions
+// Íconos SVG inline para evitar inconsistencias o retiro de marcas en lucide-react.
 const FacebookIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
@@ -20,8 +20,12 @@ const LinkedinIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+/**
+ * Pie de página público con datos de contacto, redes sociales e identificación legal del responsable.
+ * Es Server Component dinámico para reflejar la configuración legal vigente en tiempo de ejecución.
+ */
 export default async function Footer() {
-  // Leer la configuración del servidor también al atender la página de inicio.
+  // Fuerza render dinámico para leer la configuración legal del entorno en cada solicitud y no congelarla en build.
   await connection();
   const legal = configuracionLegal();
   const socialLinks = [
@@ -43,12 +47,9 @@ export default async function Footer() {
     <footer className="bg-stone-50 border-t border-stone-200 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Footer Top */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-12">
           
-          {/* Brand Info (5 columns) */}
           <div className="md:col-span-5 space-y-6">
-            {/* Logo + Text */}
             <div className="flex items-center gap-3">
               <Image
                 src="/logo.webp"
@@ -67,7 +68,6 @@ export default async function Footer() {
             </p>
           </div>
 
-          {/* Social Links (3 columns) */}
           <div className="md:col-span-3 space-y-4">
             <h4 className="text-xs uppercase tracking-wider text-brand-700 font-extrabold">Nuestras Redes</h4>
             <ul className="space-y-3.5">
@@ -95,7 +95,6 @@ export default async function Footer() {
             </ul>
           </div>
 
-          {/* Direct Address & Contact Info (4 columns) */}
           <div className="md:col-span-4 space-y-4">
             <h4 className="text-xs uppercase tracking-wider text-brand-700 font-extrabold">Información de Contacto</h4>
             <ul className="space-y-3.5">
@@ -162,7 +161,6 @@ export default async function Footer() {
           {legal.email && <p className="mt-2 break-words">Contacto adicional de privacidad: <a href={`mailto:${legal.email}`} className="font-semibold text-brand-700 underline">{legal.email}</a>.</p>}
         </section>
 
-        {/* Footer Bottom (Copyright) */}
         <div className="pt-8 border-t border-stone-250 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-stone-500 font-medium">
           <p className="text-center sm:text-left">
             © {new Date().getFullYear()} {legal.identidadCompleta ? legal.razonSocial : "Lavandería El Cobre"}. Todos los derechos reservados.

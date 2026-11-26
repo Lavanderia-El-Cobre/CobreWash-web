@@ -4,9 +4,15 @@ import PaginaLegal, { SeccionLegal } from "@/components/privacidad/PaginaLegal";
 import { configuracionLegal } from "@/lib/privacidad/configuracion";
 import { VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 
+// Renderizado dinámico para leer la configuración legal vigente en runtime sin reconstruir el bundle.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Términos y Condiciones | Lavandería El Cobre" };
 
+/**
+ * Página de Términos y Condiciones del portal web y del servicio de lavandería.
+ * Muestra el aviso de documento en revisión mientras la configuración legal no
+ * esté marcada como publicada.
+ */
 export default function TerminosPage() {
   const c = configuracionLegal();
   const razonSocial = c.razonSocial || "Lavandería El Cobre SpA";

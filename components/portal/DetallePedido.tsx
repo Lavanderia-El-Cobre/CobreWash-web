@@ -5,9 +5,16 @@ import type { PedidoCliente } from "@/lib/portal/consultar";
 import AvancePedido, { EstadoPedido } from "@/components/seguimiento/AvancePedido";
 import QrPedido from "@/components/seguimiento/QrPedido";
 const clp = (valor: number) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(valor);
+
+/**
+ * Tarjeta desplegable con el detalle completo de un pedido en el portal de clientes
+ * (resumen económico, tabla de prendas/servicios, línea de avance y código QR).
+ * Usa `<details>` nativo para ofrecer expansión accesible sin estado de React adicional.
+ */
 export default function DetallePedido({ pedido }: { pedido: PedidoCliente }) {
   const vista = presentarPedido(pedido);
   return <details className="group glass-card overflow-hidden rounded-3xl bg-white/75 shadow-premium">
+    {/* `[&::-webkit-details-marker]:hidden` oculta el triángulo nativo en Safari/WebKit para reemplazarlo por `ChevronDown`. */}
     <summary className="grid cursor-pointer list-none grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 p-5 sm:flex sm:flex-wrap sm:gap-4 sm:p-6 [&::-webkit-details-marker]:hidden">
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><Package className="h-6 w-6" /></span>
       <span className="min-w-0 flex-1"><span className="break-words font-display text-base font-extrabold text-stone-900">{pedido.numeroComanda}</span><span className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-xs text-stone-500"><CalendarDays className="h-3.5 w-3.5 shrink-0" />{fechaSeguimiento(pedido.fechaRecepcion)}</span></span>

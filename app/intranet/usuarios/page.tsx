@@ -85,6 +85,12 @@ const emptyForm: FormState = {
 
 type Modal = { mode: "crear" } | { mode: "editar"; usuario: Usuario } | null;
 
+/**
+ * Administración de usuarios y roles (`/intranet/usuarios`).
+ * Reservado exclusivamente al rol `admin`. Permite crear cuentas enviando invitación de
+ * contraseña por correo (previa confirmación de términos y privacidad), editar datos o rol
+ * y activar/desactivar accesos impidiendo la auto-modificación de la propia sesión.
+ */
 export default function UsuariosPage() {
   const permitido = useRoleGuard(["admin"]);
   const yo = useUsuarioActualContext();
@@ -266,7 +272,6 @@ export default function UsuariosPage() {
         </div>
       ) : (
         <>
-          {/* Stats */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -291,7 +296,6 @@ export default function UsuariosPage() {
             })}
           </motion.div>
 
-          {/* Filters */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -336,7 +340,6 @@ export default function UsuariosPage() {
             </div>
           </motion.div>
 
-          {/* Users Grid */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -346,6 +349,7 @@ export default function UsuariosPage() {
             <AnimatePresence mode="popLayout">
               {filtered.map((usuario, i) => {
                 const rc = roleColors[usuario.rol.nombre] ?? defaultRoleColor;
+                // Impide editar o desactivar la propia cuenta del administrador en sesión.
                 const esUnoMismo = usuario.id === yo?.id;
                 return (
                   <motion.div
@@ -433,7 +437,6 @@ export default function UsuariosPage() {
         </>
       )}
 
-      {/* Crear / Editar Modal */}
       <AnimatePresence>
         {modal && (
           <ModalIntranet

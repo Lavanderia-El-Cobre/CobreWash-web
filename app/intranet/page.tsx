@@ -19,6 +19,7 @@ const ESTADO_LABEL: Record<ComandaEstado, string> = {
   ENTREGADA: "Entregada", ANULADA: "Anulada",
 };
 
+/** Devuelve la primera etapa aún no completada del flujo de la comanda, o `null` si terminó. */
 function etapaActual(comanda: ComandaPanel) {
   return comanda.comandaEtapas_on_comanda.find((etapa) => etapa.estado !== "COMPLETADA") ?? null;
 }
@@ -27,6 +28,11 @@ function estaAtrasada(comanda: ComandaPanel, ahora: number) {
   return alertaComanda(comanda, ahora) != null;
 }
 
+/**
+ * Panel principal de producción en tiempo real (`/intranet`).
+ * Reservado al rol `admin`; muestra indicadores de comandas activas, alertas de retraso,
+ * incidencias abiertas, distribución por etapa y una tabla filtrable con refresco automático.
+ */
 export default function DashboardPage() {
   const permitido = useRoleGuard(["admin"]);
   const { alertas } = useAlertasRetraso();
@@ -51,6 +57,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void Promise.resolve().then(() => cargar());
+    // Refresca cada 10 s y al recuperar foco solo si la pestaña está visible para evitar consultas ociosas.
     const refrescar = () => { if (document.visibilityState === "visible") void cargar(true); };
     const interval = window.setInterval(refrescar, 10_000);
     window.addEventListener("focus", refrescar);

@@ -28,6 +28,12 @@ function EstadoBadge({ estado }: { estado: IncidenciaEstado }) {
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${ESTADO_STYLE[estado]}`}>{ESTADO_LABEL[estado]}</span>;
 }
 
+/**
+ * Gestión y seguimiento de incidencias de comandas (`/intranet/incidencias`).
+ * Accesible para `admin` y `recepcionista`. Consolida los problemas reportados desde
+ * producción o entrega, permite filtrar por estado/texto y actualizar el seguimiento
+ * (`ABIERTA` → `EN_REVISION` → `RESUELTA`) con actualización periódica cada 10 segundos.
+ */
 export default function IncidenciasPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const [incidencias, setIncidencias] = useState<Incidencia[]>([]);

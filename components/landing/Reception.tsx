@@ -4,6 +4,9 @@ import Image from "next/image";
 import { Clock, MapPin, Phone, Mail, Navigation } from "lucide-react";
 import { motion } from "framer-motion";
 
+/**
+ * Sección de atención presencial (`#recepcion`) con horarios, dirección en Calama y canales de contacto.
+ */
 export default function Reception() {
   const contactDetails = [
     {
@@ -90,7 +93,6 @@ export default function Reception() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
           
-          {/* Left Column: Details (7 columns on desktop) */}
           <div className="lg:col-span-7 space-y-10">
             <div className="space-y-4">
               <h2 className="text-xs uppercase tracking-widest text-brand-650 font-bold">Atención Presencial</h2>
@@ -103,7 +105,6 @@ export default function Reception() {
               </p>
             </div>
 
-            {/* Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6">
               {contactDetails.map((detail, index) => {
                 const IconComponent = detail.icon;
@@ -131,7 +132,6 @@ export default function Reception() {
             </div>
           </div>
 
-          {/* Right Column: Reception Mockup/Image (5 columns on desktop) */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -140,7 +140,6 @@ export default function Reception() {
             className="lg:col-span-5 relative"
           >
             <div className="relative mx-auto max-w-md lg:max-w-none">
-              {/* Soft visual wrapper */}
               <div className="absolute -inset-3 bg-gradient-to-br from-brand-300 to-copper-600 opacity-15 rounded-3xl blur-md -z-10" />
 
               <div className="overflow-hidden rounded-2xl border-4 border-white shadow-2xl relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-[3/4]">
@@ -153,7 +152,6 @@ export default function Reception() {
                 />
               </div>
 
-              {/* Floating Address Badge */}
               <div className="absolute -top-4 -right-4 bg-brand-600 text-white px-5 py-3 rounded-xl shadow-lg border border-brand-500 max-w-[200px]">
                 <p className="text-[10px] text-brand-100 font-bold uppercase tracking-wider">¿Dónde estamos?</p>
                 <p className="text-xs font-bold mt-0.5 leading-snug">Av. Balmaceda 1276 - 1364, Calama</p>

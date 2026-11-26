@@ -1,3 +1,8 @@
+/**
+ * Configuración de Vitest para pruebas unitarias en entorno Node.
+ * Resuelve el alias `@/` hacia la raíz del repositorio y exige cobertura mínima
+ * del 80 % en el módulo de IA (`lib/ia`).
+ */
 import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
 

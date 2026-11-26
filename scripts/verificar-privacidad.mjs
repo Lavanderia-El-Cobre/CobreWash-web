@@ -1,3 +1,16 @@
+/**
+ * Verifica el registro local de cumplimiento de la Ley 21.719 (`docs/cumplimiento-21719.json`).
+ *
+ * Comprueba que los 24 controles obligatorios estén presentes sin duplicados ni omisiones,
+ * que ninguno marque `obligatorio: false` y que todos cuenten con estado `verificado`,
+ * evidencia no vacía, responsable asignado y fecha `YYYY-MM-DD`.
+ * Termina con código `0` si no hay pendientes o `2` si restan controles por verificar.
+ *
+ * Invocación:
+ *   node scripts/verificar-privacidad.mjs
+ *
+ * Variables de entorno requeridas: ninguna.
+ */
 import { readFile } from 'node:fs/promises';
 const registro = JSON.parse(await readFile(new URL('../docs/cumplimiento-21719.json', import.meta.url), 'utf8'));
 if (!Array.isArray(registro.controles) || registro.controles.length === 0) throw new Error('Registro de controles vacío o inválido');
@@ -12,4 +25,5 @@ for (const c of registro.controles) {
 }
 for (const id of requeridos) if (!ids.has(id)) throw new Error(`Falta un control obligatorio: ${id}`);
 console.log(JSON.stringify({ preparado: pendientes.length === 0, pendientes, alcance: 'Comprueba declaraciones y referencias del registro local. No verifica contratos, infraestructura ni certifica cumplimiento legal.' }, null, 2));
+// Código 2 distingue controles pendientes de un error de formato o lectura (código 1).
 process.exitCode = pendientes.length ? 2 : 0;

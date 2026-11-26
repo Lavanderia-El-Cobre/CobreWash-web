@@ -72,6 +72,12 @@ const chipEstado: Record<EstadoVehiculo, string> = {
 
 const km = (n: number) => `${n.toLocaleString("es-CL")} km`;
 
+/**
+ * Panel operativo de jornada y vehículos para personal de reparto (`/intranet/reparto`).
+ * Reservado a roles `repartidor` y `conductor`. Permite tomar un vehículo disponible,
+ * registrar inspecciones de salida y regreso con evidencia fotográfica, acceder a
+ * `/intranet/entregas` y revisar el historial reciente de salidas propias.
+ */
 export default function RepartoPage() {
   const permitido = useRoleGuard(["repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();
@@ -82,6 +88,8 @@ export default function RepartoPage() {
   const [form, setForm] = useState<FormMovimiento | null>(null);
   const [formError, setFormError] = useState("");
   const [guardando, setGuardando] = useState(false);
+  // Flujo idempotente en dos fases: si la mutación ya se guardó pero falla Storage,
+  // bloquea los campos del formulario para reintentar únicamente la subida de fotografías.
   const [movimientoGuardado, setMovimientoGuardado] = useState(false);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [ahora, setAhora] = useState(() => Date.now());

@@ -1,7 +1,26 @@
+/**
+ * Inicializa el catálogo base de las 5 etapas de producción en Firebase Data Connect
+ * (Recepción, Lavado, Secado, Planchado y Entrega) sin sobrescribir configuraciones existentes.
+ *
+ * Invocación:
+ *   node scripts/init-production.mjs           # Solo diagnóstico (no escribe)
+ *   node scripts/init-production.mjs --apply   # Inserta las cinco etapas si el catálogo está vacío
+ *
+ * Variables de entorno requeridas:
+ *   - `GCLOUD_PROJECT`: ID del proyecto Firebase/Google Cloud.
+ *   - Credenciales administrativas (ADC / `GOOGLE_APPLICATION_CREDENTIALS`).
+ */
 import { initializeApp } from "firebase-admin/app";
 import { getDataConnect } from "firebase-admin/data-connect";
 import { pathToFileURL } from "node:url";
 
+/**
+ * Verifica el catálogo `EtapaProduccion` y crea las cinco etapas base si está vacío.
+ * Falla sin modificar datos si detecta un catálogo parcial o con orden inconsistente.
+ *
+ * @param dc - Instancia administrativa de Firebase Data Connect.
+ * @param aplicar - Si es `true`, ejecuta la inserción; en caso contrario solo informa.
+ */
 export async function inicializarEtapas(dc, aplicar = false) {
   const { data } = await dc.executeGraphqlRead("query { etapaProduccions(orderBy:[{orden:ASC}]) { id nombre orden } }");
   const existentes = data.etapaProduccions;
@@ -23,6 +42,7 @@ export async function inicializarEtapas(dc, aplicar = false) {
   console.log("Cinco etapas creadas. No se modificaron comandas.");
 }
 
+// Solo se ejecuta como CLI cuando se invoca directamente, permitiendo importar `inicializarEtapas` en pruebas.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const projectId = process.env.GCLOUD_PROJECT;
   if (!projectId) throw new Error("Define GCLOUD_PROJECT y credenciales administrativas.");

@@ -1,11 +1,13 @@
 import { DESVIACION_PREVIA } from "./ajuste";
 import type { Observacion, Produccion, TasaServicio } from "./modelo";
 
+/** Peso procesado de un tipo de servicio dentro de una comanda. */
 export interface LineaComanda {
   servicioId: string;
   kg: number;
 }
 
+/** Datos mínimos de un insumo necesarios para estimar consumo y contrastar stock. */
 export interface InsumoStock {
   id: string;
   nombre: string;
@@ -16,6 +18,7 @@ export interface InsumoStock {
 /** ok: alcanza con margen · justo: alcanza solo sin margen · insuficiente: no alcanza. */
 export type NivelStock = "ok" | "justo" | "insuficiente";
 
+/** Resultado de la predicción de consumo y suficiencia de stock para un insumo. */
 export interface EstimacionInsumo {
   insumoId: string;
   nombre: string;

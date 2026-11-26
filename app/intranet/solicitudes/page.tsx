@@ -11,6 +11,11 @@ import { fechaSeguimiento } from "@/lib/seguimiento/publico";
 import { TAMANO_BANDEJA, variablesBandeja } from "@/lib/solicitudes/bandeja";
 
 const etiquetas: Record<SolicitudContactoEstado, string> = { RECIBIDA: "Recibida", EN_REVISION: "En revisión", ATENDIDA: "Atendida" };
+/**
+ * Bandeja de solicitudes de cotización recibidas desde el sitio web (`/intranet/solicitudes`).
+ * Accesible para `admin` y `recepcionista`. Permite filtrar por estado, paginar resultados
+ * y actualizar el estado de seguimiento comercial (`RECIBIDA` → `EN_REVISION` → `ATENDIDA`).
+ */
 export default function SolicitudesPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const [datos, setDatos] = useState<GetSolicitudesContactoData | null>(null);
@@ -19,6 +24,7 @@ export default function SolicitudesPage() {
   const [cargando, setCargando] = useState(false);
   const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Control de versión para ignorar respuestas obsoletas al cambiar filtro, página o desmontar.
   const version = useRef(0);
   const cargar = useCallback(async () => {
     if (!permitido) return;

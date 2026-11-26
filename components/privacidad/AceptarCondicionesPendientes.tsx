@@ -8,9 +8,13 @@ import AceptacionTerminos from "@/components/privacidad/AceptacionTerminos";
 import AutorizacionDatos, { useAvisoPublicado } from "@/components/privacidad/AutorizacionDatos";
 
 /**
- * Se muestra a clientes cuya cuenta fue creada por el personal o que
- * aceptaron una versión anterior: el titular acepta por sí mismo antes de usar
+ * Pantalla bloqueante para clientes cuya cuenta fue creada por el personal o que
+ * aceptaron una versión anterior: exige aceptación directa del titular antes de usar
  * el portal.
+ *
+ * @param props.nombre - Nombre del titular para personalizar el saludo inicial.
+ * @param props.primeraVez - `true` cuando la cuenta se creó en recepción y nunca aceptó condiciones; `false` si es actualización de versión.
+ * @param props.onSalir - Acción para cerrar sesión si el titular decide no aceptar ahora.
  */
 export default function AceptarCondicionesPendientes({ nombre, primeraVez, onSalir }: { nombre: string; primeraVez: boolean; onSalir: () => void }) {
   const publicada = useAvisoPublicado();
@@ -24,6 +28,7 @@ export default function AceptarCondicionesPendientes({ nombre, primeraVez, onSal
     setGuardando(true); setError("");
     try {
       await aceptarCondiciones(dataConnect, { aceptaTerminos, versionTerminos: VERSION_TERMINOS, autorizaDatos, versionPrivacidad: VERSION_PRIVACIDAD });
+      // Notifica al layout/guard de sesión para recargar el perfil y desbloquear el portal sin refrescar la página.
       window.dispatchEvent(new Event("cobre:perfil-actualizado"));
     } catch (e) {
       setError(e instanceof Error && e.message.startsWith("Lee") ? e.message : "No pudimos registrar tu aceptación. Intenta nuevamente.");

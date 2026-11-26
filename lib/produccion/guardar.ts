@@ -2,7 +2,9 @@ import { executeMutation, getDataConnect, mutationRef } from "firebase/data-conn
 import { app, dataConnect } from "@/lib/firebase/client";
 import { connectorConfig, getMiComandaGuardada } from "@/src/dataconnect-generated";
 
+/** Variables para crear una comanda junto con sus líneas de detalle y flujo de etapas. */
 export interface CrearComandaConFlujoVariables {
+  /** UUID pregenerado en el cliente para garantizar idempotencia ante reintentos. */
   id: string;
   numeroComanda: string;
   clienteId: string;
@@ -23,11 +25,18 @@ export interface CrearComandaConFlujoVariables {
 
 type Resultado = { comanda_insert: { id: string } };
 
+/** Variables para actualizar cabecera y detalles de una comanda existente con control optimista. */
 export type EditarComandaConDetallesVariables = Omit<Pick<CrearComandaConFlujoVariables, "id" | "empresa" | "proyecto" | "observaciones" | "detalles">, "detalles"> & {
+  /** Marca de versión actual de la comanda usada para evitar sobrescrituras concurrentes. */
   version: string;
   detalles: (CrearComandaConFlujoVariables["detalles"][number] & { comandaId: string })[];
 };
 
+/**
+ * Ejecuta la mutación atómica `EditarComandaConDetalles` en el conector `produccion`.
+ *
+ * @param variables - Datos actualizados de la comanda, sus detalles y su `version` actual.
+ */
 export async function editarComandaConDetalles(variables: EditarComandaConDetallesVariables) {
   const dc = getDataConnect(app, { ...connectorConfig, connector: "produccion" });
   await executeMutation(mutationRef<{ comanda_update: { id: string } }, EditarComandaConDetallesVariables>(
@@ -37,6 +46,14 @@ export async function editarComandaConDetalles(variables: EditarComandaConDetall
 
 // El generador aún no admite inputs _Data con @allow. Mantener este contrato
 // acotado al input de dataconnect/produccion/mutations.gql.
+/**
+ * Crea una comanda junto con su flujo de etapas en el conector `produccion`.
+ * Si falla la red tras enviar la mutación, verifica en el servidor si el UUID
+ * ya quedó persistido para evitar duplicar la comanda en reintentos.
+ *
+ * @param variables - Datos de la comanda, líneas de detalle y UUID cliente.
+ * @returns Identificador persistido de la comanda.
+ */
 export async function guardarComandaConFlujo(variables: CrearComandaConFlujoVariables) {
   const dc = getDataConnect(app, { ...connectorConfig, connector: "produccion" });
   try {

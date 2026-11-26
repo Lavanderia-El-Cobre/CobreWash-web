@@ -1,12 +1,22 @@
+/** Versión vigente de la Política de Privacidad; debe coincidir con `LEGAL_AVISO_APROBADO_VERSION` para publicarla. */
 export const VERSION_PRIVACIDAD = "2026-11-24";
-// Versión vigente de los Términos y Condiciones del portal y del servicio.
+/** Versión vigente de los Términos y Condiciones del portal y del servicio. */
 export const VERSION_TERMINOS = "2026-11-24";
+/** Catálogo de derechos ARCOP+ y revocación ejercibles mediante el formulario público. */
 export const DERECHOS = ["ACCESO", "RECTIFICACION", "SUPRESION", "OPOSICION", "BLOQUEO", "PORTABILIDAD", "REVOCACION"] as const;
+/** Tipo literal de un derecho de protección de datos personales. */
 export type Derecho = typeof DERECHOS[number];
+/** Etiquetas legibles mostradas al titular en el formulario y en los comprobantes. */
 export const ETIQUETAS_DERECHOS: Record<Derecho, string> = {
   ACCESO: "Acceso a mis datos", RECTIFICACION: "Rectificar mis datos", SUPRESION: "Solicitar supresión",
   OPOSICION: "Oponerme a un tratamiento", BLOQUEO: "Solicitar bloqueo temporal", PORTABILIDAD: "Solicitar portabilidad", REVOCACION: "Revocar una autorización",
 };
+
+/**
+ * Valida y normaliza una solicitud ciudadana de ejercicio de derechos antes de persistirla.
+ * Exige `id` (UUID) y `secreto` (64 hex) generados por el cliente como comprobante de consulta;
+ * el campo `detalle` solo es opcional para solicitudes de `ACCESO`.
+ */
 export function validarSolicitudDerecho(body: unknown) {
   if (!body || typeof body !== "object") throw new Error("Solicitud inválida.");
   const b = body as Record<string, unknown>;
@@ -18,6 +28,7 @@ export function validarSolicitudDerecho(body: unknown) {
   const id = texto("id", 36), secreto = texto("secreto", 64);
   if (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id) || !/^[\da-f]{64}$/i.test(secreto)) throw new Error("Comprobante inválido.");
   const nombre = texto("nombre", 160), email = texto("email", 120).toLowerCase();
+  // Rechaza saltos de línea en `nombre` para prevenir inyección en encabezados de correo o registros.
   if (/[\r\n]/.test(nombre) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Revisa el nombre y el correo de respuesta.");
   const derecho = texto("derecho", 20) as Derecho;
   if (!DERECHOS.includes(derecho)) throw new Error("Selecciona un derecho.");
@@ -25,12 +36,22 @@ export function validarSolicitudDerecho(body: unknown) {
   return { id, secreto, nombre, email, derecho, detalle };
 }
 
-// Objetivo operativo conservador: 24 h para bloqueo y 48 h para el resto.
-// No sustituye los plazos legales ni requiere calcular feriados para priorizar.
+/**
+ * Calcula la meta interna de atención (ISO): 24 h para `BLOQUEO` y 48 h para el resto.
+ * Es un objetivo operativo conservador que no sustituye los plazos legales ni requiere
+ * calendario de feriados para priorizar la cola.
+ */
 export function objetivoAtencion(derecho: Derecho, ahora = new Date()) {
   return new Date(ahora.getTime() + (derecho === "BLOQUEO" ? 24 : 48) * 3_600_000).toISOString();
 }
 
+/**
+ * Valida la actualización administrativa de una solicitud de derechos.
+ * Al cerrar en estado `RESPONDIDA`, exige respaldo completo de trazabilidad
+ * (verificación de identidad, envío, resultado, ejecución/rechazo, comunicación
+ * a destinatarios y aviso de reclamación si hubo denegación total o parcial)
+ * y consolida una nota estructurada acotada a 4000 caracteres.
+ */
 export function validarGestionDerecho(body: unknown) {
   const b = body as Record<string, unknown> | null;
   if (!b || !["VERIFICACION", "EN_GESTION", "RESPONDIDA"].includes(String(b.estado))) throw new Error("Estado inválido.");

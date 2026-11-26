@@ -45,11 +45,18 @@ const GUIA_DERECHOS: Record<Derecho, { articulo: string; plazo: string; descripc
 };
 
 type Recibo = { id: string; secreto: string; recibidoEn: string; estado: string; objetivoAtencion: string };
+
+/**
+ * Formulario público para ejercer derechos de protección de datos personales (Ley 21.719)
+ * y panel lateral para consultar el estado de una solicitud usando el comprobante privado.
+ */
 export default function FormularioDerechos() {
   const [nombre, setNombre] = useState(""); const [email, setEmail] = useState("");
   const [derecho, setDerecho] = useState<Derecho>("ACCESO"); const [detalle, setDetalle] = useState("");
   const [recibo, setRecibo] = useState<Recibo | null>(null); const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false); const enCurso = useRef(false);
+  // Par `id` + `secreto` de 256 bits generado en cliente y reutilizado ante reintentos para
+  // garantizar idempotencia; el secreto solo vive en memoria y en el comprobante que descarga el titular.
   const pendiente = useRef<{ id: string; secreto: string } | null>(null);
   const [comprobante, setComprobante] = useState(""); const [estadoConsulta, setEstadoConsulta] = useState("");
   async function enviar(e: React.FormEvent) {
@@ -68,6 +75,7 @@ export default function FormularioDerechos() {
     if (!recibo) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(recibo, null, 2)], { type: "application/json" }));
     const a = document.createElement("a"); a.href = url; a.download = `comprobante-datos-${recibo.id}.json`; a.click();
+    // Margen breve para que el navegador comience la descarga antes de revocar la URL temporal.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   return <div className="space-y-5">
@@ -108,6 +116,7 @@ export default function FormularioDerechos() {
         <form className="glass-card space-y-5 rounded-3xl bg-white/65 p-5 shadow-premium backdrop-blur-lg sm:p-7" onSubmit={async e => {
       e.preventDefault(); setError(""); setEstadoConsulta(""); setOcupado(true);
       try {
+        // Acepta tanto el JSON completo del comprobante descargado como el formato compacto `id:secreto`.
         let datos: { id?: string; secreto?: string };
         try { datos = JSON.parse(comprobante); } catch { const [id, secreto] = comprobante.trim().split(":"); datos = { id, secreto }; }
         const r = await fetch("/api/privacidad/seguimiento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: datos.id, secreto: datos.secreto }) });

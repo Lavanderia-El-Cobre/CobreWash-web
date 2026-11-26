@@ -7,6 +7,11 @@ import Reception from "@/components/landing/Reception";
 import ContactForm from "@/components/landing/ContactForm";
 import Footer from "@/components/layout/Footer";
 
+/**
+ * Página de inicio pública de Lavandería El Cobre.
+ * Compone la landing comercial con presentación, servicios, maquinaria,
+ * información de recepción y formulario de cotización/contacto.
+ */
 export default function Home() {
   return (
     <>

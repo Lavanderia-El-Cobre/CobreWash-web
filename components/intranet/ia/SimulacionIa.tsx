@@ -24,6 +24,11 @@ async function llamar(metodo: "POST" | "DELETE", cuerpo: unknown) {
   return { ok: r.ok, datos: await r.json().catch(() => ({})) };
 }
 
+/**
+ * Pestaña de simulación del Módulo IA. Permite generar semanas sintéticas a partir de tasas
+ * ocultas para visualizar la curva de aprendizaje del modelo y limpiar lotes de prueba sin
+ * modificar el stock real.
+ */
 export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
   const p = PARAMETROS_SIMULACION_INICIALES;
   const [form, setForm] = useState({
@@ -63,6 +68,7 @@ export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPa
   };
 
   const borrar = async (id: string | "todos") => {
+    // Confirmación en dos clics sobre el mismo botón para evitar borrados accidentales sin abrir otro modal.
     if (confirmar !== id) { setConfirmar(id); return; }
     setBorrando(true);
     try {

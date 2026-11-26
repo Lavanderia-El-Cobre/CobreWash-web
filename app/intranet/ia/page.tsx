@@ -24,6 +24,12 @@ const PESTANAS = [
 ] as const;
 type Pestana = (typeof PESTANAS)[number]["id"];
 
+/**
+ * Módulo de inteligencia y predicción de consumo de insumos (`/intranet/ia`).
+ * Reservado al rol `admin`. Organiza resumen, tasas por servicio, datos históricos,
+ * simulación y trazabilidad del modelo en pestañas accesibles por teclado.
+ * Invariante: estima consumo y aprende de conteos físicos, pero nunca modifica el stock real.
+ */
 export default function ModuloIaPage() {
   const permitido = useRoleGuard(["admin"]);
   const [pestana, setPestana] = useState<Pestana>("resumen");
@@ -31,6 +37,7 @@ export default function ModuloIaPage() {
   const [error, setError] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const temporizador = useRef<number | undefined>(undefined);
+  // Evita que una consulta lenta sobreescriba una recarga más reciente.
   const solicitud = useRef(0);
 
   const avisar = useCallback((texto: string, tipo: Aviso["tipo"] = "success") => {

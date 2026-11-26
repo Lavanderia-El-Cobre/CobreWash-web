@@ -1,9 +1,18 @@
+// Requiere hooks de React y eventos del navegador (`visibilitychange`, timers).
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { consultarSeguimiento } from "./consultar";
 import { validarConsulta, type ConsultaSeguimiento, type PedidoPublico } from "./publico";
 
+/**
+ * Gestiona el estado de la consulta pública de pedidos (por QR o número de comanda)
+ * con control de concurrencia y actualización automática cada 30 segundos mientras
+ * la pestaña está visible.
+ *
+ * Usa un contador `secuencia` para descartar respuestas fuera de orden si el usuario
+ * realiza una nueva búsqueda antes de que termine la anterior.
+ */
 export function useSeguimientoPublico() {
   const [pedido, setPedido] = useState<PedidoPublico | null>(null);
   const [error, setError] = useState("");
@@ -40,6 +49,7 @@ export function useSeguimientoPublico() {
     }
   }, []);
 
+  // Invalida cualquier respuesta pendiente al desmontar el componente consumidor.
   useEffect(() => () => { secuencia.current++; enCurso.current = false; }, []);
 
   useEffect(() => {

@@ -1,6 +1,11 @@
 import type { MovimientoExportable } from "./movimientos";
 
-/** Recorre todas las páginas; nunca presenta una exportación truncada como completa. */
+/**
+ * Recorre todas las páginas del historial en bloques de 500 filas y valida la
+ * consistencia del conjunto; aborta si cambia el total o aparecen IDs repetidos
+ * por escrituras concurrentes, para nunca entregar una exportación truncada o
+ * duplicada como si estuviera completa.
+ */
 export async function leerHistorialCompleto<T extends MovimientoExportable>(
   cargar: (offset: number, limit: number) => Promise<{ movimientos: T[]; total: number }>,
 ): Promise<T[]> {

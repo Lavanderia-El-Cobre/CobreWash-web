@@ -1,5 +1,11 @@
 import type { ReporteExportable, Celda } from "./exportable";
 
+/**
+ * Genera un libro `.xlsx` en memoria con las hojas `Información`, `Resumen` y `Detalle`.
+ * Importa `exceljs` bajo demanda para evitar cargar la librería en el bundle inicial.
+ *
+ * @param reporte - Estructura exportable preparada con metadatos, indicadores y tablas.
+ */
 export async function generarExcel(reporte: ReporteExportable) {
   const ExcelJS = await import("exceljs");
   const libro = new ExcelJS.Workbook();
@@ -30,6 +36,7 @@ export async function generarExcel(reporte: ReporteExportable) {
       to: { row: Math.max(1, hoja.rowCount), column: tabla.columnas.length },
     };
     hoja.columns.forEach((columna, indice) => {
+      // Estima el ancho con una muestra acotada para no penalizar reportes extensos.
       columna.width = Math.min(
         48,
         Math.max(
@@ -67,6 +74,7 @@ export async function generarExcel(reporte: ReporteExportable) {
         cell.alignment = { vertical: "middle", wrapText: true };
       }),
     );
+    // `paperSize: 9` corresponde a hoja A4 en la especificación OOXML.
     hoja.pageSetup = {
       paperSize: 9,
       orientation: "landscape",
@@ -81,6 +89,13 @@ export async function generarExcel(reporte: ReporteExportable) {
   });
 }
 
+/**
+ * Genera un documento PDF A4 apaisado con metadatos, indicadores, tabla resumen
+ * y tabla detalle en página separada, añadiendo cabecera y numeración al final.
+ * Importa `jspdf` y `jspdf-autotable` de forma diferida.
+ *
+ * @param reporte - Estructura exportable preparada con metadatos, indicadores y tablas.
+ */
 export async function generarPdf(reporte: ReporteExportable) {
   const [{ jsPDF }, { autoTable }] = await Promise.all([
     import("jspdf"),
@@ -151,6 +166,7 @@ export async function generarPdf(reporte: ReporteExportable) {
       },
     });
   }
+  // Cabecera y pie se estampan al cierre para conocer el total real de páginas.
   const paginas = doc.getNumberOfPages();
   for (let pagina = 1; pagina <= paginas; pagina++) {
     doc.setPage(pagina);
@@ -174,6 +190,13 @@ export async function generarPdf(reporte: ReporteExportable) {
   return new Blob([doc.output("arraybuffer")], { type: "application/pdf" });
 }
 
+/**
+ * Dispara la descarga de un `Blob` en el navegador y libera su object URL
+ * tras una espera prudente para no cancelar descargas aún en curso.
+ *
+ * @param contenido - Archivo binario a descargar.
+ * @param nombre - Nombre completo del archivo incluyendo extensión.
+ */
 export function descargarArchivo(contenido: Blob, nombre: string) {
   const url = URL.createObjectURL(contenido);
   const enlace = document.createElement("a");
@@ -184,10 +207,17 @@ export function descargarArchivo(contenido: Blob, nombre: string) {
     enlace.click();
   } finally {
     enlace.remove();
+    // Se difiere la revocación porque algunos navegadores leen el blob de forma asíncrona tras el click.
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }
 
+/**
+ * Genera el reporte en el formato solicitado y dispara inmediatamente su descarga.
+ *
+ * @param reporte - Reporte normalizado para exportación.
+ * @param formato - Formato de salida (`"pdf"` o `"excel"`).
+ */
 export async function exportarReporte(
   reporte: ReporteExportable,
   formato: "pdf" | "excel",

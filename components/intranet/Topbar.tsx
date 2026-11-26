@@ -36,7 +36,6 @@ export default function IntranetTopbar() {
 
   return (
     <header className="hidden lg:flex items-center gap-4 px-6 py-4">
-      {/* Search */}
       <div className="relative flex-1 max-w-md">
         <input
           type="text"
@@ -48,7 +47,6 @@ export default function IntranetTopbar() {
 
       <div className="flex-1" />
 
-      {/* Quick actions */}
       <div className="flex items-center gap-2">
         <button
           onClick={toggleTheme}
@@ -67,7 +65,6 @@ export default function IntranetTopbar() {
         </Link>}
       </div>
 
-      {/* User chip */}
       <motion.div
         initial={{ opacity: 0, x: 8 }}
         animate={{ opacity: 1, x: 0 }}

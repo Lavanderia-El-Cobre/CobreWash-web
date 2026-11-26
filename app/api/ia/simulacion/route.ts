@@ -2,12 +2,26 @@ import { randomInt, randomUUID } from "node:crypto";
 import { prepararLoteSimulado, type DatosSimulacion, type ParametrosLote } from "@/lib/ia/lote-simulado";
 import { autorizarAdminIa, ErrorIa, errorIa, leerJson, responder } from "@/lib/ia/servidor";
 
+// Requiere runtime Node.js para `node:crypto` y Firebase Admin SDK.
 export const runtime = "nodejs";
 
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : NaN);
 
-/** Genera un lote de datos simulados alrededor de las tasas vigentes. */
+/**
+ * Genera y persiste un lote de datos sintéticos alrededor de las tasas vigentes
+ * para evaluar la convergencia del Módulo IA sin contaminar registros reales.
+ *
+ * - **Contrato HTTP**: `POST /api/ia/simulacion` con JSON de hasta 2.000 bytes:
+ *   `{ semanas, kgSemanalMin, kgSemanalMax, ruido, desvioTasas, semilla? }`.
+ *   Si `semilla` se omite o es `null`, se genera una semilla aleatoria criptográfica.
+ * - **Autenticación y roles**: solo administrador activo (`autorizarAdminIa`).
+ * - **Respuestas**:
+ *   - `200`: `{ id, semilla, conteos, compras, periodos, errorTasasInicial, errorTasasFinal, mapeFinal }`.
+ *   - `400`: parámetros fuera de rango o tasas insuficientes para simular.
+ *   - `401` / `403`: sesión inválida o sin permisos de administrador.
+ *   - `500` / `503`: fallo interno al persistir la simulación.
+ */
 export async function POST(request: Request) {
   try {
     const { db, dbProduccion, uid } = await autorizarAdminIa(request);
@@ -41,7 +55,20 @@ export async function POST(request: Request) {
   }
 }
 
-/** Borra un lote (con `id`) o todos los datos simulados. Nunca toca datos reales. */
+/**
+ * Elimina un lote simulado específico o todas las simulaciones existentes.
+ * Nunca modifica ni borra datos operativos reales.
+ *
+ * - **Contrato HTTP**: `DELETE /api/ia/simulacion` con JSON opcional de hasta
+ *   500 bytes: `{ id?: UUID }`. Sin `id` borra todas las simulaciones.
+ * - **Autenticación y roles**: solo administrador activo (`autorizarAdminIa`).
+ * - **Respuestas**:
+ *   - `200`: `{ borrado: "todos" | id }`.
+ *   - `400`: `id` no cumple formato UUID o JSON inválido.
+ *   - `401` / `403`: sesión inválida o sin permisos de administrador.
+ *   - `404`: la simulación indicada ya no existe.
+ *   - `500` / `503`: fallo al ejecutar la mutación en Data Connect.
+ */
 export async function DELETE(request: Request) {
   try {
     const { db } = await autorizarAdminIa(request);

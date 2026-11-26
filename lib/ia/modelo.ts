@@ -7,6 +7,7 @@
  * ocurre una sola vez en lib/ia/unidades.ts.
  */
 
+/** Origen de los datos de entrenamiento; las series REAL y SIMULADO nunca se mezclan al armar períodos. */
 export type Origen = "REAL" | "SIMULADO";
 
 /** Conteo físico aprobado: el stock medido de un insumo en un instante. */
@@ -44,6 +45,7 @@ export interface Observacion {
   kgPorServicio: Record<string, number>;
 }
 
+/** Par de conteos consecutivos excluido del entrenamiento por inconsistencia o falta de producción. */
 export interface PeriodoDescartado {
   insumoId: string;
   origen: Origen;
@@ -62,6 +64,7 @@ export interface TasaServicio {
 /** Cómo se midió el error del ajuste. */
 export type MetodoError = "validacion-cruzada" | "ajuste" | "sin-datos";
 
+/** Resultado del ajuste NNLS regularizado y métricas de error para un insumo. */
 export interface ResultadoInsumo {
   insumoId: string;
   /** Tasas resultantes por servicio, en unidad del insumo por kg. */

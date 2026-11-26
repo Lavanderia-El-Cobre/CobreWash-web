@@ -17,12 +17,21 @@ type Insumo = GetPanelIaData["insumos"][number];
 type Servicio = GetPanelIaData["tipoServicios"][number];
 type Edicion = { insumo: Insumo; servicio: Servicio; tasa?: Tasa; valor: string; unidad: string; fuente: string; reiniciar: boolean; confirmarBorrado: boolean };
 
+// Normaliza UUIDs sin guiones para indexar la matriz servicio×insumo sin depender del formato.
 const uuid = (id: string) => id.replaceAll("-", "").toLowerCase();
+
+/** Construye la clave única normalizada para una celda servicio–insumo en el mapa de tasas. */
 export const claveTasa = (servicioId: string, insumoId: string) => `${uuid(servicioId)}|${uuid(insumoId)}`;
 
+/** Margen de seguridad por defecto (15 %) aplicado cuando aún no existe configuración guardada. */
 export const MARGEN_INICIAL = 0.15;
+/** Factor de regularización λ por defecto (equivalente a un período de evidencia). */
 export const LAMBDA_INICIAL = 1;
 
+/**
+ * Matriz de tasas de consumo por servicio e insumo modelable y parámetros globales
+ * del modelo IA (margen de seguridad, regularización λ e inclusión de datos simulados).
+ */
 export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -73,6 +82,7 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
 
   const eliminar = async () => {
     if (!edicion?.tasa) return;
+    // Doble clic de confirmación dentro del mismo modal para prevenir eliminaciones involuntarias.
     if (!edicion.confirmarBorrado) { setEdicion({ ...edicion, confirmarBorrado: true }); return; }
     setGuardando(true);
     try {

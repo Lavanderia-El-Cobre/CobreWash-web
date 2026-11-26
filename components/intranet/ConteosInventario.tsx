@@ -6,6 +6,13 @@ import { dataConnect } from "@/lib/firebase/client";
 import { registrarError } from "@/lib/registro-seguro";
 import GlassSelect from "@/components/ui/GlassSelect";
 
+/**
+ * Panel de revisión y aprobación/rechazo de conteos físicos enviados desde la app móvil.
+ * Impide aprobar un conteo cuando el stock o el estado del insumo cambiaron desde que se registró.
+ *
+ * @param revision - Token externo que cambia tras mutaciones en otras secciones para forzar recarga.
+ * @param alGuardar - Notifica al contenedor tras resolver un conteo para refrescar saldos e historial.
+ */
 export default function ConteosInventario({ revision, alGuardar }: { revision: string; alGuardar: () => void }) {
   const [estado, setEstado] = useState<EstadoConteoInventario>(EstadoConteoInventario.PENDIENTE);
   const [pagina, setPagina] = useState(0);
@@ -16,6 +23,7 @@ export default function ConteosInventario({ revision, alGuardar }: { revision: s
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
+  // Contador monotónico para descartar respuestas antiguas si el usuario cambia filtro o página.
   const solicitud = useRef(0);
   const montado = useRef(true);
   const cargar = useCallback(async () => {
@@ -24,6 +32,7 @@ export default function ConteosInventario({ revision, alGuardar }: { revision: s
       const respuesta = await getConteosInventario(dataConnect, { estado, limit: 10, offset: pagina * 10 }, { fetchPolicy: "SERVER_ONLY" });
       if (montado.current && version === solicitud.current) {
         const total = respuesta.data.total[0]?._count ?? 0;
+        // Si los registros pendientes bajaron y la página actual quedó vacía, retrocede a la última válida.
         if (pagina > 0 && pagina * 10 >= total) { setPagina(Math.max(0, Math.ceil(total / 10) - 1)); return; }
         setDatos(respuesta.data);
       }
@@ -33,6 +42,7 @@ export default function ConteosInventario({ revision, alGuardar }: { revision: s
   useEffect(() => {
     montado.current = true;
     const peticiones = solicitud;
+    // Se difiere a microtarea para evitar actualizaciones síncronas dentro del efecto.
     void Promise.resolve().then(cargar);
     const refrescar = () => { if (document.visibilityState === "visible") void cargar(); };
     const timer = window.setInterval(refrescar, 30000);

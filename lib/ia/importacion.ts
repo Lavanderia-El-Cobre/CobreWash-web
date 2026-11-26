@@ -3,6 +3,7 @@ import type { ErrorCsv, FilaCsv, TipoCsv } from "./csv";
 const uuid = (id: string) => id.replaceAll("-", "").toLowerCase();
 const instante = (fecha: string) => Date.parse(fecha);
 
+/** Registros ya persistidos en el rango del archivo, usados para evitar duplicados. */
 export interface RegistrosExistentes {
   conteoInventarios: { insumoId: string; fechaConteo?: string | null }[];
   movimientoInventarios: { insumoId: string; fecha: string; cantidad: number }[];

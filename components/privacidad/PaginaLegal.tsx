@@ -10,6 +10,13 @@ const enlaces = [
   { href: "/terminos", label: "Términos y condiciones" },
 ];
 
+/**
+ * Plantilla común para las páginas legales públicas (`/privacidad`, `/privacidad/derechos`, `/terminos`).
+ * Incluye `Navbar` en modo interior, cabecera uniforme, pestañas de navegación con `aria-current="page"` y `Footer`.
+ *
+ * @param props.actual - Ruta activa para marcar la pestaña seleccionada en la navegación legal.
+ * @param props.detalle - Línea opcional de metadatos (por ejemplo, versión y fecha de vigencia).
+ */
 export default function PaginaLegal({ titulo, descripcion, actual, detalle, children }: {
   titulo: string; descripcion: string; actual: string; detalle?: string; children: ReactNode;
 }) {
@@ -37,6 +44,9 @@ export default function PaginaLegal({ titulo, descripcion, actual, detalle, chil
   </>;
 }
 
+/**
+ * Bloque de contenido estilizado dentro de una `PaginaLegal`, con título e ícono homogéneos.
+ */
 export function SeccionLegal({ titulo, icon: Icon = ShieldCheck, children }: { titulo: string; icon?: LucideIcon; children: ReactNode }) {
   return <section className="glass-card rounded-3xl bg-white/65 p-5 shadow-premium backdrop-blur-lg sm:p-8">
     <h2 className="mb-5 flex items-center gap-3 font-display text-lg font-extrabold text-stone-900 sm:text-xl"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><Icon className="h-5 w-5" /></span>{titulo}</h2>

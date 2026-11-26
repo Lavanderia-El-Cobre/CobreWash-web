@@ -4,19 +4,30 @@ import { verificarSesionAdmin } from "@/lib/firebase/sesion-admin";
 import { estimarConsumoComanda, PESO_MAXIMO_KG, type ModeloComanda } from "@/lib/ia/comanda";
 import { ErrorIa, errorIa, leerJson, responder } from "@/lib/ia/servidor";
 
+// Requiere runtime Node.js para Firebase Admin SDK y verificación de sesión.
 export const runtime = "nodejs";
 
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 
 /**
- * Estimación de consumo de insumos de una comanda que se está registrando, la misma
- * que muestra `ConsumoEstimado` en el formulario de la intranet. La usa la app móvil,
- * que no incluye el modelo de IA: solo envía el servicio y el peso total.
+ * Estima el consumo de insumos para una comanda en curso (equivalente al cálculo
+ * de `ConsumoEstimado` en la intranet). Utilizado por la app móvil, que no
+ * embebe el modelo de IA y solo envía el servicio y el peso total.
  *
- * Autorización en el servidor: ID token vigente y no revocado, y `GetModeloComandaIa`
- * ejecutado en nombre de quien llama (exige admin o recepcionista con cuenta activa).
- * Solo informa: no guarda nada ni cambia el stock. La recepción recibe el rango y si
- * el stock alcanza; administración además recibe el stock disponible, como en la web.
+ * - **Contrato HTTP**: `POST /api/ia/estimar-comanda` con JSON `{ tipoServicioId: UUID, pesoKg: number }`
+ *   (límite 1.000 bytes; `pesoKg` finito en `(0, PESO_MAXIMO_KG]`).
+ * - **Autenticación y roles**: `Authorization: Bearer <ID token>` vigente y no
+ *   revocado. `GetModeloComandaIa` se ejecuta con impersonación del llamante,
+ *   exigiendo rol `admin` o `recepcionista` activo. Solo `admin` recibe el campo
+ *   `stockActual`; recepción recibe únicamente rangos y alerta de suficiencia.
+ * - **Efectos / idempotencia**: solo lectura (idempotente); no persiste datos ni
+ *   altera el inventario.
+ * - **Respuestas**:
+ *   - `200`: `{ insumos, alerta, sinTasas }`.
+ *   - `400`: servicio o peso fuera de rango, o JSON inválido.
+ *   - `401`: falta token Bearer o la sesión venció/fue revocada.
+ *   - `403`: rol no autorizado o cuenta inactiva.
+ *   - `503`: fallo al validar la sesión contra Firebase.
  */
 export async function POST(request: Request) {
   try {

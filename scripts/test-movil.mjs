@@ -1,9 +1,23 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para las mutaciones `…Movil`
+ * generadas en `dataconnect/example/movil.gql` (operación sin conexión desde la app móvil).
+ *
+ * Valida separación entre hora original (`ocurridoEn`) y de recepción (`recibidoEn`),
+ * idempotencia por `$idOperacion` (`OPERACION_YA_APLICADA`), ventana horaria (`-72h` / `+5m` y
+ * `relojDudoso`), preservación de permisos y reglas de negocio originales en producción,
+ * entregas, conteos de inventario y flota, y que `OperacionMovil` no se exponga para consulta directa.
+ *
+ * Invocación:
+ *   node scripts/test-movil.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-// Variantes "…Movil" de las mutaciones que la app envía después de trabajar sin conexión.
-// Esta suite solo acepta el emulador local de un proyecto demo.
+// Guardia de seguridad: esta suite solo acepta el emulador local de un proyecto demo.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = "http://" + host + "/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql";
@@ -12,6 +26,10 @@ const produccion = await readFile("dataconnect/produccion/mutations.gql", "utf8"
 const legacy = await readFile("dataconnect/example/mutations.gql", "utf8");
 const vehiculos = await readFile("dataconnect/example/vehiculos-mutations.gql", "utf8");
 
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string = UID autenticado).
+ */
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user, firebase: { sign_in_provider: "password" } } } : undefined;
   const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, operationName, variables, extensions: { impersonate } }) });

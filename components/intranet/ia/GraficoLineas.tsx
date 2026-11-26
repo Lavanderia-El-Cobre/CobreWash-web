@@ -15,6 +15,7 @@ export interface Serie {
   color: string;
 }
 
+/** Paleta de alto contraste compatible con daltonismo en modo claro y oscuro. */
 export const COLORES_SERIE = {
   naranja: "text-[#ea580c]",
   azul: "text-[#0369a1] dark:text-[#0284c7]",
@@ -22,12 +23,17 @@ export const COLORES_SERIE = {
 
 const ANCHO = 640, ALTO = 220, IZQ = 44, DER = 64, ARR = 12, ABA = 30;
 
+// Redondea el máximo al siguiente múltiplo limpio de su orden de magnitud para marcas legibles en Y.
 function tope(maximo: number) {
   if (maximo <= 0) return 1;
   const paso = 10 ** Math.floor(Math.log10(maximo));
   return Math.ceil(maximo / paso) * paso;
 }
 
+/**
+ * Gráfico de líneas SVG accesible con navegación por puntero y teclado (flechas izquierda/derecha),
+ * etiqueta directa al final de cada serie y vista tabular alternativa.
+ */
 export default function GraficoLineas({ titulo, etiquetaX, puntos, series, formato }: {
   titulo: string;
   etiquetaX: string;
@@ -44,6 +50,7 @@ export default function GraficoLineas({ titulo, etiquetaX, puntos, series, forma
   const marcas = [0, 0.25, 0.5, 0.75, 1].map((f) => f * maximo);
   const pasoEtiquetaX = Math.max(1, Math.ceil(puntos.length / 8));
 
+  // Interrumpe el trazo (`M`) ante valores nulos para no interpolar datos inexistentes.
   const trazo = (s: number) => {
     let d = "", abierto = false;
     puntos.forEach((p, i) => {

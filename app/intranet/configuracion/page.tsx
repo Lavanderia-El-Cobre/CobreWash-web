@@ -36,6 +36,12 @@ function Tarjeta({ icono: Icono, titulo, descripcion, children }: { icono: React
   );
 }
 
+/**
+ * Preferencias de cuenta y configuración interna (`/intranet/configuracion`).
+ * Disponible para todos los roles internos (`admin`, `recepcionista`, `operario`, `repartidor`
+ * y `conductor`): permite elegir tema visual, consultar el perfil, cambiar contraseña y cerrar sesión.
+ * La pestaña de límites de etapas de producción se muestra exclusivamente a `admin`.
+ */
 export default function ConfiguracionPage() {
   const permitido = useRoleGuard(["admin", "recepcionista", "operario", "repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();

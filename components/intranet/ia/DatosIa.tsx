@@ -10,6 +10,7 @@ import { registrarConteoFisicoIa, registrarEntradaInventario, type GetPanelIaDat
 import { BotonGuardar, claseBotonSecundario, claseCampo, claseEtiqueta, formatoNumero, leerNumero, mensajeErrorIa, Tarjeta, type Avisar } from "./ui";
 
 type Insumo = GetPanelIaData["insumos"][number];
+// Tope de tamaño en bytes (350 KB) para validar e importar CSV sin exceder límites del servidor.
 const LIMITE_ARCHIVO = 350_000;
 const PLANTILLA: Record<TipoCsv, string> = {
   conteos: "insumo;cantidad;fecha\nDetergente;82,5;2026-10-04\nDetergente;61;2026-10-11 18:30\n",
@@ -47,6 +48,7 @@ function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recarg
       avisar(mensajeErrorIa(error), "error");
     } finally {
       setGuardando(false);
+      // Siempre recarga para refrescar `revisionStock` incluso si falló por concurrencia optimista.
       await recargar();
     }
   };
@@ -128,6 +130,7 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
   };
 
   const descargarPlantilla = () => {
+    // Antepone BOM UTF-8 para que Excel abra el CSV con tildes y separador `;` correctamente.
     const url = URL.createObjectURL(new Blob(["﻿" + PLANTILLA[tipo]], { type: "text/csv;charset=utf-8" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: `plantilla-${tipo}.csv` });
     a.click();
@@ -224,6 +227,10 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
   );
 }
 
+/**
+ * Pestaña de carga de datos del Módulo IA: permite registrar conteos físicos aprobados,
+ * compras/reposiciones directas e importaciones históricas por CSV sin alterar el stock actual.
+ */
 export default function DatosIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
   return (
     <div className="space-y-6">

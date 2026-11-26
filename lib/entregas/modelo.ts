@@ -1,6 +1,8 @@
 import type { GetComandasParaEntregaData } from "@/src/dataconnect-generated";
 
+/** Comanda finalizada lista para ser entregada en la vista de reparto. */
 export type ComandaParaEntrega = GetComandasParaEntregaData["comandas"][number];
+/** Entrega ya registrada por el repartidor en curso. */
 export type EntregaRegistrada = GetComandasParaEntregaData["misEntregas"][number];
 
 /** Deben coincidir con la lista que acepta ReportarProblemaEntrega. */
@@ -12,9 +14,12 @@ export const MOTIVOS_PROBLEMA_ENTREGA = [
   "Pedido incompleto o dañado",
   "Otro",
 ] as const;
+/** Motivo tipado para reportar una incidencia de entrega en ruta. */
 export type MotivoProblemaEntrega = (typeof MOTIVOS_PROBLEMA_ENTREGA)[number];
 
+/** Largo máximo para las observaciones opcionales al confirmar una entrega. */
 export const DETALLE_ENTREGA_MAXIMO = 280;
+/** Largo máximo para la descripción de un problema de entrega. */
 export const DETALLE_PROBLEMA_MAXIMO = 250;
 
 /** Recorta el detalle y lo convierte en null si quedó vacío. */
@@ -23,6 +28,7 @@ export function normalizarDetalle(texto: string): string | null {
   return limpio ? limpio : null;
 }
 
+/** Valida el detalle opcional al confirmar una entrega; devuelve mensaje de error o `null`. */
 export function validarEntrega(detalle: string): string | null {
   const limpio = normalizarDetalle(detalle);
   if (limpio && limpio.length > DETALLE_ENTREGA_MAXIMO) {
@@ -31,6 +37,7 @@ export function validarEntrega(detalle: string): string | null {
   return null;
 }
 
+/** Valida el motivo y el detalle al reportar un problema de entrega (exige detalle cuando el motivo es `"Otro"`). */
 export function validarProblemaEntrega(motivo: string, detalle: string): string | null {
   if (!MOTIVOS_PROBLEMA_ENTREGA.includes(motivo as MotivoProblemaEntrega)) {
     return "Selecciona el motivo del problema.";
@@ -43,7 +50,7 @@ export function validarProblemaEntrega(motivo: string, detalle: string): string 
   return null;
 }
 
-/** "3 prendas · Camisa ×2, Sábana ×1" */
+/** Resume las prendas agrupadas por tipo en una línea legible (p. ej. `"3 prendas · Camisa ×2, Sábana ×1"`). */
 export function resumirPrendas(prendas: ComandaParaEntrega["prendas"]): string {
   const porTipo = new Map<string, number>();
   let total = 0;
@@ -56,6 +63,7 @@ export function resumirPrendas(prendas: ComandaParaEntrega["prendas"]): string {
   return `${total} prenda${total === 1 ? "" : "s"} · ${detalle}`;
 }
 
+/** Devuelve los problemas de entrega asociados a la comanda que aún no están resueltos. */
 export function problemasAbiertos(comanda: Pick<ComandaParaEntrega, "problemas">) {
   return comanda.problemas.filter((p) => p.estado !== "RESUELTA");
 }
@@ -65,6 +73,7 @@ export function motivoVisible(motivo: string): string {
   return motivo.replace(/^Entrega: /, "");
 }
 
+/** Filtra comandas pendientes de entrega por número, cliente, dirección, empresa o proyecto (sin distinguir tildes). */
 export function filtrarComandasEntrega(comandas: ComandaParaEntrega[], busqueda: string): ComandaParaEntrega[] {
   const clave = (t: string | null | undefined) =>
     (t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("es-CL");
@@ -75,6 +84,7 @@ export function filtrarComandasEntrega(comandas: ComandaParaEntrega[], busqueda:
   );
 }
 
+/** Traduce errores de las mutaciones de entrega a mensajes accionables para el repartidor. */
 export function mapearErrorEntrega(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
   if (/Solo se puede entregar una comanda finalizada|ya fue registrada|no está listo para entregar/i.test(msg)) {

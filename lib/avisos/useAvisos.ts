@@ -1,14 +1,22 @@
 "use client";
+// Requiere hooks de React y eventos de ventana/documento para refresco periódico en cliente.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { consultarAvisos } from "./consultar";
 
 type Resultado = Awaited<ReturnType<typeof consultarAvisos>>;
 
+/**
+ * Carga y mantiene actualizados los avisos internos paginados del usuario actual.
+ * Refresca automáticamente cada 30 s y al recuperar foco o visibilidad de la pestaña,
+ * descartando respuestas fuera de orden cuando cambian la página o el usuario.
+ */
 export function useAvisos(usuarioId: string | undefined, rol: string | undefined, habilitado: boolean, pagina: number) {
   const [resultado, setResultado] = useState<{ clave: string; data: Resultado } | null>(null);
   const [fallo, setFallo] = useState<{ clave: string; mensaje: string } | null>(null);
+  // Contador monotónico para ignorar respuestas lentas de una consulta anterior.
   const secuencia = useRef(0);
+  // Evita apilar refrescos silenciosos si la consulta previa aún no termina.
   const enCurso = useRef(false);
   const clave = `${usuarioId}:${rol}:${pagina}`;
 
@@ -31,6 +39,7 @@ export function useAvisos(usuarioId: string | undefined, rol: string | undefined
 
   useEffect(() => {
     const solicitudes = secuencia;
+    // Se difiere un tick para no disparar actualizaciones síncronas dentro del efecto inicial.
     const timer = window.setTimeout(() => void cargar(), 0);
     const refrescar = () => {
       if (document.visibilityState === "visible") void cargar(true);
@@ -48,6 +57,7 @@ export function useAvisos(usuarioId: string | undefined, rol: string | undefined
     };
   }, [cargar]);
 
+  // Solo expone datos o error que correspondan a la clave activa (usuario/rol/página).
   const datos = habilitado && resultado?.clave === clave ? resultado.data : null;
   const error = habilitado && fallo?.clave === clave ? fallo.mensaje : "";
   return {

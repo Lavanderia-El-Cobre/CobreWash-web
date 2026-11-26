@@ -2,13 +2,22 @@ import { randomUUID } from "node:crypto";
 import { prepararRecalculo, type DatosRecalculo } from "@/lib/ia/recalculo";
 import { autorizarAdminIa, ErrorIa, errorIa, responder } from "@/lib/ia/servidor";
 
+// Requiere runtime Node.js para `node:crypto` y Firebase Admin SDK.
 export const runtime = "nodejs";
 
 /**
- * Recalcula las tasas con todos los conteos aprobados. Solo un administrador
- * activo puede ejecutarlo (verificado en el servidor). Guarda un ajuste nuevo
- * en el historial y actualiza la tasa actual de cada servicio; nunca modifica
- * el stock. Por ahora se ejecuta solo a pedido, sin programación automática.
+ * Recalcula las tasas de consumo del Módulo IA a partir de todos los conteos
+ * aprobados. Registra un nuevo ajuste en el historial y actualiza la tasa
+ * vigente de cada servicio sin modificar el stock actual. Se ejecuta bajo
+ * demanda, sin programación automática.
+ *
+ * - **Contrato HTTP**: `POST /api/ia/recalcular` (sin cuerpo).
+ * - **Autenticación y roles**: solo administrador activo (`autorizarAdminIa`).
+ * - **Respuestas**:
+ *   - `200`: `{ version, observaciones, mae, mape, insumos, descartados }`.
+ *   - `400`: datos insuficientes o inválidos para preparar el recálculo.
+ *   - `401` / `403`: sesión inválida o sin permisos de administrador.
+ *   - `500` / `503`: error al consultar o guardar el ajuste en Data Connect.
  */
 export async function POST(request: Request) {
   try {

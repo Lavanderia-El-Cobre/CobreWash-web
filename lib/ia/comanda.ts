@@ -3,7 +3,9 @@ import { estimarComanda } from "./prediccion";
 import { leerDetalleAjuste } from "./recalculo";
 import { tasasPorInsumo } from "./tasas";
 
+/** Cota superior razonable para el peso total de una comanda individual (kg). */
 export const PESO_MAXIMO_KG = 10_000;
+// Data Connect puede devolver UUID con o sin guiones según el origen; se normalizan para cruzar mapas.
 const uuid = (id: string) => id.replaceAll("-", "").toLowerCase();
 
 /** Lee el peso escrito en el formulario ("12,5" o "12.5"); null si no es válido. */

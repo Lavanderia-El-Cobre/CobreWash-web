@@ -2,7 +2,14 @@
 
 import { motion } from "framer-motion";
 
-/* ─── Vertical Bar Chart ─── */
+/**
+ * Gráfico de barras verticales animado con opacidad progresiva de izquierda a derecha.
+ *
+ * @param data - Serie numérica alineada posicionalmente con `labels`.
+ * @param labels - Etiquetas del eje X.
+ * @param color - Color CSS de relleno para todas las barras.
+ * @param height - Altura total del contenedor en píxeles.
+ */
 export function BarChart({
   data,
   labels,
@@ -14,6 +21,7 @@ export function BarChart({
   color?: string;
   height?: number;
 }) {
+  // Piso de 1 para evitar divisiones por cero cuando la serie está vacía o en cero.
   const maxVal = Math.max(...data, 1);
   return (
     <div className="flex items-end gap-1.5 w-full" style={{ height }}>
@@ -38,7 +46,13 @@ export function BarChart({
   );
 }
 
-/* ─── Horizontal Bar / Ranking Chart ─── */
+/**
+ * Gráfico de barras horizontales pensado para rankings y comparativas.
+ *
+ * @param items - Elementos a representar; `hint` permite mostrar un dato secundario junto al valor.
+ * @param formatValue - Formateador del valor principal (por defecto separadores `es-CL`).
+ * @param color - Color CSS de la barra de progreso.
+ */
 export function HBarChart({
   items,
   formatValue = (v) => v.toLocaleString("es-CL"),
@@ -48,6 +62,7 @@ export function HBarChart({
   formatValue?: (v: number) => string;
   color?: string;
 }) {
+  // Piso de 1 para evitar divisiones por cero cuando todos los ítems valen 0.
   const maxVal = Math.max(...items.map((i) => i.value), 1);
   return (
     <div className="space-y-3">
@@ -79,7 +94,13 @@ export function HBarChart({
   );
 }
 
-/* ─── Donut Chart ─── */
+/**
+ * Gráfico de dona en SVG con métrica central y leyenda de porcentajes.
+ *
+ * @param segments - Segmentos proporcionales que conforman la circunferencia.
+ * @param centerValue - Valor destacado en el centro de la dona.
+ * @param centerLabel - Etiqueta descriptiva bajo el valor central.
+ */
 export function DonutChart({
   segments,
   centerValue,
@@ -108,6 +129,7 @@ export function DonutChart({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative">
+        {/* Rotado -90° para que el primer segmento inicie arriba (las 12 en punto). */}
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
           <circle
             cx={cx}

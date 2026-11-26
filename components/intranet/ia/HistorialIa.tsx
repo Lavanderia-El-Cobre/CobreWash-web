@@ -14,12 +14,18 @@ const POR_PAGINA = 20;
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "short", timeStyle: "short" });
 const pct = (v?: number | null) => (v === null || v === undefined ? "—" : `${formatoNumero(v, 1)}%`);
 
-/** `revision` cambia con cada recálculo para volver a cargar la lista. */
+/**
+ * Historial paginado de ajustes del modelo de consumo IA, con evolución del MAPE y
+ * desglose expandible de tasas resultantes por insumo y servicio.
+ *
+ * @param revision - Clave que cambia tras cada recálculo para refrescar la lista.
+ */
 export default function HistorialIa({ revision }: { revision: string }) {
   const [pagina, setPagina] = useState(0);
   const [datos, setDatos] = useState<GetHistorialAjustesIaData | null>(null);
   const [error, setError] = useState(false);
   const [abierto, setAbierto] = useState<string | null>(null);
+  // Evita que una respuesta de una página anterior sobrescriba la vista actual.
   const solicitud = useRef(0);
 
   const cargar = useCallback(async () => {
@@ -47,6 +53,7 @@ export default function HistorialIa({ revision }: { revision: string }) {
 
   const total = datos.total[0]?._count ?? 0;
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+  // La consulta llega del ajuste más reciente al más antiguo; se invierte para graficar en orden temporal.
   const cronologico = [...datos.modeloIas].reverse();
 
   return (

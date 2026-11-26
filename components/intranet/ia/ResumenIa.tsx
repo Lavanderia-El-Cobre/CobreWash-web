@@ -9,6 +9,7 @@ import { leerDetalleAjuste, type DetalleAjuste } from "@/lib/ia/recalculo";
 import type { GetPanelIaData } from "@/src/dataconnect-generated";
 import { claseBotonPrincipal, formatoNumero, Tarjeta, type Avisar } from "./ui";
 
+// Normaliza UUIDs sin guiones para cruzar los IDs de Data Connect con los serializados en `tasasJson`.
 const uuid = (id: string) => id.replaceAll("-", "").toLowerCase();
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" });
 const porcentaje = (v: number | null | undefined, decimales = 1) => (v === null || v === undefined ? "—" : `${formatoNumero(v, decimales)}%`);
@@ -29,6 +30,7 @@ function Kpi({ etiqueta, valor, nota, clase = "" }: { etiqueta: string; valor: s
   );
 }
 
+// Semaforización de cobertura de stock: crítico (< 7 días), advertencia (< 14 días) y holgado.
 function claseDias(dias: number | null) {
   if (dias === null) return "text-stone-400";
   if (dias < 7) return "text-red-600 dark:text-red-400";
@@ -36,6 +38,10 @@ function claseDias(dias: number | null) {
   return "text-green-600 dark:text-green-400";
 }
 
+/**
+ * Vista resumen del Módulo IA: estado y métricas del modelo vigente, días estimados de stock
+ * por insumo, comparación de tasas iniciales vs. ajustadas, períodos descartados y recálculo manual.
+ */
 export default function ResumenIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
   const [recalculando, setRecalculando] = useState(false);
   const modelo = panel.modeloVigente[0];

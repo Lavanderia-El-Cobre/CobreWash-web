@@ -1,3 +1,12 @@
+/**
+ * Genera y descarga una etiqueta imprimible de insumo (proporción 100×120 mm a
+ * 1200×1440 px) rasterizando el SVG del código QR sobre un canvas y exportándolo
+ * como imagen PNG o documento PDF.
+ *
+ * @param svg - Nodo SVG del QR ya renderizado en pantalla.
+ * @param insumo - Metadatos visibles en la etiqueta (nombre, código QR y unidad).
+ * @param formato - Formato de descarga elegido (`"png"` o `"pdf"`).
+ */
 export async function exportarEtiquetaInsumo(svg: SVGSVGElement, insumo: { nombre: string; codigoQr: string; unidadMedida: string }, formato: "png" | "pdf") {
   await document.fonts?.ready;
   const copia = svg.cloneNode(true) as SVGSVGElement;
@@ -6,6 +15,7 @@ export async function exportarEtiquetaInsumo(svg: SVGSVGElement, insumo: { nombr
   const imagen = new Image();
   try {
     await new Promise<void>((resolve, reject) => {
+      // Timeout defensivo de 15 s por si el navegador bloquea o demora la decodificación del SVG.
       const timer = window.setTimeout(() => { imagen.onload = imagen.onerror = null; reject(new Error("No se pudo preparar el QR")); }, 15000);
       imagen.onload = () => { window.clearTimeout(timer); resolve(); };
       imagen.onerror = () => { window.clearTimeout(timer); reject(new Error("No se pudo preparar el QR")); };
@@ -28,6 +38,7 @@ export async function exportarEtiquetaInsumo(svg: SVGSVGElement, insumo: { nombr
     else linea = linea ? `${linea} ${palabra}` : palabra;
   }
   if (linea) lineas.push(linea);
+  // Se acota a 3 líneas para que nombres largos no se superpongan con el bloque del QR (y = 405).
   lineas.slice(0, 3).forEach((l, i) => ctx.fillText(l, 600, 246 + i * 57, 1050));
   ctx.drawImage(imagen, 200, 405, 800, 800);
   ctx.fillStyle = "#1c1917"; ctx.font = "600 27px sans-serif"; ctx.fillText("Escanea desde el inventario de la app", 600, 1254);
@@ -35,6 +46,7 @@ export async function exportarEtiquetaInsumo(svg: SVGSVGElement, insumo: { nombr
   ctx.font = "23px sans-serif"; ctx.fillText(`Unidad: ${insumo.unidadMedida}`, 600, 1366);
   let archivo: Blob;
   if (formato === "pdf") {
+    // Carga diferida para no incluir jsPDF en el bundle inicial del módulo de inventario.
     const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF({ unit: "mm", format: [100, 120], compress: true });
     pdf.setProperties({ title: `Insumo ${insumo.nombre}`, author: "Lavandería El Cobre" });
@@ -45,5 +57,6 @@ export async function exportarEtiquetaInsumo(svg: SVGSVGElement, insumo: { nombr
   const enlace = document.createElement("a"); enlace.href = descarga;
   enlace.download = `insumo-${insumo.codigoQr}.${formato}`;
   document.body.appendChild(enlace); enlace.click(); enlace.remove();
+  // Retardo de 1 s antes de revocar el Object URL para asegurar que el navegador inicie la descarga.
   window.setTimeout(() => URL.revokeObjectURL(descarga), 1000);
 }

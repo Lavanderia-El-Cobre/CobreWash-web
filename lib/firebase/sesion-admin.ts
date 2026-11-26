@@ -6,10 +6,12 @@ import type { Auth, DecodedIdToken } from "firebase-admin/auth";
 // revocación, de modo que sin credenciales falla aunque el token sea válido.
 const FALLAS_SERVIDOR = new Set(["auth/internal-error", "auth/insufficient-permission", "auth/project-not-found", "auth/invalid-credential"]);
 
+/** Extrae la propiedad `code` de un error de Firebase o devuelve cadena vacía si no existe. */
 export function codigoError(error: unknown) {
   return error && typeof error === "object" && "code" in error ? String(error.code) : "";
 }
 
+/** Determina si el error proviene de credenciales o permisos mal configurados en Firebase Admin. */
 export function esFallaCredencialesAdmin(error: unknown) {
   const codigo = codigoError(error);
   return codigo.startsWith("app/") || FALLAS_SERVIDOR.has(codigo);
@@ -26,6 +28,7 @@ export async function verificarSesionAdmin(
   errores: { sesionVencida: () => Error; servidor: () => Error },
 ): Promise<DecodedIdToken> {
   try {
+    // `checkRevoked: true` rechaza tokens de cuentas revocadas o desactivadas recientemente.
     return await auth.verifyIdToken(bearer, true);
   } catch (error) {
     if (!esFallaCredencialesAdmin(error)) throw errores.sesionVencida();

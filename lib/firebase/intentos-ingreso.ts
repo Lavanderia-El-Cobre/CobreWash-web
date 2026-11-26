@@ -55,15 +55,18 @@ function estado(registro: Registro, ahora: number): EstadoIntentos {
   };
 }
 
+/** Calcula los milisegundos de bloqueo exponencial según la cantidad acumulada de fallos. */
 export function duracionBloqueo(fallos: number): number {
   if (fallos < INTENTOS_LIBRES) return 0;
   return Math.min(BLOQUEO_BASE_MS * 2 ** (fallos - INTENTOS_LIBRES), BLOQUEO_MAX_MS);
 }
 
+/** Devuelve el estado vigente de bloqueo e intentos libres restantes para el navegador actual. */
 export function estadoIntentos(ahora = Date.now()): EstadoIntentos {
   return estado(leer(ahora), ahora);
 }
 
+/** Indica si el error corresponde a correo o contraseña inválidos y debe contabilizarse como fallo. */
 export function esCredencialInvalida(error: unknown): boolean {
   return CREDENCIALES_INVALIDAS.has((error as { code?: string } | null)?.code ?? "");
 }
@@ -87,6 +90,7 @@ export function registrarFalloIngreso(error: unknown, ahora = Date.now()): Estad
   return estado(registro, ahora);
 }
 
+/** Reinicia el registro de intentos fallidos tras un inicio de sesión exitoso. */
 export function limpiarIntentosIngreso() {
   try { localStorage.removeItem(CLAVE); } catch { /* nada que borrar */ }
 }

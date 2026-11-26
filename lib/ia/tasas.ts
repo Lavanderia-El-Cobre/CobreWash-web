@@ -11,6 +11,7 @@ export interface FilaTasa {
   unidad: string;
 }
 
+/** Campos mínimos de un insumo para validar y convertir la unidad de sus tasas. */
 export interface InsumoBase {
   id: string;
   unidadMedida: string;

@@ -103,6 +103,7 @@ const normalizarCatalogo = (value: string) =>
 
 
 
+// Extrae la cantidad recibida y la observación desde el formato estructurado usado por clientes tipo HOTEL.
 const leerDetalleHotel = (value?: string | null) => {
   const match = value?.match(/^Entregado: \d+ · Recibido: (\d+) · Pendiente: \d+(?: · (.*))?$/);
   return { recibido: match ? Number(match[1]) : 0, observacion: match?.[2] || value || "" };
@@ -112,7 +113,7 @@ const leerDetalleHotel = (value?: string | null) => {
 const prendasTotales = (c: Comanda) => c.detalle.reduce((s, d) => s + d.cantidad, 0);
 const valorTotal = (c: Comanda) => c.valorTotal;
 
-// Map de tipos DB a UI
+/** Modelo de vista de una comanda mapeado desde Data Connect para la interfaz de recepción. */
 export interface Comanda {
   id: string; // numeroComanda público, ej. "ELCOBRE-14r3"
   dbId: string; // UUID interno; nunca se muestra al usuario
@@ -211,6 +212,12 @@ const emptyForm: FormState = {
   observaciones: "",
 };
 
+/**
+ * Módulo de recepción y gestión de comandas (`/intranet/comandas`).
+ * Accesible para `admin` y `recepcionista`. Permite listar con filtros combinados y paginación
+ * en servidor, crear/editar comandas (cobro por prenda o por kg, creación de cliente al vuelo
+ * y estimación de insumos con IA), emitir comprobante QR, anular y marcar entregas.
+ */
 export default function ComandasPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const esAdmin = useUsuarioActualContext()?.rol.nombre === "admin";
@@ -238,6 +245,8 @@ export default function ComandasPage() {
   const [catData, setCatData] = useState<GetCatalogosComandaData | null>(null);
   const [loading, setLoading] = useState(true);
   const solicitudActual = useRef(0);
+  // Idempotencia en creación: conserva UUID y número generados y el último payload enviado
+  // para verificar en servidor si el INSERT ya se concretó antes de reintentar tras un fallo de red.
   const creacion = useRef<{ id: string; numero: string } | null>(null);
   const guardando = useRef(false);
   const envioPendiente = useRef<CrearComandaConFlujoVariables | null>(null);
@@ -346,7 +355,6 @@ export default function ComandasPage() {
     );
   }
 
-  /* ── form helpers ── */
   const openCrear = () => {
     const servicio = catData?.tipoServicios[0];
     const cliente = catData?.clientes[0];
@@ -406,6 +414,7 @@ export default function ComandasPage() {
       observaciones: c.observaciones || "",
     });
     void cargarModeloIa();
+    // Se captura `actualizadoEn` como versión para control de concurrencia optimista al editar.
     setForm({ mode: "editar", id: c.dbId, version: c.actualizadoEn });
   };
 
@@ -694,7 +703,6 @@ export default function ComandasPage() {
         }
       />
 
-      {/* Summary */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -728,7 +736,6 @@ export default function ComandasPage() {
         })}
       </motion.div>
 
-      {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -786,7 +793,6 @@ export default function ComandasPage() {
         </div>
       </motion.div>
 
-      {/* Table */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -892,7 +898,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Detalle modal (QR + comprobante) */}
       <AnimatePresence>
         {detalle && (
           <ComandaDetalle
@@ -911,7 +916,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Crear / Editar modal */}
       <AnimatePresence>
         {form && (
           <ModalIntranet
@@ -1116,7 +1120,6 @@ export default function ComandasPage() {
                     />
                   )}
                 </div>
-                {/* Detalle lines */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -1201,7 +1204,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Anular modal */}
       <AnimatePresence>
         {anular && (
           <ModalIntranet
@@ -1243,7 +1245,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Entregar modal */}
       <AnimatePresence>
         {entregar && (
           <ModalIntranet
