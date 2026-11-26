@@ -1,0 +1,448 @@
+# GENERADO por scripts/generar-mutaciones-movil.mjs — no editar a mano.
+# Variantes de las mutaciones que la app móvil puede enviar después de trabajar sin
+# conexión: misma lógica y permisos que la original, más idempotencia por
+# $idOperacion y la hora original de la acción ($ocurridoEn), guardadas en
+# OperacionMovil junto con la hora de recepción del servidor.
+
+mutation CompletarEtapaComandaMovil($comandaId: UUID!, $etapaId: UUID!, $orden: Int!, $estadoComanda: ComandaEstado!,
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+)
+  @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.orden >= 1 && vars.orden <= 5 && ((vars.orden < 4 && vars.estadoComanda == 'EN_PROCESO') || (vars.orden == 4 && vars.estadoComanda == 'FINALIZADA') || (vars.orden == 5 && vars.estadoComanda == 'ENTREGADA'))"
+    message: "Transición de producción inválida"
+  ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this in ['admin', 'operario']", message: "Solo administración y operarios pueden reportar avances") }
+    }
+    comanda(id: $comandaId) @check(expr: "this != null", message: "Comanda no encontrada") {
+      estado @check(expr: "(vars.orden <= 4 && this in ['PENDIENTE', 'EN_PROCESO']) || (vars.orden == 5 && this == 'FINALIZADA')", message: "La comanda ya no admite este avance")
+      fechaEntregaReal
+      cliente { email }
+      comandaEtapas_on_comanda @check(expr: "this.size() == 5", message: "La comanda no tiene el flujo completo", optional: true) { etapaId }
+    }
+    actual: comandaEtapa(key: { comandaId: $comandaId, etapaId: $etapaId }) @check(expr: "this != null", message: "La etapa no pertenece a la comanda") {
+      nombreEtapa
+      ordenEtapa @check(expr: "this == vars.orden", message: "El orden de la etapa no coincide")
+      estado @check(expr: "this in ['PENDIENTE', 'EN_PROCESO']", message: "La etapa ya fue completada")
+    }
+    anterioresIncompletas: comandaEtapas(where: {
+      comandaId: { eq: $comandaId }
+      ordenEtapa: { lt: $orden }
+      estado: { ne: COMPLETADA }
+    }) @check(expr: "this.size() == 0", message: "Primero debes completar las etapas anteriores") { etapaId }
+    posterioresAvanzadas: comandaEtapas(where: {
+      comandaId: { eq: $comandaId }
+      ordenEtapa: { gt: $orden }
+      estado: { ne: PENDIENTE }
+    }) @check(expr: "this.size() == 0", message: "La secuencia de etapas es inconsistente") { etapaId }
+  }
+  comandaEtapa_update(
+    first: { where: { comandaId: { eq: $comandaId }, etapaId: { eq: $etapaId }, estado: { in: [PENDIENTE, EN_PROCESO] } } }
+    data: { estado: COMPLETADA, fechaCompletado_expr: "request.time", operarioId_expr: "auth.uid" }
+  ) @check(expr: "this != null", message: "La etapa ya fue completada")
+  siguiente: comandaEtapa_updateMany(
+    where: { comandaId: { eq: $comandaId }, ordenEtapa: { eq_expr: "vars.orden + 1" }, estado: { eq: PENDIENTE } }
+    data: { estado: EN_PROCESO, fechaInicio_expr: "request.time" }
+  ) @check(expr: "(vars.orden < 5 && this == 1) || (vars.orden == 5 && this == 0)", message: "No se pudo activar la etapa siguiente")
+  comanda_update(
+    # Si hubo cancelación o entrega después de la lectura, se revierte también el avance de etapas.
+    first: { where: { id: { eq: $comandaId }, estado: { eq_expr: "response.query.comanda.estado" } } }
+    data: {
+      estado: $estadoComanda
+      actualizadoEn_expr: "request.time"
+      fechaEntregaReal_expr: "vars.orden == 5 ? request.time : response.query.comanda.fechaEntregaReal"
+    }
+  ) @check(expr: "this != null", message: "No se pudo actualizar la comanda")
+  comandaHistorialEstado_insert(data: {
+    comandaId: $comandaId
+    usuarioId_expr: "auth.uid"
+    estadoNuevo: $estadoComanda
+    motivo_expr: "'Etapa completada: ' + response.query.actual.nombreEtapa"
+  })
+  notificacion: _execute(
+    sql: """
+      INSERT INTO public.comanda_notificacion (id, comanda_id, destinatario, mensaje, leida, fecha)
+      SELECT gen_random_uuid(), c.id, cl.email, 'Su comanda fue entregada correctamente', false, CURRENT_TIMESTAMP
+      FROM public.comanda c JOIN public.cliente cl ON cl.id = c.cliente_id
+      WHERE c.id = $1::uuid AND $2::integer = 5
+    """
+    params: [$comandaId, $orden]
+  )
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "CompletarEtapaComanda"
+    entidadId_expr: "vars.comandaId"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation RegistrarIncidenciaComandaMovil(
+  $comandaId: UUID!
+  $motivo: String!
+  $descripcion: String = null
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.motivo.size() > 0 && vars.motivo.size() <= 100 && (vars.descripcion == null || vars.descripcion.size() <= 300)"
+    message: "Motivo o descripción inválidos"
+  ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this == 'operario'", message: "Solo operarios pueden reportar incidencias") }
+    }
+    comanda(id: $comandaId) @check(expr: "this != null", message: "Comanda no encontrada") {
+      estado @check(expr: "this in ['PENDIENTE', 'EN_PROCESO', 'FINALIZADA']", message: "La comanda ya está cerrada")
+    }
+  }
+  incidenciaComanda_insert(data: {
+    comanda: { id: $comandaId }
+    reportadaPorId_expr: "auth.uid"
+    motivo: $motivo
+    descripcion: $descripcion
+    estado: ABIERTA
+  })
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "RegistrarIncidenciaComanda"
+    entidadId_expr: "vars.comandaId"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation EntregarComandaMovil(
+  $id: UUID!
+  $detalle: String = null
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.detalle == null || (vars.detalle.size() <= 280 && vars.detalle.matches('[^[:space:]]'))"
+    message: "El detalle de la entrega no puede superar los 280 caracteres"
+  ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this in ['admin', 'recepcionista', 'repartidor', 'conductor']", message: "No autorizado para entregar comandas") }
+    }
+    comanda(id: $id)
+      @check(expr: "this != null", message: "Comanda no encontrada") {
+      estado @check(expr: "this == 'FINALIZADA'", message: "Solo se puede entregar una comanda finalizada")
+      cliente { email telefono }
+      comandaEtapas_on_comanda @check(expr: "this.size() == 0 || (this.size() == 5 && this.filter(e, e.ordenEtapa < 5 && e.estado == 'COMPLETADA').size() == 4 && this.filter(e, e.ordenEtapa == 5 && e.estado in ['PENDIENTE', 'EN_PROCESO']).size() == 1)", message: "El flujo no está listo para entregar", optional: true) { ordenEtapa estado }
+    }
+  }
+  comanda_update(
+    first: { where: { id: { eq: $id }, estado: { eq: FINALIZADA } } }
+    data: {
+      estado: ENTREGADA
+      fechaEntregaReal_expr: "request.time"
+      actualizadoEn_expr: "request.time"
+    }
+  ) @check(expr: "this != null", message: "Comanda no encontrada")
+  entrega: comandaEtapa_updateMany(
+    where: { comandaId: { eq: $id }, ordenEtapa: { eq: 5 }, estado: { in: [PENDIENTE, EN_PROCESO] } }
+    data: { estado: COMPLETADA, fechaCompletado_expr: "request.time", operarioId_expr: "auth.uid" }
+  ) @check(expr: "this == (response.query.comanda.comandaEtapas_on_comanda.size() == 0 ? 0 : 1)", message: "La entrega ya fue registrada")
+  
+  comandaHistorialEstado_insert(data: {
+    comanda: { id: $id }
+    usuarioId_expr: "auth.uid"
+    estadoAnterior: FINALIZADA
+    estadoNuevo: ENTREGADA
+    motivo_expr: "vars.detalle == null ? 'Entrega a cliente' : 'Entrega a cliente: ' + vars.detalle"
+  })
+  # Los problemas de entrega pendientes quedan resueltos con la entrega efectiva.
+  problemasResueltos: incidenciaComanda_updateMany(
+    where: { comandaId: { eq: $id }, motivo: { startsWith: "Entrega: " }, estado: { ne: RESUELTA } }
+    data: { estado: RESUELTA, actualizadaEn_expr: "request.time" }
+  )
+  comandaNotificacion_insert(data: {
+    comanda: { id: $id }
+    destinatario_expr: "response.query.comanda.cliente.email"
+    mensaje: "Su comanda fue entregada correctamente"
+  })
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "EntregarComanda"
+    entidadId_expr: "vars.id"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation ReportarProblemaEntregaMovil(
+  $comandaId: UUID!
+  $motivo: String!
+  $detalle: String = null
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact @check(
+    expr: "vars.motivo in ['Cliente ausente', 'Dirección errónea', 'Dirección inaccesible', 'Cliente rechaza la entrega', 'Pedido incompleto o dañado', 'Otro'] && (vars.detalle == null || (vars.detalle.size() <= 250 && vars.detalle.matches('[^[:space:]]'))) && (vars.motivo != 'Otro' || vars.detalle != null)"
+    message: "Motivo o detalle del problema de entrega inválidos"
+  ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol { nombre @check(expr: "this in ['admin', 'repartidor', 'conductor']", message: "No autorizado para reportar problemas de entrega") }
+    }
+    comanda(id: $comandaId) @check(expr: "this != null", message: "Comanda no encontrada") {
+      estado @check(expr: "this == 'FINALIZADA'", message: "Solo se pueden reportar problemas de comandas listas para entregar")
+    }
+  }
+  # Bloquea la comanda: si otra sesión la entregó o anuló entre medio, se revierte.
+  bloqueo: comanda_update(
+    first: { where: { id: { eq: $comandaId }, estado: { eq: FINALIZADA } } }
+    data: { actualizadoEn_expr: "request.time" }
+  ) @check(expr: "this != null", message: "Solo se pueden reportar problemas de comandas listas para entregar")
+  incidenciaComanda_insert(data: {
+    comanda: { id: $comandaId }
+    reportadaPorId_expr: "auth.uid"
+    motivo_expr: "'Entrega: ' + vars.motivo"
+    descripcion: $detalle
+    estado: ABIERTA
+  })
+  comandaHistorialEstado_insert(data: {
+    comanda: { id: $comandaId }
+    usuarioId_expr: "auth.uid"
+    estadoAnterior: FINALIZADA
+    estadoNuevo: FINALIZADA
+    motivo_expr: "vars.detalle == null ? 'Problema de entrega: ' + vars.motivo : 'Problema de entrega: ' + vars.motivo + ' — ' + vars.detalle"
+  })
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "ReportarProblemaEntrega"
+    entidadId_expr: "vars.comandaId"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation RegistrarSalidaFlotaMovil(
+  $salidaId: UUID = null
+  $inspeccionId: UUID = null
+  $vehiculoId: UUID!
+  $repartidorId: String!
+  $kilometraje: Float!
+  $estadoVehiculo: EstadoVehiculo!
+  $observaciones: String
+  $observacionesInspeccion: String
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact
+    @check(
+      expr: "vars.kilometraje >= 0 && (vars.observaciones == null || vars.observaciones.size() <= 300) && (vars.observacionesInspeccion == null || vars.observacionesInspeccion.size() <= 500)"
+      message: "El kilometraje debe ser mayor o igual a cero y las observaciones no deben exceder el límite permitido"
+    )
+    @check(
+      expr: "vars.estadoVehiculo != 'NO_APTO'"
+      message: "No se puede autorizar la salida de un vehículo calificado como NO_APTO"
+    ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol {
+        nombre @check(
+          expr: "this == 'admin' || (this in ['repartidor', 'conductor'] && vars.repartidorId == auth.uid)"
+          message: "Solo administración o el propio repartidor pueden registrar la salida"
+        )
+      }
+    }
+    vehiculo(id: $vehiculoId) @check(expr: "this != null", message: "Vehículo no encontrado") {
+      activo @check(expr: "this == true", message: "El vehículo está inactivo o en mantención")
+    }
+    conductor: usuario(id: $repartidorId) @check(expr: "this != null", message: "Conductor no encontrado") {
+      activo @check(expr: "this == true", message: "El conductor seleccionado está inactivo")
+      rol {
+        nombre @check(
+          expr: "this in ['conductor', 'repartidor']"
+          message: "El usuario asignado debe tener rol de conductor o repartidor"
+        )
+      }
+    }
+    salidaActiva: salidaVehiculo(first: { where: {
+      vehiculoId: { eq: $vehiculoId }
+      estado: { in: [PROGRAMADA, EN_SERVICIO] }
+    } }) @check(expr: "this == null", message: "El vehículo ya se encuentra en ruta o con una salida activa") {
+      id
+    }
+  }
+  bloqueo: vehiculo_update(id: $vehiculoId, data: { revision_update: { inc: 1 } })
+  revision: query @redact {
+    vehiculo(id: $vehiculoId) { activo @check(expr: "this == true", message: "El vehículo está inactivo") }
+    salidaVehiculo(first: { where: { vehiculoId: { eq: $vehiculoId }, estado: { in: [PROGRAMADA, EN_SERVICIO] } } })
+      @check(expr: "this == null", message: "El vehículo ya tiene una salida activa") { id }
+    previas: inspeccionVehiculos(where: { salida: { vehiculoId: { eq: $vehiculoId } } }, orderBy: [{ kilometraje: DESC }], limit: 1)
+      @check(expr: "this.all(i, i.kilometraje <= vars.kilometraje)", message: "El kilometraje no puede ser menor al último registrado") { kilometraje }
+    propias: salidaVehiculos(where: { repartidorId: { eq: $repartidorId }, estado: { in: [PROGRAMADA, EN_SERVICIO] } }, limit: 1)
+      @check(
+        expr: "response.query.usuario.rol.nombre == 'admin' || this.size() == 0"
+        message: "Ya tienes un vehículo en ruta: registra su regreso antes de tomar otro"
+      ) { id }
+  }
+  salida: salidaVehiculo_insert(data: {
+    id_expr: "vars.salidaId != null ? vars.salidaId : uuidV4()"
+    vehiculo: { id: $vehiculoId }
+    repartidor: { id: $repartidorId }
+    estado: EN_SERVICIO
+    fechaSalida_expr: "request.time"
+    observaciones: $observaciones
+  })
+  inspeccion: inspeccionVehiculo_insert(data: {
+    id_expr: "vars.inspeccionId != null ? vars.inspeccionId : uuidV4()"
+    salidaId_expr: "response.salida.id"
+    momento: ANTES
+    estadoVehiculo: $estadoVehiculo
+    kilometraje: $kilometraje
+    observaciones: $observacionesInspeccion
+  })
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "RegistrarSalidaFlota"
+    entidadId_expr: "response.salida.id"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation RegistrarRetornoFlotaMovil(
+  $inspeccionId: UUID = null
+  $salidaId: UUID!
+  $kilometraje: Float!
+  $estadoVehiculo: EstadoVehiculo!
+  $observacionesRetorno: String
+  $observacionesInspeccion: String
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact
+    @check(
+      expr: "vars.kilometraje >= 0 && (vars.observacionesRetorno == null || vars.observacionesRetorno.size() <= 300) && (vars.observacionesInspeccion == null || vars.observacionesInspeccion.size() <= 500)"
+      message: "El kilometraje debe ser válido y las observaciones no deben superar el límite permitido"
+    ) {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
+      activo @check(expr: "this == true", message: "La cuenta está inactiva")
+      rol {
+        nombre @check(
+          expr: "this in ['admin', 'repartidor', 'conductor']"
+          message: "Solo administración o el repartidor asignado pueden registrar el regreso"
+        )
+      }
+    }
+    salidaActual: salidaVehiculo(first: { where: {
+      id: { eq: $salidaId }
+      estado: { eq: EN_SERVICIO }
+    } }) @check(expr: "this != null", message: "La salida no existe o ya fue finalizada") {
+      id vehiculoId repartidorId
+    }
+    inspeccionAntes: inspeccionVehiculo(first: { where: {
+      salidaId: { eq: $salidaId }
+      momento: { eq: ANTES }
+    } }) @check(expr: "this != null", message: "La salida no cuenta con inspección inicial registrada") {
+      kilometraje @check(
+        expr: "this <= vars.kilometraje"
+        message: "El kilometraje de retorno no puede ser menor al kilometraje de salida"
+      )
+    }
+  }
+  # Un repartidor solo cierra las salidas registradas a su nombre.
+  propiedad: query @redact
+    @check(
+      expr: "response.query.usuario.rol.nombre == 'admin' || response.query.salidaActual.repartidorId == auth.uid"
+      message: "La salida no está registrada a tu nombre"
+    ) {
+    usuario(id_expr: "auth.uid") { id }
+  }
+  bloqueo: vehiculo_update(first: { where: { id: { eq_expr: "response.query.salidaActual.vehiculoId" } } }, data: { revision_update: { inc: 1 } })
+  inspeccion: inspeccionVehiculo_insert(data: {
+    id_expr: "vars.inspeccionId != null ? vars.inspeccionId : uuidV4()"
+    salida: { id: $salidaId }
+    momento: DESPUES
+    estadoVehiculo: $estadoVehiculo
+    kilometraje: $kilometraje
+    observaciones: $observacionesInspeccion
+  })
+  salidaVehiculo_update(
+    id: $salidaId
+    data: {
+      estado: FINALIZADA
+      fechaRetorno_expr: "request.time"
+      observaciones: $observacionesRetorno
+    }
+  )
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "RegistrarRetornoFlota"
+    entidadId_expr: "vars.salidaId"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}
+
+mutation RegistrarConteoInventarioMovil($id: UUID!, $insumoId: UUID!, $cantidad: Float!, $revisionStock: Int!,
+  $idOperacion: UUID!
+  $ocurridoEn: Timestamp!
+  $relojDudoso: Boolean! = false
+) @auth(level: USER) @transaction {
+  query @redact @check(expr: "vars.cantidad >= 0 && vars.cantidad <= 9999999999.99", message: "Cantidad contada inválida") {
+    operacionPrevia: operacionMovil(id: $idOperacion) @check(expr: "this == null", message: "OPERACION_YA_APLICADA") { id }
+    horaAccion: operacionMovil(id: $idOperacion)
+      @check(expr: "vars.ocurridoEn >= request.time - duration('72h') && vars.ocurridoEn <= request.time + duration('5m')", message: "HORA_FUERA_DE_RANGO") { id }
+    usuario(id_expr: "auth.uid") @check(expr: "this != null") {
+      activo @check(expr: "this == true")
+      rol { nombre @check(expr: "this in ['admin', 'operario']") }
+    }
+    insumo(id: $insumoId) @check(expr: "this != null") {
+      activo @check(expr: "this == true", message: "El insumo está inactivo")
+      stockActual
+      revisionStock @check(expr: "this == vars.revisionStock", message: "El stock cambió. Actualiza el insumo y vuelve a contar.")
+    }
+  }
+  conteoInventario_insert(data: {
+    id: $id, insumoId: $insumoId, cantidadContada: $cantidad,
+    stockSistema_expr: "response.query.insumo.stockActual",
+    revisionStock: $revisionStock, registradoPorId_expr: "auth.uid"
+  })
+  operacion: operacionMovil_insert(data: {
+    id: $idOperacion
+    usuarioId_expr: "auth.uid"
+    tipo: "RegistrarConteoInventario"
+    entidadId_expr: "vars.id"
+    ocurridoEn: $ocurridoEn
+    relojDudoso: $relojDudoso
+  })
+}

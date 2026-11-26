@@ -23,7 +23,9 @@
     "test:privacidad": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-privacidad.mjs\"",
     "test:production": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-production.mjs\"",
     "dataconnect:compile:web": "node scripts/prepare-production-test.mjs --sdk && firebase dataconnect:sdk:generate --config scratch/production-test/firebase.json && node scripts/normalize-generated.mjs",
-    "test:estabilizacion": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-estabilizacion.mjs\""
+    "test:estabilizacion": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-estabilizacion.mjs\"",
+    "test:movil": "node scripts/prepare-production-test.mjs && firebase emulators:exec --only dataconnect --project demo-production --config scratch/production-test/firebase.json \"node scripts/test-movil.mjs\"",
+    "dataconnect:movil": "node scripts/generar-mutaciones-movil.mjs"
   },
   "dependencies": {
     "@dataconnect/generated": "link:src/dataconnect-generated",
