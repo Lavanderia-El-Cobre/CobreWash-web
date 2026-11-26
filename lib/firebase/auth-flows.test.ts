@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   createSecondary: vi.fn(),
   linkFicha: vi.fn(),
+  setPersistence: vi.fn(),
 }));
 
 vi.mock("firebase/auth", () => ({
@@ -30,6 +31,9 @@ vi.mock("firebase/auth", () => ({
   sendEmailVerification: mocks.sendVerification,
   signInWithEmailAndPassword: mocks.signIn,
   signOut: mocks.signOut,
+  setPersistence: mocks.setPersistence,
+  browserSessionPersistence: "session",
+  indexedDBLocalPersistence: "local",
 }));
 
 vi.mock("firebase/data-connect", () => ({
@@ -125,8 +129,18 @@ describe("flujos de autenticación", () => {
 
     expect(mocks.signIn).toHaveBeenCalledWith(auth, "ana@example.com", "clave1");
     expect(mocks.getProfile).toHaveBeenCalledWith(dataConnect, { fetchPolicy: "SERVER_ONLY" });
+    // Sin "mantener la sesión iniciada", la sesión no sobrevive al cierre del navegador.
+    expect(mocks.setPersistence).toHaveBeenCalledWith(auth, "session");
+    expect(mocks.setPersistence.mock.invocationCallOrder[0]).toBeLessThan(mocks.signIn.mock.invocationCallOrder[0]);
   });
 
+  it("con «mantener la sesión iniciada» guarda la sesión de forma persistente", async () => {
+    const auth = authCon(usuarioAuth());
+    mocks.signIn.mockResolvedValue({});
+    mocks.getProfile.mockResolvedValue({ data: { usuario: { activo: true, rol: { nombre: "admin" }, clientes_on_usuario: [] } } });
+    await signInAndResolveLanding({ auth, dataConnect }, "ana@example.com", "clave1", true);
+    expect(mocks.setPersistence).toHaveBeenCalledWith(auth, "local");
+  });
 
   it("una cuenta nueva sin correo verificado no ingresa y recibe un nuevo enlace", async () => {
     const user = usuarioAuth({ emailVerified: false });

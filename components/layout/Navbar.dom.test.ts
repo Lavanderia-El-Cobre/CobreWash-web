@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: m.push }) }));
 vi.mock("next/image", () => ({ default: (props: Record<string, unknown>) => createElement("img", { alt: props.alt as string }) }));
 vi.mock("firebase/auth", () => ({ signOut: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/firebase/client", () => ({ auth: m.auth, dataConnect: {} }));
+vi.mock("@/lib/firebase/sesion-recordada", () => ({ DIAS_SESION_RECORDADA: 30, cerrarSesionRecordadaVencida: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/lib/firebase/verificacion", () => ({ enviarVerificacion: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/firebase/auth-flows", () => ({
   registerPublicClient: m.registrar, signInAndResolveLanding: m.ingresar, resolverIngreso: m.resolver,
@@ -119,4 +120,43 @@ it("una cuenta con perfil entra directo a su vista", async () => {
   await act(async () => { vi.advanceTimersByTime(1500); });
   expect(m.push).toHaveBeenCalledWith("/intranet");
   vi.useRealTimers();
+});
+
+it("el ingreso pasa de correo a contraseña con Tab y deja «olvidé» al final", async () => {
+  await abrir("/?login=1");
+  const correo = screen.getByPlaceholderText("correo@ejemplo.com");
+  const enfocables = Array.from(correo.closest("form")!.querySelectorAll<HTMLElement>("input, button, a[href]"))
+    .filter((el) => el.tabIndex >= 0);
+  const pos = (el: HTMLElement) => enfocables.indexOf(el);
+  expect(enfocables[pos(correo) + 1]).toBe(screen.getByPlaceholderText("••••••••"));
+  const olvide = screen.getByRole("button", { name: "¿Olvidaste tu contraseña?" });
+  expect(pos(olvide)).toBeGreaterThan(pos(screen.getByRole("button", { name: "Ingresar" })));
+});
+
+it("envía la opción de mantener la sesión iniciada", async () => {
+  m.ingresar.mockResolvedValue({ tipo: "verificar", email: "ana@example.com" });
+  await abrir("/?login=1");
+  escribir("correo@ejemplo.com", "ana@example.com");
+  fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "clave123" } });
+  const recordar = screen.getByRole("checkbox", { name: /Mantener la sesión iniciada/ }) as HTMLInputElement;
+  expect(recordar.checked).toBe(false);
+  fireEvent.click(recordar);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Ingresar" })); });
+  expect(m.ingresar).toHaveBeenCalledWith(expect.anything(), "ana@example.com", "clave123", true);
+});
+
+it("con una sesión vigente, «Iniciar sesión» lleva directo a la vista sin abrir el modal", async () => {
+  m.auth.currentUser = { uid: "uid-admin", emailVerified: true, reload: vi.fn().mockResolvedValue(undefined) };
+  m.resolver.mockResolvedValue({ tipo: "landing", ruta: "/intranet" });
+  await abrir("/");
+  await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Iniciar Sesión" })[0]); });
+  expect(m.push).toHaveBeenCalledWith("/intranet");
+  expect(screen.queryByPlaceholderText("correo@ejemplo.com")).toBeNull();
+});
+
+it("sin sesión, «Iniciar sesión» abre el modal", async () => {
+  await abrir("/");
+  await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Iniciar Sesión" })[0]); });
+  expect(screen.getByPlaceholderText("correo@ejemplo.com")).toBeTruthy();
+  expect(m.push).not.toHaveBeenCalled();
 });

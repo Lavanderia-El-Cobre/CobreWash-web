@@ -31,6 +31,7 @@ import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 import { CorreoNoVerificadoError, contrasenaTemporal, enviarInvitacion, enviarVerificacion, requiereVerificacion } from "@/lib/firebase/verificacion";
 import { borrarRegistroPendiente, guardarRegistroPendiente } from "@/lib/registro-pendiente";
 import { registrarError } from "@/lib/registro-seguro";
+import { aplicarRecordarSesion } from "@/lib/firebase/sesion-recordada";
 
 interface FirebaseContext {
   auth: Auth;
@@ -124,7 +125,10 @@ export async function signInAndResolveLanding(
   context: FirebaseContext,
   email: string,
   password: string,
+  recordar = false,
 ): Promise<ResultadoIngreso> {
+  // Sin "mantener la sesión iniciada" la sesión termina al cerrar el navegador.
+  await aplicarRecordarSesion(context.auth, recordar);
   await signInWithEmailAndPassword(context.auth, email.trim(), password);
   const resultado = await resolverIngreso(context);
   // Al entrar sin verificar se reenvía el enlace; un fallo no impide mostrar el aviso.
@@ -146,6 +150,8 @@ export async function registerPublicClient(
   }
   const aceptacion = validateAceptacion(input);
   if (aceptacion) throw new Error(aceptacion);
+  // La sesión debe sobrevivir a la pestaña: el enlace de verificación suele abrir otra.
+  await aplicarRecordarSesion(context.auth, true);
   const credential = await createUserWithEmailAndPassword(
     context.auth,
     input.email.trim(),

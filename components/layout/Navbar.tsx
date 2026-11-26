@@ -31,6 +31,7 @@ import AceptacionTerminos from "@/components/privacidad/AceptacionTerminos";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
 import { enviarVerificacion } from "@/lib/firebase/verificacion";
 import { leerRegistroPendiente } from "@/lib/registro-pendiente";
+import { cerrarSesionRecordadaVencida, DIAS_SESION_RECORDADA } from "@/lib/firebase/sesion-recordada";
 
 const tipoClienteOptions = [
   { value: TipoCliente.PARTICULAR, label: "Particular" },
@@ -77,6 +78,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   const [authInfo, setAuthInfo] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [recordarSesion, setRecordarSesion] = useState(false);
+  const [comprobandoSesion, setComprobandoSesion] = useState(false);
   const [authName, setAuthName] = useState("");
   const [authConfirmPass, setAuthConfirmPass] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -240,6 +243,36 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     setAuthView("login");
   };
 
+  const abrirModalIngreso = () => {
+    setIsLoginOpen(true);
+    setAuthView("login");
+    setAuthError("");
+    setAuthSuccess(false);
+  };
+
+  /**
+   * "Iniciar sesión": con una sesión vigente (por ejemplo, recordada) va
+   * directo a la vista del rol sin pasar por el modal.
+   */
+  const abrirIngreso = async () => {
+    setIsOpen(false);
+    if (comprobandoSesion) return;
+    setComprobandoSesion(true);
+    try {
+      await auth.authStateReady();
+      await cerrarSesionRecordadaVencida(auth);
+      if (!auth.currentUser) { abrirModalIngreso(); return; }
+      const resultado = await resolverIngreso({ auth, dataConnect });
+      if (resultado.tipo === "landing") { router.push(resultado.ruta); return; }
+      await continuarIngreso(resultado);
+    } catch (err) {
+      abrirModalIngreso();
+      setAuthError(mapAuthError(err));
+    } finally {
+      setComprobandoSesion(false);
+    }
+  };
+
   // Auth Submission (Firebase Auth + Data Connect)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -274,7 +307,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       try {
         // Cada rol es redirigido a su vista; una cuenta sin verificar o sin
         // perfil continúa en el paso que le falta.
-        const resultado = await signInAndResolveLanding({ auth, dataConnect }, authEmail, authPassword);
+        const resultado = await signInAndResolveLanding({ auth, dataConnect }, authEmail, authPassword, recordarSesion);
         setAuthLoading(false);
         setAuthPassword("");
         await continuarIngreso(resultado);
@@ -411,15 +444,12 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
 
                 {/* Iniciar Sesión CTA */}
                 <button
-                  onClick={() => {
-                    setIsLoginOpen(true);
-                    setAuthView("login");
-                    setAuthError("");
-                    setAuthSuccess(false);
-                  }}
+                  onClick={() => { void abrirIngreso(); }}
+                  disabled={comprobandoSesion}
+                  aria-busy={comprobandoSesion}
                   className="flex items-center justify-center gap-2 bg-gradient-brand text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-premium hover:shadow-lg transition-all duration-200 hover:scale-[1.02] cursor-pointer"
                 >
-                  <LogIn className="w-4 h-4" />
+                  {comprobandoSesion ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                   <span>Iniciar Sesión</span>
                 </button>
               </div>
@@ -468,16 +498,12 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                     <span>Seguimiento</span>
                   </button>
                   <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      setIsLoginOpen(true);
-                      setAuthView("login");
-                      setAuthError("");
-                      setAuthSuccess(false);
-                    }}
+                    onClick={() => { void abrirIngreso(); }}
+                    disabled={comprobandoSesion}
+                    aria-busy={comprobandoSesion}
                     className="flex items-center justify-center gap-2 bg-gradient-brand text-white py-3 rounded-xl font-bold text-sm shadow-sm"
                   >
-                    <LogIn className="w-4 h-4" />
+                    {comprobandoSesion ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                     <span>Iniciar Sesión</span>
                   </button>
                 </div>
@@ -785,18 +811,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                       {/* Password input for Login / Register */}
                       {(authView === "login" || authView === "register") && (
                         <div className="space-y-1.5">
-                          <div className="flex justify-between items-center">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Contraseña</label>
-                            {authView === "login" && (
-                              <button
-                                type="button"
-                                onClick={() => setAuthView("forgot")}
-                                className="text-[10px] font-bold text-brand-650 hover:text-brand-700 transition-colors cursor-pointer"
-                              >
-                                ¿Olvidaste tu contraseña?
-                              </button>
-                            )}
-                          </div>
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Contraseña</label>
                           <div className="relative">
                             <input
                               type="password"
@@ -817,6 +832,21 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                             </p>
                           )}
                         </div>
+                      )}
+
+                      {authView === "login" && (
+                        <label className="flex cursor-pointer items-start gap-2.5 text-xs text-stone-600">
+                          <input
+                            type="checkbox"
+                            checked={recordarSesion}
+                            onChange={(e) => setRecordarSesion(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+                          />
+                          <span>
+                            <span className="font-semibold text-stone-700">Mantener la sesión iniciada</span>
+                            <span className="block text-[11px] text-stone-500">Hasta {DIAS_SESION_RECORDADA} días, aunque cierres el navegador. No lo marques en equipos compartidos.</span>
+                          </span>
+                        </label>
                       )}
 
                       {/* Confirm Password input for Register */}
@@ -864,6 +894,16 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
 
                       {/* Footer Actions (Toggles) */}
                       <div className="pt-4 border-t border-stone-100 flex flex-col items-center gap-2 text-xs">
+                        {/* Al final del orden de tabulación: de correo se pasa directo a contraseña. */}
+                        {authView === "login" && (
+                          <button
+                            type="button"
+                            onClick={() => { setAuthView("forgot"); setAuthError(""); }}
+                            className="font-bold text-brand-650 hover:text-brand-700 hover:underline transition-colors cursor-pointer"
+                          >
+                            ¿Olvidaste tu contraseña?
+                          </button>
+                        )}
                         {authView === "login" && (
                           <p className="text-stone-500">
                             ¿No tienes cuenta?{" "}
