@@ -111,6 +111,13 @@ describe("validación de usuarios creados por administración", () => {
     informado: true,
   };
 
+  it("no pide contraseña: la persona la crea con el enlace de su correo", () => {
+    const { password: _sinClave, ...sinClave } = validClient;
+    void _sinClave;
+    expect(validateManagedUserRegistration({ ...sinClave, rolId: "rol-operario", informado: true }, "operario")).toBeNull();
+    expect(validateManagedUserRegistration({ ...validManagedUser, email: "sin-arroba" }, "operario")).toContain("correo válido");
+  });
+
   it("exige confirmar que se informó a la persona de los términos y el aviso", () => {
     expect(validateManagedUserRegistration({ ...validManagedUser, informado: false }, "operario")).toContain("Confirma que informaste");
   });

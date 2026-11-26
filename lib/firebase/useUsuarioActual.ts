@@ -8,6 +8,7 @@ import {
   type ActiveUserProfile,
 } from "@/lib/firebase/auth-flows";
 import { requiereVerificacion } from "@/lib/firebase/verificacion";
+import { cerrarSesionRecordadaVencida, sesionRecordadaVencida } from "@/lib/firebase/sesion-recordada";
 
 export type UsuarioActual = ActiveUserProfile;
 
@@ -21,6 +22,13 @@ export function useUsuarioActual() {
     const actualizar = (user: typeof auth.currentUser) => {
       const solicitud = ++version;
       setUsuario(null);
+      // Pasado el plazo de "mantener la sesión iniciada" se vuelve a pedir la contraseña.
+      if (user && sesionRecordadaVencida()) {
+        setLoading(true);
+        // El plazo se borra al cerrar, así que el reintento no vuelve a entrar aquí.
+        void cerrarSesionRecordadaVencida(auth).then(() => { if (montado && solicitud === version) actualizar(auth.currentUser); });
+        return;
+      }
       // Una cuenta nueva sin correo verificado no ingresa: termina su alta en el inicio.
       if (!user || requiereVerificacion(user)) {
         setUsuario(null);

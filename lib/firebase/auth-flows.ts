@@ -28,9 +28,10 @@ import { isPublicClientType, validateAceptacion, validateClientCompletion } from
 import { LANDING_POR_ROL, type Rol } from "@/lib/roles";
 import { createSecondaryFirebaseContext } from "@/lib/firebase/secondary";
 import { VERSION_PRIVACIDAD, VERSION_TERMINOS } from "@/lib/privacidad/modelo";
-import { CorreoNoVerificadoError, enviarVerificacion, requiereVerificacion } from "@/lib/firebase/verificacion";
+import { CorreoNoVerificadoError, contrasenaTemporal, enviarInvitacion, enviarVerificacion, requiereVerificacion } from "@/lib/firebase/verificacion";
 import { borrarRegistroPendiente, guardarRegistroPendiente } from "@/lib/registro-pendiente";
 import { registrarError } from "@/lib/registro-seguro";
+import { aplicarRecordarSesion } from "@/lib/firebase/sesion-recordada";
 
 interface FirebaseContext {
   auth: Auth;
@@ -124,7 +125,10 @@ export async function signInAndResolveLanding(
   context: FirebaseContext,
   email: string,
   password: string,
+  recordar = false,
 ): Promise<ResultadoIngreso> {
+  // Sin "mantener la sesión iniciada" la sesión termina al cerrar el navegador.
+  await aplicarRecordarSesion(context.auth, recordar);
   await signInWithEmailAndPassword(context.auth, email.trim(), password);
   const resultado = await resolverIngreso(context);
   // Al entrar sin verificar se reenvía el enlace; un fallo no impide mostrar el aviso.
@@ -146,6 +150,8 @@ export async function registerPublicClient(
   }
   const aceptacion = validateAceptacion(input);
   if (aceptacion) throw new Error(aceptacion);
+  // La sesión debe sobrevivir a la pestaña: el enlace de verificación suele abrir otra.
+  await aplicarRecordarSesion(context.auth, true);
   const credential = await createUserWithEmailAndPassword(
     context.auth,
     input.email.trim(),
@@ -207,11 +213,17 @@ export async function requestPasswordReset(auth: Auth, email: string): Promise<v
   await sendPasswordResetEmail(auth, email.trim());
 }
 
+/**
+ * Crea la cuenta de otra persona desde administración. La contraseña inicial es
+ * aleatoria y nadie la conoce: la persona recibe un enlace en su correo para
+ * crear la suya, de modo que nunca debe decírsela al personal. Al definirla con
+ * ese enlace también queda confirmado su correo.
+ */
 export async function createManagedUser(
   dataConnect: DataConnect,
   input: ManagedUserRegistrationInput,
   roleName: string,
-): Promise<{ verificacionEnviada: boolean }> {
+): Promise<{ invitacionEnviada: boolean }> {
   if (input.informado !== true) throw new Error("Confirma que informaste a la persona de los Términos y Condiciones y del Aviso de Privacidad.");
   const context = createSecondaryFirebaseContext();
   let credential: Awaited<ReturnType<typeof createUserWithEmailAndPassword>> | null = null;
@@ -219,7 +231,7 @@ export async function createManagedUser(
     credential = await createUserWithEmailAndPassword(
       context.auth,
       input.email.trim(),
-      input.password,
+      contrasenaTemporal(),
     );
     const variables = { ...registrationVariables(input), email: input.email.trim() };
 
@@ -237,9 +249,12 @@ export async function createManagedUser(
         rolId: input.rolId,
       });
     }
-    // La cuenta queda creada; la persona debe verificar su correo para ingresar.
-    const verificacionEnviada = await enviarVerificacion(credential.user).then(() => true, () => false);
-    return { verificacionEnviada };
+    // La cuenta queda creada; la persona la activa definiendo su contraseña con el enlace.
+    const invitacionEnviada = await enviarInvitacion(context.auth, input.email.trim()).then(() => true, (error) => {
+      registrarError("No se pudo enviar la invitación de la cuenta", error);
+      return false;
+    });
+    return { invitacionEnviada };
   } catch (error) {
     if (credential) {
       await credential.user.delete().catch(() => undefined);

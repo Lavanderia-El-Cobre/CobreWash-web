@@ -10,7 +10,7 @@ vi.mock("firebase/data-connect", () => ({ executeMutation: m.executeMutation, mu
 vi.mock("@/src/dataconnect-generated", () => ({ TipoCliente: { PARTICULAR: "PARTICULAR", HOTEL: "HOTEL" }, crearClienteConCuenta: m.crearConCuenta }));
 vi.mock("@/lib/firebase/secondary", () => ({ createSecondaryFirebaseContext: () => ({ auth: { secundaria: true }, cleanup: m.cleanup }) }));
 
-import { avisoClienteConCuenta, nombreDeCuenta, registrarClienteConCuenta } from "./cuenta";
+import { avisoClienteConCuenta, nombreDeCuenta, registrarClienteConCuenta, registrarFichaCliente } from "./cuenta";
 import { TipoCliente } from "@/src/dataconnect-generated";
 
 const dc = {} as DataConnect;
@@ -66,6 +66,23 @@ describe("cliente registrado por recepción con cuenta asociada", () => {
     m.sendReset.mockRejectedValue(new Error("cuota"));
     await expect(registrarClienteConCuenta(dc, ficha)).resolves.toMatchObject({ cuenta: "creada", invitacionEnviada: false });
     expect(m.borrar).not.toHaveBeenCalled();
+  });
+});
+
+describe("cliente registrado solo con ficha", () => {
+  it("no crea cuenta y acepta el correo vacío", async () => {
+    m.executeMutation.mockResolvedValue({ data: { cliente_insert: { id: "ficha-3" } } });
+    await expect(registrarFichaCliente(dc, { ...ficha, email: "  " })).resolves.toBe("ficha-3");
+    expect(m.mutationRef).toHaveBeenCalledWith(dc, "CrearClienteComanda", expect.objectContaining({ email: undefined, nombre: "Ana  María Pérez", direccion: undefined }));
+    expect(m.createUser).not.toHaveBeenCalled();
+    expect(m.sendReset).not.toHaveBeenCalled();
+  });
+
+  it("guarda el correo opcional normalizado y rechaza uno inválido", async () => {
+    m.executeMutation.mockResolvedValue({ data: { cliente_insert: { id: "ficha-4" } } });
+    await registrarFichaCliente(dc, ficha);
+    expect(m.mutationRef).toHaveBeenCalledWith(dc, "CrearClienteComanda", expect.objectContaining({ email: "ana@example.cl" }));
+    await expect(registrarFichaCliente(dc, { ...ficha, email: "malo" })).rejects.toThrow("correo válido");
   });
 });
 

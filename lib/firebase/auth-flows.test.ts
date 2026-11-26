@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   createSecondary: vi.fn(),
   linkFicha: vi.fn(),
+  setPersistence: vi.fn(),
 }));
 
 vi.mock("firebase/auth", () => ({
@@ -30,6 +31,9 @@ vi.mock("firebase/auth", () => ({
   sendEmailVerification: mocks.sendVerification,
   signInWithEmailAndPassword: mocks.signIn,
   signOut: mocks.signOut,
+  setPersistence: mocks.setPersistence,
+  browserSessionPersistence: "session",
+  indexedDBLocalPersistence: "local",
 }));
 
 vi.mock("firebase/data-connect", () => ({
@@ -125,6 +129,17 @@ describe("flujos de autenticación", () => {
 
     expect(mocks.signIn).toHaveBeenCalledWith(auth, "ana@example.com", "clave1");
     expect(mocks.getProfile).toHaveBeenCalledWith(dataConnect, { fetchPolicy: "SERVER_ONLY" });
+    // Sin "mantener la sesión iniciada", la sesión no sobrevive al cierre del navegador.
+    expect(mocks.setPersistence).toHaveBeenCalledWith(auth, "session");
+    expect(mocks.setPersistence.mock.invocationCallOrder[0]).toBeLessThan(mocks.signIn.mock.invocationCallOrder[0]);
+  });
+
+  it("con «mantener la sesión iniciada» guarda la sesión de forma persistente", async () => {
+    const auth = authCon(usuarioAuth());
+    mocks.signIn.mockResolvedValue({});
+    mocks.getProfile.mockResolvedValue({ data: { usuario: { activo: true, rol: { nombre: "admin" }, clientes_on_usuario: [] } } });
+    await signInAndResolveLanding({ auth, dataConnect }, "ana@example.com", "clave1", true);
+    expect(mocks.setPersistence).toHaveBeenCalledWith(auth, "local");
   });
 
   it("una cuenta nueva sin correo verificado no ingresa y recibe un nuevo enlace", async () => {
@@ -322,26 +337,32 @@ describe("creación de usuarios desde administración", () => {
     mocks.createUser.mockResolvedValue({ user: creado });
     mocks.createAdminUser.mockResolvedValue({});
     mocks.createAdminClient.mockResolvedValue({});
-    mocks.sendVerification.mockResolvedValue(undefined);
+    mocks.sendReset.mockResolvedValue(undefined);
     cleanup.mockResolvedValue(undefined);
   });
 
   it("usa Auth secundario y la sesión Data Connect principal para crear clientes", async () => {
     await expect(createManagedUser(dataConnect, { ...managedInput, direccion: " Calle Uno 123 " }, "cliente"))
-      .resolves.toEqual({ verificacionEnviada: true });
+      .resolves.toEqual({ invitacionEnviada: true });
 
-    expect(mocks.createUser).toHaveBeenCalledWith(secondaryAuth, "ana@example.com", "clave123");
+    // La contraseña inicial es aleatoria: el administrador nunca la define ni la conoce.
+    const [, , clave] = mocks.createUser.mock.calls[0];
+    expect(mocks.createUser).toHaveBeenCalledWith(secondaryAuth, "ana@example.com", expect.any(String));
+    expect(clave).not.toBe("clave123");
+    expect(clave.length).toBeGreaterThanOrEqual(24);
     expect(mocks.createAdminClient).toHaveBeenCalledWith(
       dataConnect,
       expect.objectContaining({ id: "nuevo-uid", direccion: "Calle Uno 123", tipoCliente: "PARTICULAR", email: "ana@example.com" }),
     );
-    expect(mocks.sendVerification).toHaveBeenCalledWith(creado, null);
+    // La persona recibe el enlace para crear su contraseña.
+    expect(mocks.sendReset).toHaveBeenCalledWith(secondaryAuth, "ana@example.com", undefined);
+    expect(mocks.sendVerification).not.toHaveBeenCalled();
     expect(mocks.createAdminUser).not.toHaveBeenCalled();
     expect(creado.delete).not.toHaveBeenCalled();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
-  it("crea solo Usuario para un rol interno y envía la verificación", async () => {
+  it("crea solo Usuario para un rol interno y envía la invitación", async () => {
     await createManagedUser(dataConnect, { ...managedInput, rolId: "rol-operario", tipoCliente: "" }, "operario");
 
     expect(mocks.createAdminUser).toHaveBeenCalledWith(
@@ -349,7 +370,7 @@ describe("creación de usuarios desde administración", () => {
       expect.objectContaining({ id: "nuevo-uid", rolId: "rol-operario", email: "ana@example.com" }),
     );
     expect(mocks.createAdminClient).not.toHaveBeenCalled();
-    expect(mocks.sendVerification).toHaveBeenCalledOnce();
+    expect(mocks.sendReset).toHaveBeenCalledOnce();
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
@@ -358,9 +379,9 @@ describe("creación de usuarios desde administración", () => {
     expect(mocks.createUser).not.toHaveBeenCalled();
   });
 
-  it("la cuenta queda creada aunque falle el envío de la verificación", async () => {
-    mocks.sendVerification.mockRejectedValue(new Error("cuota"));
-    await expect(createManagedUser(dataConnect, managedInput, "cliente")).resolves.toEqual({ verificacionEnviada: false });
+  it("la cuenta queda creada aunque falle el envío de la invitación", async () => {
+    mocks.sendReset.mockRejectedValue(new Error("cuota"));
+    await expect(createManagedUser(dataConnect, managedInput, "cliente")).resolves.toEqual({ invitacionEnviada: false });
     expect(creado.delete).not.toHaveBeenCalled();
   });
 

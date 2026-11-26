@@ -9,7 +9,6 @@ import {
   Mail,
   Phone,
   IdCard,
-  Lock,
   UserCog,
   MapPin,
   CheckCircle2,
@@ -28,7 +27,7 @@ import {
   type GetRolesData,
   TipoCliente,
 } from "@/src/dataconnect-generated";
-import { cleanRut, formatRut, isValidRut, validatePassword } from "@/lib/validators";
+import { cleanRut, formatRut, isValidRut } from "@/lib/validators";
 import { mapAuthError } from "@/lib/firebase/errors";
 import {
   createManagedUser,
@@ -81,7 +80,6 @@ const emptyForm: FormState = {
   email: "",
   direccion: "",
   tipoCliente: "",
-  password: "",
   informado: false,
 };
 
@@ -105,7 +103,6 @@ export default function UsuariosPage() {
   const rutDigits = cleanRut(form.rut);
   const rutTouched = rutDigits.length > 0;
   const rutValid = rutTouched && isValidRut(form.rut);
-  const passwordCheck = validatePassword(form.password);
   const selectedRole = roles.find((r) => r.id === form.rolId);
 
   const cargarUsuarios = async () => {
@@ -164,7 +161,6 @@ export default function UsuariosPage() {
       email: usuario.email,
       direccion: "",
       tipoCliente: "",
-      password: "",
     });
     setFormError("");
     setModal({ mode: "editar", usuario });
@@ -184,12 +180,12 @@ export default function UsuariosPage() {
 
     setSaving(true);
     try {
-      const { verificacionEnviada } = await createManagedUser(dataConnect, form, selectedRole?.nombre ?? "");
+      const { invitacionEnviada } = await createManagedUser(dataConnect, form, selectedRole?.nombre ?? "");
       await cargarUsuarios();
       setModal(null);
-      setAviso(verificacionEnviada
-        ? `Cuenta creada. Enviamos a ${form.email.trim()} un enlace para verificar el correo; podrá ingresar después de confirmarlo.`
-        : `Cuenta creada, pero no se pudo enviar la verificación a ${form.email.trim()}. Se reenviará cuando intente iniciar sesión.`);
+      setAviso(invitacionEnviada
+        ? `Cuenta creada. Enviamos a ${form.email.trim()} un enlace para que cree su contraseña y active la cuenta.`
+        : `Cuenta creada, pero no se pudo enviar la invitación a ${form.email.trim()}. Pídele usar "¿Olvidaste tu contraseña?" en el inicio de sesión para crear su contraseña.`);
     } catch (err) {
       setFormError(mapAuthError(err));
     } finally {
@@ -592,29 +588,10 @@ export default function UsuariosPage() {
                 </Field>
 
                 {modal.mode === "crear" && (
-                  <Field label="Contraseña">
-                    <div className="relative">
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none transition-all text-sm font-medium ${
-                          form.password
-                            ? passwordCheck.valid
-                              ? "border-green-300 dark:border-green-500/40 focus:border-green-500"
-                              : "border-red-300 dark:border-red-500/40 focus:border-red-500"
-                            : "border-stone-200 dark:border-white/10 focus:border-brand-500"
-                        }`}
-                      />
-                      <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    </div>
-                    {form.password && (
-                      <p className={`text-[11px] font-semibold ${passwordCheck.valid ? "text-green-600" : "text-red-500"}`}>
-                        {passwordCheck.message}
-                      </p>
-                    )}
-                  </Field>
+                  <p className="flex items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs leading-relaxed text-stone-600 dark:border-white/10 dark:bg-stone-800 dark:text-stone-300">
+                    <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
+                    No necesitas definir una contraseña: la persona recibirá en este correo un enlace para crearla y activar su cuenta.
+                  </p>
                 )}
 
                 {modal.mode === "crear" && (
@@ -631,7 +608,7 @@ export default function UsuariosPage() {
                       <Link href="/terminos" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-700 underline dark:text-brand-400">Términos y Condiciones</Link>{" "}
                       (v{VERSION_TERMINOS}) y del{" "}
                       <Link href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-700 underline dark:text-brand-400">Aviso de Privacidad</Link>{" "}
-                      (v{VERSION_PRIVACIDAD}), y que recibirá un correo para verificar su cuenta antes de ingresar.
+                      (v{VERSION_PRIVACIDAD}), y que recibirá un correo para crear su contraseña antes de ingresar.
                       {selectedRole?.nombre === "cliente" && " Al ingresar por primera vez, el cliente deberá aceptarlos personalmente."}
                     </span>
                   </label>
