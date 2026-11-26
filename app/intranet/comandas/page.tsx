@@ -40,8 +40,8 @@ import {
 import { normalizarEtapas, type EtapaVisible } from "@/lib/produccion/modelo";
 import { guardarComandaConFlujo, editarComandaConDetalles, type CrearComandaConFlujoVariables } from "@/lib/produccion/guardar";
 import { getMiComandaGuardada } from "@/src/dataconnect-generated";
-import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
-import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
+import ConfirmacionCuentaCliente, { OpcionCuentaCliente } from "@/components/intranet/ConfirmacionCuentaCliente";
+import { avisoClienteConCuenta, registrarClienteConCuenta, registrarFichaCliente } from "@/lib/clientes/cuenta";
 import { dataConnect } from "@/lib/firebase/client";
 import { formatRut, isValidRut } from "@/lib/validators";
 import { normalizarTelefono, validarTelefono } from "@/lib/telefonos";
@@ -302,6 +302,8 @@ export default function ComandasPage() {
   const [motivo, setMotivo] = useState("");
   const [nuevoCliente, setNuevoCliente] = useState(false);
   const [clienteInformado, setClienteInformado] = useState(false);
+  // Cliente nuevo con cuenta en la plataforma: exige correo y la confirmación final.
+  const [registrarCuenta, setRegistrarCuenta] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [anularError, setAnularError] = useState<string | null>(null);
   const [entregar, setEntregar] = useState<Comanda | null>(null);
@@ -367,6 +369,8 @@ export default function ComandasPage() {
       }],
     });
     setNuevoCliente((catData?.clientes.length ?? 0) === 0);
+    setRegistrarCuenta(false);
+    setClienteInformado(false);
     void cargarModeloIa();
     creacion.current = { id: crypto.randomUUID(), numero: generarNumeroComanda() };
     envioPendiente.current = null;
@@ -446,11 +450,16 @@ export default function ComandasPage() {
       setFormError(errorTelefono);
       return;
     }
-    if (nuevoCliente && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
+    const conCuenta = nuevoCliente && registrarCuenta;
+    if (conCuenta && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
       setFormError("Ingresa el correo del cliente: se usa para crear su cuenta.");
       return;
     }
-    if (nuevoCliente && !clienteInformado) {
+    if (nuevoCliente && formData.email.trim() && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
+      setFormError("Ingresa un correo válido o déjalo en blanco.");
+      return;
+    }
+    if (conCuenta && !clienteInformado) {
       setFormError("Confirma que informaste al cliente sobre su cuenta.");
       return;
     }
@@ -529,19 +538,24 @@ export default function ComandasPage() {
         let clienteId = formData.clienteId;
 
         if (nuevoCliente) {
-          // El cliente nuevo queda con cuenta asociada: recibe un enlace para activarla.
           const email = formData.email.trim();
-          const resultado = await registrarClienteConCuenta(dataConnect, {
+          const ficha = {
             nombre: formData.cliente.trim(),
             tipoCliente: formData.tipoCliente,
             rut: formatRut(formData.rut),
             telefono: normalizarTelefono(formData.telefono) || undefined,
-            email,
             direccion: formData.direccion.trim() || undefined,
-          });
-          clienteId = resultado.id;
-          avisoCuenta = avisoClienteConCuenta(resultado, email);
+          };
+          if (conCuenta) {
+            // Con cuenta: el cliente recibe un enlace para crear su contraseña.
+            const resultado = await registrarClienteConCuenta(dataConnect, { ...ficha, email });
+            clienteId = resultado.id;
+            avisoCuenta = avisoClienteConCuenta(resultado, email);
+          } else {
+            clienteId = await registrarFichaCliente(dataConnect, { ...ficha, email: email || undefined });
+          }
           setNuevoCliente(false);
+          setRegistrarCuenta(false);
           setClienteInformado(false);
           setFormData((prev) => ({ ...prev, clienteId }));
         }
@@ -942,6 +956,8 @@ export default function ComandasPage() {
                         const c = catData?.clientes.find(cli => cli.id === v);
                         const prendas = c?.tipoCliente === TipoCliente.HOTEL ? PRENDAS_HOTEL : PRENDAS_FORMULARIO;
                         setNuevoCliente(false);
+                        setRegistrarCuenta(false);
+                        setClienteInformado(false);
                         setFormData({ 
                           ...formData, 
                           clienteId: c?.id || "",
@@ -962,8 +978,8 @@ export default function ComandasPage() {
                       searchable
                       searchPlaceholder="Buscar por nombre o RUT…"
                       options={[
-                        ...(catData?.clientes || []).map((c) => ({ value: c.id, label: c.rut ? `${c.nombre} · ${c.rut}` : c.nombre })),
                         { value: "__nuevo__", label: "+ Registrar cliente nuevo" },
+                        ...(catData?.clientes || []).map((c) => ({ value: c.id, label: c.rut ? `${c.nombre} · ${c.rut}` : c.nombre })),
                       ]}
                     />
                   </div>
@@ -993,6 +1009,13 @@ export default function ComandasPage() {
                     </div>
                 </div>
                 {nuevoCliente && (
+                  <OpcionCuentaCliente
+                    marcada={registrarCuenta}
+                    onChange={(valor) => { setRegistrarCuenta(valor); if (!valor) setClienteInformado(false); }}
+                    disabled={isSubmitting}
+                  />
+                )}
+                {nuevoCliente && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FieldInput label="Nombre del cliente" value={formData.cliente} onChange={(v) => setFormData({ ...formData, cliente: v })} placeholder="Nombre o razón social" />
                     <FieldInput
@@ -1017,10 +1040,9 @@ export default function ComandasPage() {
                     <label htmlFor="comanda-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
                     <TelefonoInput id="comanda-telefono" value={formData.telefono} onChange={(telefono) => setFormData((actual) => ({ ...actual, telefono }))} />
                   </div>
-                  <FieldInput label={nuevoCliente ? "Correo (obligatorio)" : "Correo"} value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
+                  <FieldInput label={nuevoCliente && registrarCuenta ? "Correo (obligatorio)" : nuevoCliente ? "Correo (opcional)" : "Correo"} value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
                 </div>
                 <FieldInput label="Dirección" value={formData.direccion} onChange={(v) => setFormData({ ...formData, direccion: v })} placeholder="Dirección de retiro / entrega" />
-                {nuevoCliente && <ConfirmacionCuentaCliente marcada={clienteInformado} onChange={setClienteInformado} disabled={isSubmitting} />}
                 {/* Modalidad de cobro: por prendas (cantidad × precio) o por kg (peso × $/kg) */}
                 <div className="space-y-1.5">
                   <span id="modalidad-cobro" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Cobro</span>
@@ -1172,6 +1194,8 @@ export default function ComandasPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Observaciones</label>
                   <textarea value={formData.observaciones} onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })} rows={3} placeholder="Observaciones generales de recepción..." className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800 focus:border-brand-500 focus:outline-none dark:border-white/10 dark:bg-stone-800 dark:text-stone-200" />
                 </div>
+                {/* Al final del formulario: confirmación de términos para el cliente que tendrá cuenta. */}
+                {nuevoCliente && registrarCuenta && <ConfirmacionCuentaCliente marcada={clienteInformado} onChange={setClienteInformado} disabled={isSubmitting} />}
               </div>
           </ModalIntranet>
         )}

@@ -15,8 +15,8 @@ import { executeMutation, executeQuery, mutationRef, queryRef } from "firebase/d
 import GlassSelect from "@/components/ui/GlassSelect";
 import EncabezadoSeccion, { BOTON_ENCABEZADO } from "@/components/intranet/EncabezadoSeccion";
 import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
-import ConfirmacionCuentaCliente from "@/components/intranet/ConfirmacionCuentaCliente";
-import { avisoClienteConCuenta, registrarClienteConCuenta } from "@/lib/clientes/cuenta";
+import ConfirmacionCuentaCliente, { OpcionCuentaCliente } from "@/components/intranet/ConfirmacionCuentaCliente";
+import { avisoClienteConCuenta, registrarClienteConCuenta, registrarFichaCliente } from "@/lib/clientes/cuenta";
 import { mapAuthError } from "@/lib/firebase/errors";
 
 const clp = (n: number) => `$${n.toLocaleString("es-CL")}`;
@@ -73,6 +73,8 @@ export default function ClientesPage() {
   const [form, setForm] = useState<ClienteForm | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [informado, setInformado] = useState(false);
+  // Ficha nueva con cuenta en la plataforma: exige correo y la confirmación.
+  const [conCuenta, setConCuenta] = useState(false);
   const solicitudActual = useRef(0);
 
   const cargarClientes = useCallback(async (silencioso = false) => {
@@ -156,7 +158,7 @@ export default function ClientesPage() {
       setNotice(errorTelefono);
       return;
     }
-    if (!form.id && !form.email.trim()) {
+    if (!form.id && conCuenta && !form.email.trim()) {
       setNotice("Ingresa el correo del cliente: se usa para crear su cuenta.");
       return;
     }
@@ -164,7 +166,7 @@ export default function ClientesPage() {
       setNotice("Ingresa un correo válido.");
       return;
     }
-    if (!form.id && !informado) {
+    if (!form.id && conCuenta && !informado) {
       setNotice("Confirma que informaste al cliente sobre su cuenta.");
       return;
     }
@@ -186,11 +188,18 @@ export default function ClientesPage() {
           { id: form.id, ...datos },
         ));
       } else {
-        const resultado = await registrarClienteConCuenta(dataConnect, { ...datos, telefono: datos.telefono || undefined, direccion: datos.direccion || undefined });
+        const ficha = { ...datos, telefono: datos.telefono || undefined, direccion: datos.direccion || undefined };
+        if (conCuenta) {
+          const resultado = await registrarClienteConCuenta(dataConnect, ficha);
+          setNotice(avisoClienteConCuenta(resultado, datos.email));
+        } else {
+          await registrarFichaCliente(dataConnect, { ...ficha, email: datos.email || undefined });
+          setNotice("Ficha registrada correctamente (sin cuenta en la plataforma).");
+        }
         await cargarClientes(true);
-        setNotice(avisoClienteConCuenta(resultado, datos.email));
         setForm(null);
         setInformado(false);
+        setConCuenta(false);
         return;
       }
       await cargarClientes(true);
@@ -221,7 +230,7 @@ export default function ClientesPage() {
         titulo="Clientes"
         descripcion={`${clientes.length} fichas registradas en Firebase`}
         acciones={
-          <button onClick={() => setForm({ ...FORM_VACIO })} className={BOTON_ENCABEZADO}>
+          <button onClick={() => { setForm({ ...FORM_VACIO }); setConCuenta(false); setInformado(false); }} className={BOTON_ENCABEZADO}>
             <Plus className="h-4 w-4" /> Registrar cliente
           </button>
         }
@@ -277,7 +286,7 @@ export default function ClientesPage() {
             </button>
             <button
               onClick={guardar}
-              disabled={saving || !form.nombre.trim() || (!form.id && (!form.email.trim() || !informado))}
+              disabled={saving || !form.nombre.trim() || (!form.id && conCuenta && (!form.email.trim() || !informado))}
               className={BOTON_MODAL_PRIMARIO}
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -287,6 +296,7 @@ export default function ClientesPage() {
         }
       >
           <div className="space-y-4">
+            {!form.id && <OpcionCuentaCliente marcada={conCuenta} onChange={(valor) => { setConCuenta(valor); if (!valor) setInformado(false); }} disabled={saving} />}
             <Field label="Nombre o razón social" value={form.nombre} onChange={(nombre) => setForm({ ...form, nombre })} required />
             <Field
               label="RUT de persona o empresa"
@@ -319,10 +329,10 @@ export default function ClientesPage() {
                   ayuda="Celular por defecto; elige «Chile · teléfono fijo» u otro país"
                 />
               </div>
-              <Field label={form.id ? "Correo" : "Correo (obligatorio)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
+              <Field label={form.id ? "Correo" : conCuenta ? "Correo (obligatorio)" : "Correo (opcional)"} type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} placeholder="contacto@empresa.cl" />
             </div>
             <Field label="Dirección" value={form.direccion} onChange={(direccion) => setForm({ ...form, direccion })} placeholder="Av. Balmaceda 1234, Calama" />
-            {!form.id && <ConfirmacionCuentaCliente marcada={informado} onChange={setInformado} disabled={saving} />}
+            {!form.id && conCuenta && <ConfirmacionCuentaCliente marcada={informado} onChange={setInformado} disabled={saving} />}
           </div>
       </ModalIntranet>}
       </AnimatePresence>
