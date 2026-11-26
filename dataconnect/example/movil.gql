@@ -162,7 +162,7 @@ mutation EntregarComandaMovil(
     where: { comandaId: { eq: $id }, ordenEtapa: { eq: 5 }, estado: { in: [PENDIENTE, EN_PROCESO] } }
     data: { estado: COMPLETADA, fechaCompletado_expr: "request.time", operarioId_expr: "auth.uid" }
   ) @check(expr: "this == (response.query.comanda.comandaEtapas_on_comanda.size() == 0 ? 0 : 1)", message: "La entrega ya fue registrada")
-  
+
   comandaHistorialEstado_insert(data: {
     comanda: { id: $id }
     usuarioId_expr: "auth.uid"

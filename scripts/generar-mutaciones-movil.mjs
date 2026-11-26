@@ -87,7 +87,8 @@ for (const [nombre, archivo, entidad] of OPERACIONES) {
   if (!archivos.has(archivo)) archivos.set(archivo, await readFile(archivo, "utf8"));
   partes.push(variante(extraer(archivos.get(archivo).replaceAll("\r\n", "\n"), nombre), nombre, entidad));
 }
-const salida = encabezado + "\n" + partes.join("\n\n") + "\n";
+// Sin espacios al final de línea: el CI rechaza los "trailing whitespace" (git diff --check).
+const salida = (encabezado + "\n" + partes.join("\n\n") + "\n").replace(/[ \t]+$/gm, "");
 
 if (process.argv.includes("--check")) {
   const actual = (await readFile(DESTINO, "utf8").catch(() => "")).replaceAll("\r\n", "\n");

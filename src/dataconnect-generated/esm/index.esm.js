@@ -622,6 +622,90 @@ export function getHistorialInventario(dcOrVars, varsOrOptions, options) {
   return executeQuery(getHistorialInventarioRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
 
+export const completarEtapaComandaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'CompletarEtapaComandaMovil', inputVars);
+}
+completarEtapaComandaMovilRef.operationName = 'CompletarEtapaComandaMovil';
+
+export function completarEtapaComandaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(completarEtapaComandaMovilRef(dcInstance, inputVars));
+}
+
+export const registrarIncidenciaComandaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'RegistrarIncidenciaComandaMovil', inputVars);
+}
+registrarIncidenciaComandaMovilRef.operationName = 'RegistrarIncidenciaComandaMovil';
+
+export function registrarIncidenciaComandaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(registrarIncidenciaComandaMovilRef(dcInstance, inputVars));
+}
+
+export const entregarComandaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'EntregarComandaMovil', inputVars);
+}
+entregarComandaMovilRef.operationName = 'EntregarComandaMovil';
+
+export function entregarComandaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(entregarComandaMovilRef(dcInstance, inputVars));
+}
+
+export const reportarProblemaEntregaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'ReportarProblemaEntregaMovil', inputVars);
+}
+reportarProblemaEntregaMovilRef.operationName = 'ReportarProblemaEntregaMovil';
+
+export function reportarProblemaEntregaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(reportarProblemaEntregaMovilRef(dcInstance, inputVars));
+}
+
+export const registrarSalidaFlotaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'RegistrarSalidaFlotaMovil', inputVars);
+}
+registrarSalidaFlotaMovilRef.operationName = 'RegistrarSalidaFlotaMovil';
+
+export function registrarSalidaFlotaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(registrarSalidaFlotaMovilRef(dcInstance, inputVars));
+}
+
+export const registrarRetornoFlotaMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'RegistrarRetornoFlotaMovil', inputVars);
+}
+registrarRetornoFlotaMovilRef.operationName = 'RegistrarRetornoFlotaMovil';
+
+export function registrarRetornoFlotaMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(registrarRetornoFlotaMovilRef(dcInstance, inputVars));
+}
+
+export const registrarConteoInventarioMovilRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'RegistrarConteoInventarioMovil', inputVars);
+}
+registrarConteoInventarioMovilRef.operationName = 'RegistrarConteoInventarioMovil';
+
+export function registrarConteoInventarioMovil(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(registrarConteoInventarioMovilRef(dcInstance, inputVars));
+}
+
 export const registrarseRef = (dcOrVars, vars) => {
   const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
   dcInstance._useGeneratedSdk();

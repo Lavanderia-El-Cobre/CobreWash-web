@@ -1,4 +1,4 @@
-const { agregarComentarioComandaRef, resolverMiIncidenciaRef, autoAsignarComandaOperarioRef, getComandaDetalleOperarioRef, getMisComandasAsignadasRef, getInsumosOperarioRef, crearAvisoRef, getAvisosAdministracionRef, getAvisosParaEquipoRef, getSolicitudContactoConfirmadaRef, prepararLimiteContactoRef, getLimiteContactoRef, registrarSolicitudContactoRef, getSolicitudesContactoRef, actualizarEstadoSolicitudContactoRef, getComandasParaEntregaRef, getInspeccionParaEvidenciasRef, getMovimientoFlotaPorInspeccionRef, registrarEvidenciaGuardadaRef, vincularMiFichaVerificadaRef, autorizarModuloIaRef, getPanelIaRef, getHistorialAjustesIaRef, guardarTasaConsumoRef, eliminarTasaConsumoRef, guardarConfiguracionIaRef, registrarConteoFisicoIaRef, getInsumosImportacionIaRef, getRegistrosExistentesIaRef, getDatosEntrenamientoIaRef, getTasasSimulacionIaRef, borrarSimulacionIaRef, borrarSimulacionesIaRef, getModeloComandaIaRef, registrarConteoInventarioRef, getMiConteoInventarioRef, getMisConteosInventarioRef, getConteosInventarioRef, aprobarConteoInventarioRef, rechazarConteoInventarioRef, getStockInventarioRef, getHistorialInventarioRef, registrarseRef, crearUsuarioAdministradoRef, registrarseComoClienteRef, crearClienteAdministradoRef, aceptarCondicionesVigentesRef, crearClienteConCuentaRef, actualizarUsuarioRef, crearVehiculoRef, actualizarVehiculoRef, crearSalidaVehiculoRef, registrarInspeccionAntesRef, iniciarSalidaVehiculoRef, registrarInspeccionDespuesRef, agregarFotoInspeccionVehiculoRef, crearClienteComandaRef, editarFichaClienteRef, crearComandaRef, agregarComandaDetalleRef, anularComandaRef, entregarComandaRef, reportarProblemaEntregaRef, editarComandaRef, eliminarDetallesComandaRef, crearTipoPrendaRef, crearTipoServicioRef, crearInsumoRef, actualizarInsumoRef, registrarEntradaInventarioRef, registrarSalidaInventarioRef, getMisComandasRef, vincularMiComandaRef, autorizarGestionPrivacidadRef, getComprobanteDerechoRef, recibirSolicitudDerechoRef, listarSolicitudesDerechoRef, gestionarSolicitudDerechoRef, contarLimitesContactoVencidosRef, purgarLimitesContactoRef, asociarFlujoComandaPendienteRef, configurarEtapaProduccionRef, configurarLimitesEtapasRef, completarEtapaComandaRef, registrarIncidenciaComandaRef, actualizarEstadoIncidenciaRef, reasignarOperarioEtapaRef, getEtapasProduccionRef, getSeguimientoProduccionRef, getPanelProduccionRef, getComandasParaAlertasRef, getIncidenciasRef, getMiComandaGuardadaRef, getRolesRef, getMiPerfilRef, getUsuariosRef, getComandaPorQrRef, getInsumoPorQrRef, getInventarioRef, getVehiculosRef, getMisSalidasVehiculoRef, getComandasPaginadasRef, getComandasActivasCountRef, getComandaDetalleRef, getCatalogosComandaRef, diagnosticoComandasRef, getFichasClientesRef, getReporteVolumenRef, getReporteCuentasRef, getDetalleReporteCuentasRef, getFiltrosReportesRef, getReporteServiciosRef, getDetalleReporteServiciosRef, getSeguimientoPublicoPorQrRef, getSeguimientoPublicoPorNumeroRef, getComandaOperativaPorQrRef, registrarVehiculoFlotaRef, editarVehiculoFlotaRef, registrarSalidaFlotaRef, registrarRetornoFlotaRef, adjuntarFotoInspeccionFlotaRef, getFlotaVehiculosRef, getHistorialVehiculosRef, getPanelRepartidorRef, connectorConfig } = require('../index.cjs.js');
+const { agregarComentarioComandaRef, resolverMiIncidenciaRef, autoAsignarComandaOperarioRef, getComandaDetalleOperarioRef, getMisComandasAsignadasRef, getInsumosOperarioRef, crearAvisoRef, getAvisosAdministracionRef, getAvisosParaEquipoRef, getSolicitudContactoConfirmadaRef, prepararLimiteContactoRef, getLimiteContactoRef, registrarSolicitudContactoRef, getSolicitudesContactoRef, actualizarEstadoSolicitudContactoRef, getComandasParaEntregaRef, getInspeccionParaEvidenciasRef, getMovimientoFlotaPorInspeccionRef, registrarEvidenciaGuardadaRef, vincularMiFichaVerificadaRef, autorizarModuloIaRef, getPanelIaRef, getHistorialAjustesIaRef, guardarTasaConsumoRef, eliminarTasaConsumoRef, guardarConfiguracionIaRef, registrarConteoFisicoIaRef, getInsumosImportacionIaRef, getRegistrosExistentesIaRef, getDatosEntrenamientoIaRef, getTasasSimulacionIaRef, borrarSimulacionIaRef, borrarSimulacionesIaRef, getModeloComandaIaRef, registrarConteoInventarioRef, getMiConteoInventarioRef, getMisConteosInventarioRef, getConteosInventarioRef, aprobarConteoInventarioRef, rechazarConteoInventarioRef, getStockInventarioRef, getHistorialInventarioRef, completarEtapaComandaMovilRef, registrarIncidenciaComandaMovilRef, entregarComandaMovilRef, reportarProblemaEntregaMovilRef, registrarSalidaFlotaMovilRef, registrarRetornoFlotaMovilRef, registrarConteoInventarioMovilRef, registrarseRef, crearUsuarioAdministradoRef, registrarseComoClienteRef, crearClienteAdministradoRef, aceptarCondicionesVigentesRef, crearClienteConCuentaRef, actualizarUsuarioRef, crearVehiculoRef, actualizarVehiculoRef, crearSalidaVehiculoRef, registrarInspeccionAntesRef, iniciarSalidaVehiculoRef, registrarInspeccionDespuesRef, agregarFotoInspeccionVehiculoRef, crearClienteComandaRef, editarFichaClienteRef, crearComandaRef, agregarComandaDetalleRef, anularComandaRef, entregarComandaRef, reportarProblemaEntregaRef, editarComandaRef, eliminarDetallesComandaRef, crearTipoPrendaRef, crearTipoServicioRef, crearInsumoRef, actualizarInsumoRef, registrarEntradaInventarioRef, registrarSalidaInventarioRef, getMisComandasRef, vincularMiComandaRef, autorizarGestionPrivacidadRef, getComprobanteDerechoRef, recibirSolicitudDerechoRef, listarSolicitudesDerechoRef, gestionarSolicitudDerechoRef, contarLimitesContactoVencidosRef, purgarLimitesContactoRef, asociarFlujoComandaPendienteRef, configurarEtapaProduccionRef, configurarLimitesEtapasRef, completarEtapaComandaRef, registrarIncidenciaComandaRef, actualizarEstadoIncidenciaRef, reasignarOperarioEtapaRef, getEtapasProduccionRef, getSeguimientoProduccionRef, getPanelProduccionRef, getComandasParaAlertasRef, getIncidenciasRef, getMiComandaGuardadaRef, getRolesRef, getMiPerfilRef, getUsuariosRef, getComandaPorQrRef, getInsumoPorQrRef, getInventarioRef, getVehiculosRef, getMisSalidasVehiculoRef, getComandasPaginadasRef, getComandasActivasCountRef, getComandaDetalleRef, getCatalogosComandaRef, diagnosticoComandasRef, getFichasClientesRef, getReporteVolumenRef, getReporteCuentasRef, getDetalleReporteCuentasRef, getFiltrosReportesRef, getReporteServiciosRef, getDetalleReporteServiciosRef, getSeguimientoPublicoPorQrRef, getSeguimientoPublicoPorNumeroRef, getComandaOperativaPorQrRef, registrarVehiculoFlotaRef, editarVehiculoFlotaRef, registrarSalidaFlotaRef, registrarRetornoFlotaRef, adjuntarFotoInspeccionFlotaRef, getFlotaVehiculosRef, getHistorialVehiculosRef, getPanelRepartidorRef, connectorConfig } = require('../index.cjs.js');
 const { validateArgs, CallerSdkTypeEnum } = require('firebase/data-connect');
 const { useDataConnectQuery, useDataConnectMutation, validateReactArgs } = require('@tanstack-query-firebase/react/data-connect');
 
@@ -290,6 +290,62 @@ exports.useGetHistorialInventario = function useGetHistorialInventario(dcOrVars,
   const ref = getHistorialInventarioRef(dcInstance, inputVars);
   return useDataConnectQuery(ref, inputOpts, CallerSdkTypeEnum.GeneratedReact);
 }
+exports.useCompletarEtapaComandaMovil = function useCompletarEtapaComandaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return completarEtapaComandaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useRegistrarIncidenciaComandaMovil = function useRegistrarIncidenciaComandaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return registrarIncidenciaComandaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useEntregarComandaMovil = function useEntregarComandaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return entregarComandaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useReportarProblemaEntregaMovil = function useReportarProblemaEntregaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return reportarProblemaEntregaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useRegistrarSalidaFlotaMovil = function useRegistrarSalidaFlotaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return registrarSalidaFlotaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useRegistrarRetornoFlotaMovil = function useRegistrarRetornoFlotaMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return registrarRetornoFlotaMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
+exports.useRegistrarConteoInventarioMovil = function useRegistrarConteoInventarioMovil(dcOrOptions, options) {
+  const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
+  function refFactory(vars) {
+    return registrarConteoInventarioMovilRef(dcInstance, vars);
+  }
+  return useDataConnectMutation(refFactory, inputOpts, CallerSdkTypeEnum.GeneratedReact);
+}
+
 exports.useRegistrarse = function useRegistrarse(dcOrOptions, options) {
   const { dc: dcInstance, vars: inputOpts } = validateArgs(connectorConfig, dcOrOptions, options);
   function refFactory(vars) {
