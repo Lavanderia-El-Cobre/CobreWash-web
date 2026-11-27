@@ -44,7 +44,7 @@ it.each([
   [{ pesoTexto: "abc" }, "Ingresa el peso total"],
   [{ modelo: null }, "Cargando estimación"],
   [{ error: true }, "No se pudo cargar la estimación"],
-  [{ servicioId: "otro", servicioNombre: "Planchado" }, "«Planchado» aún no tiene tasas"],
+  [{ servicioId: "otro", servicioNombre: "Planchado" }, "Sin estimación configurada para «Planchado»"],
   [{ servicioId: null, servicioNombre: "" }, "«sin servicio»"],
 ])("explica por qué no hay estimación (%#)", (extra, texto) => {
   render(createElement(ConsumoEstimado, { ...props, ...extra }));

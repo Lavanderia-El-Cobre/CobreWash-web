@@ -85,8 +85,8 @@ describe("recálculo del modelo", () => {
     expect(r.tasas[0].tasaActual).toBe(12);
     const insumo = r.detalle.insumos[0];
     expect(insumo.fuenteConsumo).toBe("kg-recientes");
-    // Las cuatro semanas de comandas caen dentro de los últimos 30 días.
-    expect(insumo.consumoDiario).toBeCloseTo((4000 * 0.012) / 30);
+    // Las cuatro semanas de comandas cubren 27 días efectivos desde el primer registro hasta `ahora`.
+    expect(insumo.consumoDiario).toBeCloseTo((4000 * 0.012) / 27);
     const sinNada = prepararRecalculo(datos({ conteoInventarios: [], comandaDetalles: [] }), { id: "m", usuarioId: "a", ahora });
     expect(sinNada.detalle.insumos[0]).toMatchObject({ consumoDiario: null, fuenteConsumo: null });
   });

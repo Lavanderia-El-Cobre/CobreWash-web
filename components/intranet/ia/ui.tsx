@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import ModalIntranet from "@/components/intranet/ModalIntranet";
 
+/** Identificadores de las pestañas principales del Módulo IA. */
+export type PestanaIa = "resumen" | "tasas" | "datos" | "laboratorio";
 /** Mensaje transitorio mostrado por `AvisoFlotante` en el Módulo IA. */
 export type Aviso = { texto: string; tipo: "success" | "warning" | "error" };
 /** Callback para publicar un aviso temporal desde cualquier pestaña del Módulo IA. */

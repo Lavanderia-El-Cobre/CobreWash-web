@@ -39,7 +39,7 @@ export default function ConsumoEstimado({ modelo, error, servicioId, servicioNom
   else {
     const r = servicioId ? estimarConsumoComanda(modelo, servicioId, kg) : null;
     if (!r || !r.insumos.length) {
-      contenido = <p className="text-xs text-stone-500 dark:text-stone-400">El servicio «{servicioNombre || "sin servicio"}» aún no tiene tasas de consumo en el Módulo IA.</p>;
+      contenido = <p className="text-xs text-stone-500 dark:text-stone-400">Sin estimación configurada para «{servicioNombre || "sin servicio"}».</p>;
     } else {
       const faltan = r.insumos.filter((i) => i.nivel === "insuficiente");
       contenido = (
@@ -73,7 +73,7 @@ export default function ConsumoEstimado({ modelo, error, servicioId, servicioNom
     <section aria-label="Consumo estimado de insumos" className="space-y-2 rounded-xl border border-brand-200/70 bg-brand-500/5 p-3 dark:border-brand-500/20">
       <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-brand-700 dark:text-brand-300">
         <BrainCircuit className="h-3.5 w-3.5" />Consumo estimado
-        <span className="font-normal normal-case tracking-normal text-stone-400">· Módulo IA</span>
+        <span className="font-normal normal-case tracking-normal text-stone-400">· Estimación automática</span>
       </h3>
       {contenido}
     </section>

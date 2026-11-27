@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet, ShoppingCart, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Download, FileSpreadsheet, Info, RefreshCw, ShoppingCart, Upload } from "lucide-react";
 import GlassSelect from "@/components/ui/GlassSelect";
 import { auth, dataConnect } from "@/lib/firebase/client";
 import { registrarError } from "@/lib/registro-seguro";
 import { leerCsv, type ErrorCsv, type TipoCsv } from "@/lib/ia/csv";
 import { registrarConteoFisicoIa, registrarEntradaInventario, type GetPanelIaData } from "@/src/dataconnect-generated";
-import { BotonGuardar, claseBotonSecundario, claseCampo, claseEtiqueta, formatoNumero, leerNumero, mensajeErrorIa, Tarjeta, type Avisar } from "./ui";
+import { BotonGuardar, claseBotonSecundario, claseCampo, claseEtiqueta, formatoNumero, leerNumero, mensajeErrorIa, Tarjeta, type Avisar, type PestanaIa } from "./ui";
 
 type Insumo = GetPanelIaData["insumos"][number];
 // Tope de tamaño en bytes (350 KB) para validar e importar CSV sin exceder límites del servidor.
@@ -27,7 +27,7 @@ function SelectorInsumo({ insumos, value, onChange }: { insumos: Insumo[]; value
   );
 }
 
-function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar }) {
+function ConteoFisico({ insumos, recargar, avisar, onRegistrado }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar; onRegistrado: () => void }) {
   const [insumoId, setInsumoId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -43,6 +43,7 @@ function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recarg
     try {
       await registrarConteoFisicoIa(dataConnect, { id: crypto.randomUUID(), insumoId: insumo.id, cantidad: valor, revisionStock: insumo.revisionStock });
       setCantidad("");
+      onRegistrado();
       avisar(`Conteo de ${insumo.nombre} registrado: el stock quedó en ${formatoNumero(valor)} ${insumo.unidadMedida}.`, "success");
     } catch (error) {
       registrarError("No se pudo registrar el conteo físico", error);
@@ -55,7 +56,12 @@ function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recarg
   };
 
   return (
-    <Tarjeta icono={ClipboardCheck} titulo="Conteo físico" descripcion="Lo medido en bodega. Reemplaza el stock del insumo y queda aprobado.">
+    <Tarjeta
+      icono={ClipboardCheck}
+      titulo="Conteo físico de hoy"
+      descripcion="Lo medido en bodega. Actualiza el stock actual y queda aprobado para la predicción."
+      accion={<span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-300">Actualiza stock</span>}
+    >
       <form onSubmit={guardar} className="space-y-4">
         <div className="space-y-1.5"><span className={claseEtiqueta}>Insumo</span><SelectorInsumo insumos={insumos} value={insumoId} onChange={setInsumoId} /></div>
         <label className="block space-y-1.5">
@@ -69,7 +75,7 @@ function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recarg
   );
 }
 
-function Compra({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar }) {
+function Compra({ insumos, recargar, avisar, onRegistrado }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar; onRegistrado: () => void }) {
   const [insumoId, setInsumoId] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [referencia, setReferencia] = useState("");
@@ -86,6 +92,7 @@ function Compra({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: ()
     try {
       await registrarEntradaInventario(dataConnect, { insumoId: insumo.id, cantidad: valor, motivo: referencia.trim() ? `Compra: ${referencia.trim()}` : "Compra" });
       setCantidad(""); setReferencia("");
+      onRegistrado();
       avisar(`Compra de ${formatoNumero(valor)} ${insumo.unidadMedida} de ${insumo.nombre} registrada.`, "success");
       await recargar();
     } catch (error) {
@@ -95,7 +102,12 @@ function Compra({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: ()
   };
 
   return (
-    <Tarjeta icono={ShoppingCart} titulo="Compra o reposición" descripcion="Suma la cantidad al stock actual del insumo.">
+    <Tarjeta
+      icono={ShoppingCart}
+      titulo="Compra o reposición de hoy"
+      descripcion="Suma la cantidad ingresada al stock actual del insumo."
+      accion={<span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-300">Actualiza stock</span>}
+    >
       <form onSubmit={guardar} className="space-y-4">
         <div className="space-y-1.5"><span className={claseEtiqueta}>Insumo</span><SelectorInsumo insumos={insumos} value={insumoId} onChange={setInsumoId} /></div>
         <label className="block space-y-1.5">
@@ -112,7 +124,7 @@ function Compra({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: ()
   );
 }
 
-function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar }) {
+function CargaCsv({ insumos, recargar, avisar, onRegistrado }: { insumos: Insumo[]; recargar: () => Promise<void>; avisar: Avisar; onRegistrado: () => void }) {
   const [tipo, setTipo] = useState<TipoCsv>("conteos");
   const [archivo, setArchivo] = useState<{ nombre: string; texto: string } | null>(null);
   const [erroresServidor, setErroresServidor] = useState<ErrorCsv[] | null>(null);
@@ -133,7 +145,7 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
 
   const descargarPlantilla = () => {
     // Antepone BOM UTF-8 para que Excel abra el CSV con tildes y separador `;` correctamente.
-    const url = URL.createObjectURL(new Blob(["﻿" + PLANTILLA[tipo]], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + PLANTILLA[tipo]], { type: "text/csv;charset=utf-8" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: `plantilla-${tipo}.csv` });
     a.click();
     URL.revokeObjectURL(url);
@@ -141,7 +153,7 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
 
   const importar = async () => {
     const usuario = auth.currentUser;
-    if (!archivo || !vista || !usuario) return;
+    if (guardando || !archivo || !vista || !usuario) return;
     setGuardando(true);
     try {
       const r = await fetch("/api/ia/importar", {
@@ -155,6 +167,7 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
         avisar(datos.error ?? "No se pudo importar el archivo.", "error");
         return;
       }
+      onRegistrado();
       avisar(`Se importaron ${datos.guardadas} ${tipo === "conteos" ? "conteos" : "compras"}.`, "success");
       limpiar();
       await recargar();
@@ -166,9 +179,15 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
 
   return (
     <Tarjeta
-      icono={FileSpreadsheet} titulo="Carga desde CSV"
-      descripcion="Conteos o compras pasados. Se revisa el archivo completo antes de guardar y no cambia el stock actual."
-      accion={<button type="button" onClick={descargarPlantilla} className={claseBotonSecundario}><Download className="h-4 w-4" />Plantilla</button>}
+      icono={FileSpreadsheet}
+      titulo="Importar historial desde CSV"
+      descripcion="Conteos o compras pasados para entrenar la predicción. No modifica el stock actual."
+      accion={
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-green-500/10 px-2.5 py-1 text-[11px] font-bold text-green-700 dark:text-green-400">No cambia stock</span>
+          <button type="button" onClick={descargarPlantilla} className={claseBotonSecundario}><Download className="h-4 w-4" />Plantilla</button>
+        </div>
+      }
     >
       <div className="space-y-4">
         <div role="radiogroup" aria-label="Tipo de datos" className="flex gap-2">
@@ -230,17 +249,47 @@ function CargaCsv({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: 
 }
 
 /**
- * Pestaña de carga de datos del Módulo IA: permite registrar conteos físicos aprobados,
- * compras/reposiciones directas e importaciones históricas por CSV sin alterar el stock actual.
+ * Pestaña de carga de datos del Módulo IA: distingue claramente los registros del día
+ * (compartidos con Inventario) de la importación histórica por CSV.
  */
-export default function DatosIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
+export default function DatosIa({
+  panel,
+  recargar,
+  avisar,
+  onCambioDatos,
+  irAPestana,
+}: {
+  panel: GetPanelIaData;
+  recargar: () => Promise<void>;
+  avisar: Avisar;
+  onCambioDatos?: () => void;
+  irAPestana?: (p: PestanaIa) => void;
+}) {
+  const [registradoAhora, setRegistradoAhora] = useState(false);
+
+  const marcarRegistrado = () => {
+    setRegistradoAhora(true);
+    onCambioDatos?.();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ConteoFisico insumos={panel.insumos} recargar={recargar} avisar={avisar} />
-        <Compra insumos={panel.insumos} recargar={recargar} avisar={avisar} />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200/80 bg-stone-50/70 px-4 py-3 text-xs text-stone-600 dark:border-white/10 dark:bg-white/5 dark:text-stone-300">
+        <span className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-brand-500" />
+          Los conteos y compras registrados aquí o en <strong>Inventario</strong> se comparten automáticamente con la predicción.
+        </span>
+        {registradoAhora && irAPestana && (
+          <button type="button" onClick={() => irAPestana("resumen")} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-600">
+            <RefreshCw className="h-3.5 w-3.5" />Ir a actualizar predicción
+          </button>
+        )}
       </div>
-      <CargaCsv insumos={panel.insumos} recargar={recargar} avisar={avisar} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ConteoFisico insumos={panel.insumos} recargar={recargar} avisar={avisar} onRegistrado={marcarRegistrado} />
+        <Compra insumos={panel.insumos} recargar={recargar} avisar={avisar} onRegistrado={marcarRegistrado} />
+      </div>
+      <CargaCsv insumos={panel.insumos} recargar={recargar} avisar={avisar} onRegistrado={marcarRegistrado} />
     </div>
   );
 }

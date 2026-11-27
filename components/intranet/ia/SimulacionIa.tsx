@@ -1,41 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, FlaskConical, Info, LineChart, Trash2 } from "lucide-react";
-import { auth } from "@/lib/firebase/client";
+import { ChevronDown, Eye, EyeOff, FlaskConical, Info, LineChart, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { auth, dataConnect } from "@/lib/firebase/client";
 import { registrarError } from "@/lib/registro-seguro";
 import { leerLote } from "@/lib/ia/lote-simulado";
 import { PARAMETROS_SIMULACION_INICIALES } from "@/lib/ia/simulacion";
-import type { GetPanelIaData } from "@/src/dataconnect-generated";
+import { guardarConfiguracionIa, type GetPanelIaData } from "@/src/dataconnect-generated";
 import GraficoLineas, { COLORES_SERIE } from "./GraficoLineas";
-import { BotonGuardar, claseBotonSecundario, claseCampo, claseEtiqueta, formatoNumero, leerNumero, Tarjeta, type Avisar } from "./ui";
+import { LAMBDA_INICIAL, MARGEN_INICIAL } from "./TasasIa";
+import { BotonGuardar, claseBotonPrincipal, claseBotonSecundario, claseCampo, claseEtiqueta, formatoNumero, leerNumero, Tarjeta, type Avisar } from "./ui";
 
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "short" });
 const pct = (v: number) => `${formatoNumero(v, 1)}%`;
 
-async function llamar(metodo: "POST" | "DELETE", cuerpo: unknown) {
+async function llamar(metodo: "POST" | "DELETE", cuerpo: unknown, ruta = "/api/ia/simulacion") {
   const usuario = auth.currentUser;
   if (!usuario) throw new Error("Sin sesión");
-  const r = await fetch("/api/ia/simulacion", {
+  const r = await fetch(ruta, {
     method: metodo, cache: "no-store",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${await usuario.getIdToken()}` },
-    body: JSON.stringify(cuerpo),
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   });
   return { ok: r.ok, datos: await r.json().catch(() => ({})) };
 }
 
 /**
- * Pestaña de simulación del Módulo IA. Permite generar semanas sintéticas a partir de tasas
- * ocultas para visualizar la curva de aprendizaje del modelo y limpiar lotes de prueba sin
- * modificar el stock real.
+ * Simulador de pruebas del Módulo IA. Permite generar lotes sintéticos con un clic,
+ * personalizar parámetros en un desplegable y aplicar simulados + recalcular directamente.
  */
-export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
+export default function SimulacionIa({
+  panel,
+  recargar,
+  avisar,
+  onRecalculado,
+}: {
+  panel: GetPanelIaData;
+  recargar: () => Promise<void>;
+  avisar: Avisar;
+  onRecalculado?: () => void;
+}) {
   const p = PARAMETROS_SIMULACION_INICIALES;
   const [form, setForm] = useState({
     semanas: String(p.semanas), kgMin: String(p.kgSemanalMin), kgMax: String(p.kgSemanalMax),
     ruido: String(p.ruido * 100), desvio: String(p.desvioTasas * 100), semilla: "",
   });
   const [generando, setGenerando] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
   const [elegido, setElegido] = useState<string | null>(null);
   const [revelar, setRevelar] = useState(false);
   const [confirmar, setConfirmar] = useState<string | null>(null);
@@ -48,6 +59,7 @@ export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPa
 
   const generar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (generando) return;
     const n = (v: string) => leerNumero(v);
     const semilla = form.semilla.trim() ? n(form.semilla) : undefined;
     const cuerpo = {
@@ -67,7 +79,32 @@ export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPa
     } finally { setGenerando(false); }
   };
 
+  const aplicarYRecalcular = async () => {
+    if (aplicando) return;
+    setAplicando(true);
+    try {
+      if (!incluido) {
+        const config = panel.configuracionIa;
+        await guardarConfiguracionIa(dataConnect, {
+          margenSeguridad: config?.margenSeguridad ?? MARGEN_INICIAL,
+          lambda: config?.lambda ?? LAMBDA_INICIAL,
+          incluirSimulado: true,
+        });
+      }
+      const { ok, datos } = await llamar("POST", undefined, "/api/ia/recalcular");
+      if (!ok) { avisar(datos.error ?? "No se pudo recalcular con datos simulados.", "error"); return; }
+      onRecalculado?.();
+      await recargar();
+      const error = datos.mape === null || datos.mape === undefined ? "aún sin error medible" : `error medio ${pct(datos.mape)}`;
+      avisar(`Ajuste ${datos.version} listo con simulados: ${datos.observaciones} períodos, ${error}.`, "success");
+    } catch (error) {
+      registrarError("No se pudo aplicar la simulación", error);
+      avisar("No se pudo recalcular con los datos simulados. Revisa tu conexión.", "error");
+    } finally { setAplicando(false); }
+  };
+
   const borrar = async (id: string | "todos") => {
+    if (borrando) return;
     // Confirmación en dos clics sobre el mismo botón para evitar borrados accidentales sin abrir otro modal.
     if (confirmar !== id) { setConfirmar(id); return; }
     setBorrando(true);
@@ -93,30 +130,48 @@ export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPa
 
   return (
     <div className="space-y-6">
-      <Tarjeta icono={FlaskConical} titulo="Generar datos simulados" descripcion="Crea semanas de producción, compras y conteos alrededor de unas tasas «verdaderas» ocultas, para mostrar cómo el modelo las descubre.">
+      <Tarjeta icono={FlaskConical} titulo="Simulador de pruebas" descripcion="Genera semanas ficticias alrededor de dosis ocultas para comprobar cómo aprende el modelo sin tocar el inventario real.">
         <form onSubmit={generar} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            {campo("semanas", "Semanas", "Entre 1 y 52. Un conteo al cierre de cada semana.")}
-            {campo("kgMin", "Kg semanales mínimos", "Entre 6.000 y 9.000.")}
-            {campo("kgMax", "Kg semanales máximos", "Entre 6.000 y 9.000.")}
-            {campo("ruido", "Ruido del consumo (%)", "Variación diaria del consumo real.")}
-            {campo("desvio", "Desvío de las tasas ocultas (%)", "Cuánto difieren de tus tasas iniciales.")}
-            {campo("semilla", "Semilla (opcional)", "Repite exactamente la misma simulación.")}
+          <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl p-3 text-xs ${incluido ? "bg-green-500/10 text-green-800 dark:text-green-300" : "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"}`}>
+            <span className="flex items-start gap-2">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {incluido
+                ? "El modelo está usando los datos simulados. Puedes recalcular directamente después de generar."
+                : "Los datos simulados no afectan la predicción real hasta que los actives. Nunca cambian el stock ni aparecen en Inventario."}
+            </span>
+            {lotes.length > 0 && (
+              <button type="button" onClick={() => void aplicarYRecalcular()} disabled={aplicando || generando} className={claseBotonPrincipal}>
+                {aplicando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {incluido ? "Recalcular con simulados" : "Activar simulados y recalcular"}
+              </button>
+            )}
           </div>
-          <div className={`flex items-start gap-2 rounded-xl p-3 text-xs ${incluido ? "bg-green-500/10 text-green-800 dark:text-green-300" : "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"}`}>
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {incluido
-              ? "El modelo está usando los datos simulados. Recalcula en Resumen después de generar."
-              : "Los datos simulados no afectan al modelo hasta que actives «Incluir datos simulados» en Tasas y recalcules. Nunca cambian el stock real ni aparecen en Inventario."}
+
+          <details className="group rounded-xl border border-stone-200/80 bg-stone-50/50 p-4 dark:border-white/10 dark:bg-white/5">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold text-stone-600 dark:text-stone-300">
+              <span>Personalizar parámetros ({form.semanas} semanas · {form.kgMin}–{form.kgMax} kg/sem · ruido {form.ruido}%)</span>
+              <ChevronDown className="h-4 w-4 text-stone-400 transition group-open:rotate-180" />
+            </summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {campo("semanas", "Semanas", "Entre 1 y 52. Un conteo al cierre de cada semana.")}
+              {campo("kgMin", "Kg semanales mínimos", "Entre 6.000 y 9.000.")}
+              {campo("kgMax", "Kg semanales máximos", "Entre 6.000 y 9.000.")}
+              {campo("ruido", "Ruido del consumo (%)", "Variación diaria del consumo real.")}
+              {campo("desvio", "Desvío de las tasas ocultas (%)", "Cuánto difieren de tus dosis iniciales.")}
+              {campo("semilla", "Semilla (opcional)", "Repite exactamente la misma simulación.")}
+            </div>
+          </details>
+
+          <div className="flex justify-end">
+            <BotonGuardar guardando={generando}>{generando ? "Generando…" : "Generar simulación"}</BotonGuardar>
           </div>
-          <div className="flex justify-end"><BotonGuardar guardando={generando}>{generando ? "Generando…" : "Generar simulación"}</BotonGuardar></div>
         </form>
       </Tarjeta>
 
       {lotes.length > 0 && actual && (
         <Tarjeta
           icono={LineChart} titulo="Curva de aprendizaje"
-          descripcion="Con cada cantidad de conteos vistos: el error al predecir las semanas que el modelo aún no vio y la distancia de sus tasas a las ocultas."
+          descripcion="Con cada cantidad de conteos vistos: cómo baja el error al predecir semanas nuevas y la distancia a las dosis ocultas."
           accion={
             <button type="button" onClick={() => borrar("todos")} disabled={borrando} className={`${claseBotonSecundario} ${confirmar === "todos" ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300" : "hover:text-red-600"}`}>
               <Trash2 className="h-4 w-4" />{confirmar === "todos" ? "Confirmar: borrar todo lo simulado" : "Borrar todos"}
@@ -161,7 +216,7 @@ export default function SimulacionIa({ panel, recargar, avisar }: { panel: GetPa
                         ))}
                       </tbody>
                     </table>
-                    <p className="mt-2 text-[11px] text-stone-400">Compáralas con las tasas actuales en Resumen después de recalcular con los datos simulados.</p>
+                    <p className="mt-2 text-[11px] text-stone-400">Compáralas con las tasas actuales en el detalle técnico de Predicción y stock después de recalcular.</p>
                   </div>
                 )}
               </div>

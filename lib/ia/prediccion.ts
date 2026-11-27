@@ -109,20 +109,83 @@ export function consumoDiarioReciente(observaciones: Observacion[], insumoId: st
 /**
  * Consumo diario esperado según los kg procesados en los últimos días. Sirve
  * mientras aún no hay dos conteos para medir el consumo real.
+ * Si el historial completo de producción cubre menos días que `ventanaDias`,
+ * promedia sobre los días reales transcurridos (mínimo 1) para no subestimar el consumo.
  */
 export function consumoDiarioEstimado(produccion: Produccion[], tasas: TasaServicio[], ahora: Date, ventanaDias = 30): number | null {
-  const desde = ahora.getTime() - ventanaDias * DIA;
+  const ahoraMs = ahora.getTime();
+  const desde = ahoraMs - ventanaDias * DIA;
   const tasa = new Map(tasas.map((t) => [t.servicioId, t.tasaActual]));
   const recientes = produccion.filter((p) => {
     const t = Date.parse(p.fecha);
-    return t > desde && t <= ahora.getTime() && tasa.has(p.servicioId);
+    return t > desde && t <= ahoraMs && tasa.has(p.servicioId);
   });
   if (!recientes.length) return null;
-  return recientes.reduce((s, p) => s + p.kg * tasa.get(p.servicioId)!, 0) / ventanaDias;
+  let primeraFecha = Infinity;
+  for (const p of produccion) {
+    const t = Date.parse(p.fecha);
+    if (Number.isFinite(t) && t <= ahoraMs && t < primeraFecha) primeraFecha = t;
+  }
+  const diasTranscurridos = Number.isFinite(primeraFecha) ? Math.max(1, Math.ceil((ahoraMs - primeraFecha) / DIA)) : ventanaDias;
+  const diasEfectivos = Math.min(ventanaDias, diasTranscurridos);
+  return recientes.reduce((s, p) => s + p.kg * tasa.get(p.servicioId)!, 0) / diasEfectivos;
 }
 
 /** Días que dura el stock al ritmo de consumo indicado; null si no hay consumo. */
 export function diasDeStock(stockActual: number, consumoDiario: number | null): number | null {
   if (consumoDiario === null || !(consumoDiario > 0)) return null;
   return Math.max(0, stockActual) / consumoDiario;
+}
+
+/**
+ * Cantidad sugerida de compra para alcanzar `diasObjetivo` días de cobertura
+ * (redondeada hacia arriba en enteros), o `null` si el stock ya cubre el objetivo
+ * o no existe consumo diario medible.
+ */
+export function compraSugerida(stockActual: number, consumoDiario: number | null, diasObjetivo = 14): number | null {
+  if (consumoDiario === null || !(consumoDiario > 0)) return null;
+  const faltante = consumoDiario * diasObjetivo - Math.max(0, stockActual);
+  return faltante > 0 ? Math.ceil(faltante) : null;
+}
+
+/** Nivel de confianza legible del modelo según cantidad de períodos observados y MAPE. */
+export interface ConfianzaModelo {
+  nivel: "alta" | "media" | "aprendiendo";
+  etiqueta: string;
+  detalle: string;
+}
+
+/**
+ * Traduce las métricas técnicas del modelo (observaciones y MAPE) a una calificación
+ * comprensible para usuarios no técnicos.
+ */
+export function confianzaModelo(observaciones: number, mape: number | null): ConfianzaModelo {
+  if (observaciones < 3 || mape === null) {
+    return {
+      nivel: "aprendiendo",
+      etiqueta: "En aprendizaje",
+      detalle: observaciones === 0
+        ? "Registra al menos 2 conteos físicos para medir el consumo real"
+        : `Con ${observaciones} ${observaciones === 1 ? "período" : "períodos"} medidos; mejora con 3 o más`,
+    };
+  }
+  if (mape <= 15 && observaciones >= 4) {
+    return {
+      nivel: "alta",
+      etiqueta: "Alta",
+      detalle: `Respaldado por ${observaciones} períodos medidos`,
+    };
+  }
+  return {
+    nivel: "media",
+    etiqueta: "Media",
+    detalle: `Basado en ${observaciones} períodos; afinará con más conteos`,
+  };
+}
+
+/** Formatea una tasa de consumo con decimales adecuados a la unidad (`ml`/`g` vs `L`/`kg`). */
+export function formatoTasaLegible(valor: number, unidad: string): string {
+  const esSubunidad = unidad === "ml" || unidad === "g";
+  const decimales = esSubunidad ? (Math.abs(valor) < 1 ? 2 : 1) : 4;
+  return valor.toLocaleString("es-CL", { maximumFractionDigits: decimales });
 }

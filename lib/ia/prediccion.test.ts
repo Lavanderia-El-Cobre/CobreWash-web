@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DESVIACION_PREVIA } from "./ajuste";
 import type { Observacion, TasaServicio } from "./modelo";
-import { consumoDiarioEstimado, consumoDiarioReciente, diasDeStock, estimarComanda, kgPorServicio } from "./prediccion";
+import { compraSugerida, confianzaModelo, consumoDiarioEstimado, consumoDiarioReciente, diasDeStock, estimarComanda, formatoTasaLegible, kgPorServicio } from "./prediccion";
 
 const tasas: Record<string, TasaServicio[]> = {
   det: [{ servicioId: "lav", tasaInicial: 0.012, tasaActual: 0.01 }, { servicioId: "des", tasaInicial: 0.02, tasaActual: 0.02 }],
@@ -84,5 +84,28 @@ describe("días de stock restante", () => {
     expect(diasDeStock(-5, 4)).toBe(0);
     expect(diasDeStock(100, 0)).toBeNull();
     expect(diasDeStock(100, null)).toBeNull();
+  });
+
+  it("usa los días reales transcurridos cuando el negocio lleva menos de 30 días operando", () => {
+    const ahora = new Date(dia(6));
+    const produccionReciente = [
+      { servicioId: "lav", fecha: dia(1), kg: 500, origen: "REAL" as const },
+      { servicioId: "lav", fecha: dia(5), kg: 500, origen: "REAL" as const },
+    ];
+    // 5 días entre dia(1) y dia(6): 1000 kg * 0.01 / 5 días = 2 L/día (no dividido en 30).
+    expect(consumoDiarioEstimado(produccionReciente, tasas.det, ahora, 30)).toBeCloseTo(2);
+  });
+
+  it("calcula compra sugerida a 14 días, confianza legible y formato de tasas", () => {
+    expect(compraSugerida(10, 2, 14)).toBe(18);
+    expect(compraSugerida(30, 2, 14)).toBeNull();
+    expect(compraSugerida(10, null, 14)).toBeNull();
+
+    expect(confianzaModelo(0, null).nivel).toBe("aprendiendo");
+    expect(confianzaModelo(3, 18).nivel).toBe("media");
+    expect(confianzaModelo(5, 8.2).nivel).toBe("alta");
+
+    expect(formatoTasaLegible(12.3847, "ml")).toBe("12,4");
+    expect(formatoTasaLegible(0.0125, "L")).toBe("0,0125");
   });
 });
