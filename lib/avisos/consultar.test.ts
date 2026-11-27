@@ -15,9 +15,14 @@ describe("consulta de avisos por rol", () => {
     expect(mocks.admin).toHaveBeenCalledWith(mocks.dc, { limit: 20, offset: 20 }, { fetchPolicy: "SERVER_ONLY" });
     expect(mocks.equipo).not.toHaveBeenCalled();
   });
-  it.each(["operario", "recepcionista", "repartidor", "conductor"])("solicita la lista filtrada para %s", async (rol) => {
+  it.each([
+    ["operario", "operario"],
+    ["recepcionista", "recepcionista"],
+    ["repartidor", "repartidor"],
+    ["conductor", "repartidor"],
+  ])("solicita la lista filtrada para %s usando el rol de avisos %s", async (rol, rolEsperado) => {
     expect(await consultarAvisos(rol, 1)).toEqual({ avisos: [], total: 3 });
-    expect(mocks.equipo).toHaveBeenCalledWith(mocks.dc, { limit: 20, offset: 0, rol }, { fetchPolicy: "SERVER_ONLY" });
+    expect(mocks.equipo).toHaveBeenCalledWith(mocks.dc, { limit: 20, offset: 0, rol: rolEsperado }, { fetchPolicy: "SERVER_ONLY" });
     expect(mocks.admin).not.toHaveBeenCalled();
   });
   it("rechaza roles externos antes de consultar", async () => {

@@ -16,6 +16,12 @@ import {
   etiquetaDestinatario, fechaAviso, validarAviso,
 } from "@/lib/avisos/modelo";
 
+/**
+ * Tablón de comunicación interna (`/intranet/comunicacion`).
+ * Accesible para todo el equipo interno (`admin`, `operario`, `recepcionista`, `repartidor`
+ * y `conductor`). Solo `admin` puede publicar avisos generales o segmentados por rol; el resto
+ * accede en modo solo lectura a los avisos que le corresponden.
+ */
 export default function ComunicacionPage() {
   const permitido = useRoleGuard(["admin", "operario", "recepcionista", "repartidor", "conductor"]);
   const usuario = useUsuarioActualContext();
@@ -28,6 +34,7 @@ export default function ComunicacionPage() {
   const [guardando, setGuardando] = useState(false);
   const [errorPublicacion, setErrorPublicacion] = useState("");
   const [mensaje, setMensaje] = useState("");
+  // Bloqueo síncrono para evitar doble envío y cierre del modal mientras la mutación está en vuelo.
   const envioEnCurso = useRef(false);
 
   const cerrarModal = () => {
@@ -88,7 +95,6 @@ export default function ComunicacionPage() {
         )}
       />
 
-      {/* Avisos */}
       {mensaje && <p role="status" className="text-sm text-green-700 dark:text-green-400">{mensaje}</p>}
       {error && (
         <div role="alert" className="rounded-xl border border-red-200 dark:border-red-500/20 p-4 text-sm text-red-700 dark:text-red-400">
@@ -138,7 +144,6 @@ export default function ComunicacionPage() {
         </nav>
       )}
 
-      {/* Publicar modal (solo admin) */}
       <AnimatePresence>
         {nuevo && esAdmin && (
           <ModalIntranet

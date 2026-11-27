@@ -6,6 +6,10 @@ import { sendEmailVerification, sendPasswordResetEmail, type ActionCodeSettings,
  */
 export const INICIO_VERIFICACION_OBLIGATORIA = Date.parse("2026-11-24T00:00:00-03:00");
 
+/**
+ * Error lanzado al intentar completar un registro público sin haber verificado el correo.
+ * Expone el código `auth/email-not-verified` para mapearlo de forma uniforme en la UI.
+ */
 export class CorreoNoVerificadoError extends Error {
   readonly code = "auth/email-not-verified";
   constructor() {
@@ -16,6 +20,10 @@ export class CorreoNoVerificadoError extends Error {
 
 type UsuarioAuth = Pick<User, "emailVerified" | "metadata">;
 
+/**
+ * Indica si el usuario debe verificar su correo antes de acceder al portal.
+ * Aplica a cuentas creadas desde `INICIO_VERIFICACION_OBLIGATORIA` o sin fecha de creación confiable.
+ */
 export function requiereVerificacion(user: UsuarioAuth | null | undefined): boolean {
   if (!user || user.emailVerified) return false;
   const creada = Date.parse(user.metadata?.creationTime ?? "");
@@ -51,6 +59,7 @@ async function conRetorno(enviar: (ajustes?: ActionCodeSettings) => Promise<void
 
 const codigo = (error: unknown) => (error as { code?: string } | null)?.code;
 
+/** Envía el correo de verificación de dirección al usuario recién registrado. */
 export function enviarVerificacion(user: User) {
   return conRetorno((ajustes) => sendEmailVerification(user, ajustes ?? null));
 }
@@ -60,9 +69,13 @@ export function enviarInvitacion(auth: Auth, email: string) {
   return conRetorno((ajustes) => sendPasswordResetEmail(auth, email, ajustes));
 }
 
-/** Contraseña aleatoria que nadie conoce: la cuenta se activa con el enlace del correo. */
+/**
+ * Genera una contraseña temporal criptográficamente aleatoria que nadie conoce:
+ * la cuenta se activa únicamente mediante el enlace enviado por correo.
+ */
 export function contrasenaTemporal(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
+  // Alfabeto sin caracteres ambiguos (I, O, l, 0, 1); el sufijo fijo garantiza mayúscula, minúscula, dígito y símbolo.
   const base = Array.from(bytes, (b) => "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"[b % 57]).join("");
   return `${base}aA9!`;
 }

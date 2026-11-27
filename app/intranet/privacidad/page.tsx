@@ -13,11 +13,19 @@ type Bandeja = { solicitudDerechos: Solicitud[]; total: { _count: number }[] };
 const campoInterno = "mt-2 block w-full rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-sm font-medium normal-case tracking-normal text-stone-900 outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-white/10 dark:bg-white/5 dark:text-stone-100";
 const etiquetaInterna = "block text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400";
 const estados: Record<string, string> = { RECIBIDA: "Recibida", VERIFICACION: "Verificando identidad", EN_GESTION: "En gestión", RESPONDIDA: "Respondida" };
+/**
+ * Bandeja de gestión de solicitudes de datos personales (`/intranet/privacidad`).
+ * Reservada exclusivamente al rol `admin`. Consulta y registra actuaciones vía
+ * `/api/privacidad/gestion` usando el ID token de Firebase y control de concurrencia
+ * optimista (`revision`). Solo documenta la tramitación; no ejecuta bloqueos,
+ * exportaciones ni borrados de datos de forma automática.
+ */
 export default function GestionPrivacidadPage() {
   const permitido = useRoleGuard(["admin"]); const [pagina, setPagina] = useState(0);
   const usuarioId = useUsuarioActualContext()?.id;
   const [respondidas, setRespondidas] = useState(false);
   const [datos, setDatos] = useState<Bandeja | null>(null); const [error, setError] = useState("");
+  // `generacion` descarta respuestas en vuelo al cambiar filtros, página o sesión activa.
   const [ocupado, setOcupado] = useState(false); const generacion = useRef(0);
   const cargar = useCallback(async () => {
     if (!permitido || !usuarioId) return; const g = ++generacion.current; const user = auth.currentUser;
@@ -26,7 +34,13 @@ export default function GestionPrivacidadPage() {
       if (!user) throw new Error("Inicia sesión.");
       const r = await fetch(`/api/privacidad/gestion?pagina=${pagina}&respondidas=${respondidas ? 1 : 0}`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
       const d = await r.json(); if (!r.ok) throw new Error(d.error);
-      if (g === generacion.current && auth.currentUser?.uid === user.uid) setDatos(d);
+      if (g === generacion.current && auth.currentUser?.uid === user.uid) {
+        if (d.solicitudDerechos.length === 0 && pagina > 0) {
+          setPagina((p) => Math.max(0, p - 1));
+          return;
+        }
+        setDatos(d);
+      }
     } catch (e) { if (g === generacion.current) setError((e as Error).message); }
     finally { if (g === generacion.current) setOcupado(false); }
   }, [pagina, permitido, usuarioId, respondidas]);

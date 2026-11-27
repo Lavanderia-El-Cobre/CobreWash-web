@@ -48,16 +48,19 @@ const elegir = (etiqueta: string, opcion: string, contenedor: HTMLElement = docu
 
 it("muestra la matriz de tasas y deja fuera los insumos sin volumen ni masa", () => {
   render(createElement(TasasIa, { panel, recargar, avisar }));
-  expect(screen.getByRole("button", { name: "Editar tasa de Detergente para Lavado" }).textContent).toContain("actual 10,5");
+  const celda = screen.getByRole("button", { name: "Editar tasa de Detergente para Lavado" }).textContent!;
+  expect(celda).toContain("10,5");
+  expect(celda).toContain("inicial 12");
   expect(screen.getByRole("button", { name: "Definir tasa de Cloro para Desmanchado" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Bolsas/ })).toBeNull();
   expect(screen.getByText(/No entran al modelo por su unidad: Bolsas \(unidad\)/)).toBeTruthy();
 });
 
-it("una tasa nueva parte con la tasa actual igual a la inicial", async () => {
+it("una tasa nueva parte con la tasa actual igual a la inicial y muestra referencia de 10 kg", async () => {
   render(createElement(TasasIa, { panel, recargar, avisar }));
   fireEvent.click(screen.getByRole("button", { name: "Definir tasa de Cloro para Desmanchado" }));
   fireEvent.change(screen.getByPlaceholderText("Ej: 12"), { target: { value: "4,5" } });
+  expect(screen.getByText(/una comanda de 10 kg usaría aprox\. 45 ml/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Guardar tasa" }));
   await waitFor(() => expect(api.tasa).toHaveBeenCalledWith({}, { tipoServicioId: DES, insumoId: CLORO, tasaInicial: 4.5, tasaActual: 4.5, unidad: "ml", fuente: null }));
   expect(recargar).toHaveBeenCalled();
@@ -91,18 +94,24 @@ it("pide confirmación antes de eliminar una tasa", async () => {
   await waitFor(() => expect(api.borrar).toHaveBeenCalledWith({}, { tipoServicioId: LAV, insumoId: DET }));
 });
 
-it("valida y guarda los parámetros del modelo con el margen como fracción", async () => {
-  render(createElement(TasasIa, { panel, recargar, avisar }));
+it("valida y guarda los parámetros del modelo con el margen como fracción y sincroniza cambios externos", async () => {
+  const { rerender } = render(createElement(TasasIa, { panel, recargar, avisar }));
   const margen = screen.getByRole("textbox", { name: /Margen de seguridad/ });
   expect((margen as HTMLInputElement).value).toBe("15");
   fireEvent.change(margen, { target: { value: "150" } });
   fireEvent.click(screen.getByRole("button", { name: "Guardar parámetros" }));
   expect(avisar).toHaveBeenCalledWith("El margen debe estar entre 0% y 100%.", "error");
   fireEvent.change(margen, { target: { value: "20" } });
+  fireEvent.click(screen.getByRole("button", { name: "Conservador" }));
+  expect((screen.getByRole("textbox", { name: /Regularización/ }) as HTMLInputElement).value).toBe("3");
   fireEvent.change(screen.getByRole("textbox", { name: /Regularización/ }), { target: { value: "2,5" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Incluir datos simulados" }));
   fireEvent.click(screen.getByRole("button", { name: "Guardar parámetros" }));
   await waitFor(() => expect(api.config).toHaveBeenCalledWith({}, { margenSeguridad: 0.2, lambda: 2.5, incluirSimulado: true }));
+
+  const panelActualizado = { ...(panel as object), configuracionIa: { margenSeguridad: 0.25, lambda: 0.5, incluirSimulado: false, actualizadoEn: "2026-10-10T00:00:00Z" } } as never;
+  rerender(createElement(TasasIa, { panel: panelActualizado, recargar, avisar }));
+  expect((screen.getByRole("textbox", { name: /Margen de seguridad/ }) as HTMLInputElement).value).toBe("25");
 });
 
 it("registra un conteo físico con la revisión de stock que leyó", async () => {

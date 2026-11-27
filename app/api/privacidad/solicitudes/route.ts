@@ -1,8 +1,31 @@
 import { serviciosAdmin } from "@/lib/firebase/admin";
 import { objetivoAtencion, validarSolicitudDerecho, VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
 import { ErrorPrivacidad, errorPrivacidad, hash, leerJsonLimitado, limitarDerechos, responder } from "@/lib/privacidad/servidor";
+// Requiere runtime Node.js para criptografía y Firebase Admin SDK.
 export const runtime = "nodejs";
 type Comprobante = { solicitudDerecho: { id: string; secretoHash: string; contenidoHash: string; estado: string; creadoEn: string; objetivoAtencion: string } | null };
+
+/**
+ * Recibe y registra solicitudes públicas de ejercicio de derechos ARCO+
+ * (disponible para titulares con o sin cuenta en el portal).
+ *
+ * - **Contrato HTTP**: `POST /api/privacidad/solicitudes` con JSON limitado por
+ *   `leerJsonLimitado` y validado por `validarSolicitudDerecho` (incluye `id` y
+ *   `secreto` generados por el cliente para formar el comprobante privado).
+ * - **Autenticación**: endpoint público; el secreto nunca se almacena en claro,
+ *   solo su hash (`secretoHash`).
+ * - **Idempotencia**: ante reintentos con el mismo `id`, si `secretoHash` y
+ *   `contenidoHash` coinciden devuelve el mismo recibo (`200`), incluso tras
+ *   condiciones de carrera en escritura; si difieren responde `409`.
+ * - **Rate limiting**: aplicado por origen mediante `limitarDerechos` (`429` al
+ *   dispararse `LIMITE_DERECHOS`).
+ * - **Respuestas**:
+ *   - `200`: recibo `{ id, estado, recibidoEn, objetivoAtencion, mensaje }`.
+ *   - `400`: cuerpo inválido o fuera del límite de tamaño.
+ *   - `409`: el `id` del comprobante ya existe con otro secreto o contenido.
+ *   - `429`: se alcanzó el límite temporal de solicitudes por origen.
+ *   - `503`: no se pudo confirmar la persistencia o fallo de disponibilidad.
+ */
 export async function POST(request: Request) {
   try {
     const raw = await leerJsonLimitado(request); let entrada;

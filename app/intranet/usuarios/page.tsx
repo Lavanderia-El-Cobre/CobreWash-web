@@ -85,6 +85,12 @@ const emptyForm: FormState = {
 
 type Modal = { mode: "crear" } | { mode: "editar"; usuario: Usuario } | null;
 
+/**
+ * Administración de usuarios y roles (`/intranet/usuarios`).
+ * Reservado exclusivamente al rol `admin`. Permite crear cuentas enviando invitación de
+ * contraseña por correo (previa confirmación de términos y privacidad), editar datos o rol
+ * y activar/desactivar accesos impidiendo la auto-modificación de la propia sesión.
+ */
 export default function UsuariosPage() {
   const permitido = useRoleGuard(["admin"]);
   const yo = useUsuarioActualContext();
@@ -99,6 +105,7 @@ export default function UsuariosPage() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [pageError, setPageError] = useState("");
 
   const rutDigits = cleanRut(form.rut);
   const rutTouched = rutDigits.length > 0;
@@ -221,15 +228,24 @@ export default function UsuariosPage() {
   };
 
   const toggleActivo = async (usuario: Usuario) => {
-    await toggleManagedUserActive(dataConnect, {
-      id: usuario.id,
-      rolId: usuario.rol.id,
-      nombre: usuario.nombre,
-      apellido: usuario.apellido ?? null,
-      telefono: usuario.telefono ?? null,
-      activo: !usuario.activo,
-    });
-    await cargarUsuarios();
+    if (saving) return;
+    setSaving(true);
+    setPageError("");
+    try {
+      await toggleManagedUserActive(dataConnect, {
+        id: usuario.id,
+        rolId: usuario.rol.id,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido ?? null,
+        telefono: usuario.telefono ?? null,
+        activo: usuario.activo,
+      });
+      await cargarUsuarios();
+    } catch (err) {
+      setPageError(mapAuthError(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!permitido) {
@@ -258,6 +274,11 @@ export default function UsuariosPage() {
             {aviso} <button type="button" onClick={() => setAviso("")} className="ml-2 underline">Cerrar</button>
           </p>
         )}
+        {pageError && (
+          <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+            {pageError} <button type="button" onClick={() => setPageError("")} className="ml-2 underline">Cerrar</button>
+          </p>
+        )}
       </EncabezadoSeccion>
 
       {loading ? (
@@ -266,7 +287,6 @@ export default function UsuariosPage() {
         </div>
       ) : (
         <>
-          {/* Stats */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -291,7 +311,6 @@ export default function UsuariosPage() {
             })}
           </motion.div>
 
-          {/* Filters */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -336,7 +355,6 @@ export default function UsuariosPage() {
             </div>
           </motion.div>
 
-          {/* Users Grid */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -346,6 +364,7 @@ export default function UsuariosPage() {
             <AnimatePresence mode="popLayout">
               {filtered.map((usuario, i) => {
                 const rc = roleColors[usuario.rol.nombre] ?? defaultRoleColor;
+                // Impide editar o desactivar la propia cuenta del administrador en sesión.
                 const esUnoMismo = usuario.id === yo?.id;
                 return (
                   <motion.div
@@ -433,7 +452,6 @@ export default function UsuariosPage() {
         </>
       )}
 
-      {/* Crear / Editar Modal */}
       <AnimatePresence>
         {modal && (
           <ModalIntranet

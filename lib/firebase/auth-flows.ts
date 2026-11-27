@@ -38,8 +38,13 @@ interface FirebaseContext {
   dataConnect: DataConnect;
 }
 
+/** Perfil activo del usuario autenticado tal como lo devuelve Data Connect (`getMiPerfil`). */
 export type ActiveUserProfile = NonNullable<GetMiPerfilData["usuario"]>;
 
+/**
+ * Error lanzado cuando un usuario autenticado figura como inactivo en Data Connect.
+ * Expone el código `auth/user-disabled` para reutilizar el mapeo de errores de Firebase Auth.
+ */
 export class InactiveAccountError extends Error {
   readonly code = "auth/user-disabled";
 
@@ -49,6 +54,7 @@ export class InactiveAccountError extends Error {
   }
 }
 
+/** Datos para actualizar rol, datos básicos o estado activo de un usuario desde administración. */
 export interface ManagedUserUpdateInput {
   id: string;
   rolId: string;
@@ -79,6 +85,15 @@ export function requiereAceptacion(profile: Pick<ActiveUserProfile, "rol" | "ver
   return profile.versionPrivacidad !== VERSION_PRIVACIDAD || profile.versionTerminos !== VERSION_TERMINOS;
 }
 
+/**
+ * Carga el perfil del usuario actual directamente desde el servidor (`SERVER_ONLY`).
+ *
+ * Invariantes de seguridad:
+ * - Si el usuario es cliente con correo verificado y aún no tiene ficha vinculada, intenta
+ *   asociar automáticamente su ficha creada en recepción (`vincularMiFichaVerificada`).
+ * - Si la cuenta está desactivada (`activo === false`), cierra la sesión local y lanza
+ *   `InactiveAccountError` para bloquear el acceso.
+ */
 export async function loadActiveUserProfile(
   context: FirebaseContext,
 ): Promise<ActiveUserProfile | null> {
@@ -95,6 +110,7 @@ export async function loadActiveUserProfile(
   }
 
   if (profile && !profile.activo) {
+    // Evita cerrar por error otra sesión si el usuario actual ya cambió durante la consulta.
     if (!context.auth.currentUser || context.auth.currentUser.uid === profile.id) await signOut(context.auth).catch(() => undefined);
     throw new InactiveAccountError();
   }
@@ -113,6 +129,7 @@ export async function resolverIngreso(context: FirebaseContext): Promise<Resulta
   if (requiereVerificacion(user)) {
     await user.reload().catch(() => undefined);
     if (requiereVerificacion(user)) return { tipo: "verificar", email };
+    // Fuerza la renovación del ID token para propagar el claim `email_verified` a Data Connect.
     await user.getIdToken(true).catch(() => undefined);
   }
   const profile = await loadActiveUserProfile(context);
@@ -121,6 +138,10 @@ export async function resolverIngreso(context: FirebaseContext): Promise<Resulta
   return { tipo: "landing", ruta: LANDING_POR_ROL[role] ?? "/cuenta" };
 }
 
+/**
+ * Configura la persistencia de sesión, autentica con correo/contraseña y resuelve
+ * el destino correspondiente (`landing`, `verificar` o `completar`).
+ */
 export async function signInAndResolveLanding(
   context: FirebaseContext,
   email: string,
@@ -193,6 +214,7 @@ export async function completarRegistroCliente(
   };
   try { await registrarseComoCliente(context.dataConnect, variables); }
   catch (e) {
+    // Si recepción ya había registrado una ficha con el mismo RUT, se crea solo el usuario y se vincula abajo.
     if (!String(e).includes("FICHA_RUT_EXISTENTE")) throw e;
     await registrarseComoCliente(context.dataConnect, { ...variables, crearFicha: false });
   }
@@ -209,6 +231,7 @@ export async function aceptarCondiciones(dataConnect: DataConnect, input: Acepta
   await aceptarCondicionesVigentes(dataConnect, { versionPrivacidad: VERSION_PRIVACIDAD, versionTerminos: VERSION_TERMINOS });
 }
 
+/** Envía un correo de restablecimiento de contraseña mediante Firebase Auth. */
 export async function requestPasswordReset(auth: Auth, email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email.trim());
 }
@@ -239,6 +262,7 @@ export async function createManagedUser(
       const datos = { ...variables, id: credential.user.uid, direccion: input.direccion.trim() || null, tipoCliente: input.tipoCliente as TipoCliente };
       try { await crearClienteAdministrado(dataConnect, datos); }
       catch (error) {
+        // Si ya existe una ficha con ese RUT, crea solo el usuario sin duplicar la ficha.
         if (!String(error).includes("FICHA_RUT_EXISTENTE")) throw error;
         await crearClienteAdministrado(dataConnect, { ...datos, crearFicha: false });
       }
@@ -256,6 +280,7 @@ export async function createManagedUser(
     });
     return { invitacionEnviada };
   } catch (error) {
+    // Rollback: elimina la identidad creada en Firebase Auth si falla el alta en Data Connect.
     if (credential) {
       await credential.user.delete().catch(() => undefined);
     }
@@ -265,6 +290,7 @@ export async function createManagedUser(
   }
 }
 
+/** Actualiza los datos editables y el rol de un usuario administrado en Data Connect. */
 export async function updateManagedUser(
   dataConnect: DataConnect,
   input: ManagedUserUpdateInput,
@@ -277,6 +303,7 @@ export async function updateManagedUser(
   });
 }
 
+/** Alterna el estado `activo` de un usuario administrado (habilitar o suspender acceso). */
 export async function toggleManagedUserActive(
   dataConnect: DataConnect,
   input: ManagedUserUpdateInput,

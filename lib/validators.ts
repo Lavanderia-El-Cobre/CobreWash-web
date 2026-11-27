@@ -1,7 +1,9 @@
+/** Elimina puntos, guiones y espacios de un RUT y normaliza la letra `K` en mayúscula. */
 export function cleanRut(value: string): string {
   return value.replace(/[^0-9kK]/g, "").toUpperCase();
 }
 
+// Algoritmo chileno de módulo 11 con multiplicadores cíclicos 2..7 de derecha a izquierda.
 function computeCheckDigit(body: string): string {
   let sum = 0;
   let multiplier = 2;
@@ -15,6 +17,7 @@ function computeCheckDigit(body: string): string {
   return String(remainder);
 }
 
+/** Formatea un RUT chileno con separadores de miles y guion (`12.345.678-K`), acotado a 9 caracteres. */
 export function formatRut(value: string): string {
   const clean = cleanRut(value).slice(0, 9);
   if (!clean) return "";
@@ -32,6 +35,7 @@ export function formatRut(value: string): string {
   return `${groupedReversed.reverse().join("")}-${dv}`;
 }
 
+/** Valida que el RUT tenga cuerpo numérico y dígito verificador correcto según módulo 11. */
 export function isValidRut(value: string): boolean {
   const clean = cleanRut(value);
   if (clean.length < 2) return false;
@@ -43,6 +47,7 @@ export function isValidRut(value: string): boolean {
   return computeCheckDigit(body) === dv;
 }
 
+// Códigos de área fijos vigentes en Chile (sin el prefijo 0 ni código de país +56).
 const CHILEAN_FIXED_AREA_CODES = new Set([
   "2", "32", "33", "34", "35", "41", "42", "43", "44", "45",
   "51", "52", "53", "55", "57", "58", "61", "63", "64", "65",
@@ -62,8 +67,10 @@ export function cleanChileanPhone(value: string): string {
   return digits.slice(0, 9);
 }
 
+/** Clasificación de un número telefónico chileno válido, o `null` si no cumple el formato nacional. */
 export type ChileanPhoneType = "Celular" | "Teléfono fijo" | null;
 
+/** Clasifica un teléfono chileno de 9 dígitos como celular (`9…`) o fijo (Santiago `2…` o regiones). */
 export function getChileanPhoneType(value: string): ChileanPhoneType {
   const digits = cleanChileanPhone(value);
   if (digits.length !== 9) return null;
@@ -72,6 +79,7 @@ export function getChileanPhoneType(value: string): ChileanPhoneType {
   return CHILEAN_FIXED_AREA_CODES.has(digits.slice(0, 2)) ? "Teléfono fijo" : null;
 }
 
+/** Indica si el valor corresponde a un celular o teléfono fijo chileno válido. */
 export function isValidChileanPhone(value: string): boolean {
   return getChileanPhoneType(value) !== null;
 }
@@ -101,11 +109,13 @@ export function formatChileanPhone(value: string): string {
   return [`+56 ${area}`, middle, last].filter(Boolean).join(" ");
 }
 
+/** Resultado de validar la política mínima de complejidad de una contraseña. */
 export interface PasswordCheck {
   valid: boolean;
   message: string;
 }
 
+/** Valida que la contraseña tenga al menos 8 caracteres, una letra y un dígito. */
 export function validatePassword(password: string): PasswordCheck {
   if (password.length < 8) return { valid: false, message: "Mínimo 8 caracteres" };
   if (!/[a-zA-Z]/.test(password)) return { valid: false, message: "Debe incluir al menos una letra" };

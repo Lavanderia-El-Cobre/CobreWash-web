@@ -1,4 +1,5 @@
 "use client";
+// Requiere hooks de React, suscripción de Firebase Auth en cliente y eventos de `window`.
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -10,8 +11,18 @@ import {
 import { requiereVerificacion } from "@/lib/firebase/verificacion";
 import { cerrarSesionRecordadaVencida, sesionRecordadaVencida } from "@/lib/firebase/sesion-recordada";
 
+/** Alias público del perfil activo del usuario autenticado en el cliente. */
 export type UsuarioActual = ActiveUserProfile;
 
+/**
+ * Suscribe el componente a la sesión de Firebase Auth y carga el perfil activo desde Data Connect.
+ *
+ * Invariantes de seguridad y concurrencia:
+ * - Cierra automáticamente sesiones recordadas cuyo plazo máximo expiró.
+ * - Impide el acceso mientras la cuenta nueva no tenga su correo verificado.
+ * - Usa un contador `version` y bandera `montado` para descartar respuestas fuera de orden
+ *   cuando cambia de usuario o se emite el evento `cobre:perfil-actualizado`.
+ */
 export function useUsuarioActual() {
   const [usuario, setUsuario] = useState<UsuarioActual | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +54,7 @@ export function useUsuarioActual() {
     };
     const unsubscribe = onAuthStateChanged(auth, actualizar);
     const refrescar = () => actualizar(auth.currentUser);
+    // Permite forzar la recarga del perfil tras aceptar condiciones o editar datos propios.
     window.addEventListener("cobre:perfil-actualizado", refrescar);
 
     return () => { montado = false; version++; unsubscribe(); window.removeEventListener("cobre:perfil-actualizado", refrescar); };

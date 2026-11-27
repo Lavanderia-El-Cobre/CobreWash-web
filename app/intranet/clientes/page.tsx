@@ -64,6 +64,12 @@ const FORM_VACIO: ClienteForm = {
   direccion: "",
 };
 
+/**
+ * Gestión comercial de fichas de clientes (`/intranet/clientes`).
+ * Accesible para `admin` y `recepcionista`. Permite listar, buscar, editar y registrar
+ * clientes (con o sin creación de cuenta de acceso a la plataforma) junto con sus métricas
+ * acumuladas de comandas, prendas y facturación.
+ */
 export default function ClientesPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const [clientes, setClientes] = useState<ClienteFirebase[]>([]);
@@ -71,10 +77,12 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ClienteForm | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [informado, setInformado] = useState(false);
   // Ficha nueva con cuenta en la plataforma: exige correo y la confirmación.
   const [conCuenta, setConCuenta] = useState(false);
+  // Contador monotónico para descartar respuestas fuera de orden entre polling y acciones manuales.
   const solicitudActual = useRef(0);
 
   const cargarClientes = useCallback(async (silencioso = false) => {
@@ -119,6 +127,7 @@ export default function ClientesPage() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  // Prendas y facturado excluyen comandas anuladas; el total de comandas conserva el histórico completo.
   const fichas = useMemo(() => clientes.map((cliente) => {
     const activas = cliente.comandas_on_cliente.filter((c) => c.estado !== ComandaEstado.ANULADA);
     return {
@@ -145,29 +154,31 @@ export default function ClientesPage() {
   }, [fichas, search]);
 
   const guardar = async () => {
+    if (saving) return;
+    setFormError(null);
     if (!form || !form.nombre.trim()) {
-      setNotice("El nombre del cliente es obligatorio.");
+      setFormError("El nombre del cliente es obligatorio.");
       return;
     }
     if (!isValidRut(form.rut)) {
-      setNotice("Ingresa un RUT chileno válido.");
+      setFormError("Ingresa un RUT chileno válido.");
       return;
     }
     const errorTelefono = validarTelefono(form.telefono);
     if (errorTelefono) {
-      setNotice(errorTelefono);
+      setFormError(errorTelefono);
       return;
     }
     if (!form.id && conCuenta && !form.email.trim()) {
-      setNotice("Ingresa el correo del cliente: se usa para crear su cuenta.");
+      setFormError("Ingresa el correo del cliente: se usa para crear su cuenta.");
       return;
     }
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      setNotice("Ingresa un correo válido.");
+      setFormError("Ingresa un correo válido.");
       return;
     }
     if (!form.id && conCuenta && !informado) {
-      setNotice("Confirma que informaste al cliente sobre su cuenta.");
+      setFormError("Confirma que informaste al cliente sobre su cuenta.");
       return;
     }
 
@@ -198,6 +209,7 @@ export default function ClientesPage() {
         }
         await cargarClientes(true);
         setForm(null);
+        setFormError(null);
         setInformado(false);
         setConCuenta(false);
         return;
@@ -205,10 +217,11 @@ export default function ClientesPage() {
       await cargarClientes(true);
       setNotice("Ficha actualizada correctamente.");
       setForm(null);
+      setFormError(null);
     } catch (error) {
       registrarError("No se pudo guardar la ficha:", error);
       const code = (error as { code?: string } | null)?.code;
-      setNotice(String(error).includes("ALREADY_EXISTS")
+      setFormError(String(error).includes("ALREADY_EXISTS")
         ? "Ya existe un cliente o una cuenta registrada con ese RUT o correo."
         : code?.startsWith("auth/") ? mapAuthError(error)
         : "No se pudo guardar la ficha del cliente.");
@@ -223,14 +236,14 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen space-y-6 p-4 text-stone-900 dark:text-stone-100 sm:p-6">
-      {notice && <div className="fixed right-5 top-20 z-[70] rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white shadow-xl dark:bg-white dark:text-stone-900">{notice}</div>}
+      {notice && <div className="fixed right-5 top-20 z-[120] rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white shadow-xl dark:bg-white dark:text-stone-900">{notice}</div>}
 
       <EncabezadoSeccion
         antetitulo="Comercial · Fichas de clientes"
         titulo="Clientes"
         descripcion={`${clientes.length} fichas registradas en Firebase`}
         acciones={
-          <button onClick={() => { setForm({ ...FORM_VACIO }); setConCuenta(false); setInformado(false); }} className={BOTON_ENCABEZADO}>
+          <button onClick={() => { setForm({ ...FORM_VACIO }); setFormError(null); setConCuenta(false); setInformado(false); }} className={BOTON_ENCABEZADO}>
             <Plus className="h-4 w-4" /> Registrar cliente
           </button>
         }
@@ -252,7 +265,7 @@ export default function ClientesPage() {
                 <p className="truncate text-sm font-bold text-stone-900 dark:text-white">{cliente.nombre}</p>
                 <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-600 dark:text-brand-400">{cliente.tipoCliente === TipoCliente.HOTEL ? "Hotel" : "Particular / Empresa"}</span>
               </div>
-              <button onClick={() => setForm({ id: cliente.id, rut: cliente.rut || "", nombre: cliente.nombre, tipoCliente: cliente.tipoCliente, telefono: cliente.telefono || "", email: cliente.email || "", direccion: cliente.direccion || "" })} className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-brand-500/10 hover:text-brand-600" title="Editar ficha"><Pencil className="h-4 w-4" /></button>
+              <button onClick={() => { setFormError(null); setForm({ id: cliente.id, rut: cliente.rut || "", nombre: cliente.nombre, tipoCliente: cliente.tipoCliente, telefono: cliente.telefono || "", email: cliente.email || "", direccion: cliente.direccion || "" }); }} className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-brand-500/10 hover:text-brand-600" title="Editar ficha"><Pencil className="h-4 w-4" /></button>
             </div>
             <div className="mb-3 space-y-1.5 text-xs text-stone-500 dark:text-stone-400">
               <span className="flex items-center gap-2"><span className="w-3.5 text-center font-bold">R</span>{cliente.rut || "Sin RUT"}</span>
@@ -273,7 +286,7 @@ export default function ClientesPage() {
 
       <AnimatePresence>
       {form && <ModalIntranet
-        onCerrar={() => setForm(null)}
+        onCerrar={() => { setFormError(null); setForm(null); }}
         bloqueado={saving}
         icono={User}
         etiqueta="Ficha administrativa"
@@ -281,7 +294,7 @@ export default function ClientesPage() {
         subtitulo="Gestión de datos de facturación y contacto."
         pie={
           <>
-            <button type="button" onClick={() => setForm(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>
+            <button type="button" onClick={() => { setFormError(null); setForm(null); }} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>
               Cancelar
             </button>
             <button
@@ -296,6 +309,11 @@ export default function ClientesPage() {
         }
       >
           <div className="space-y-4">
+            {formError && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                {formError}
+              </div>
+            )}
             {!form.id && <OpcionCuentaCliente marcada={conCuenta} onChange={(valor) => { setConCuenta(valor); if (!valor) setInformado(false); }} disabled={saving} />}
             <Field label="Nombre o razón social" value={form.nombre} onChange={(nombre) => setForm({ ...form, nombre })} required />
             <Field

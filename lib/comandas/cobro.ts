@@ -1,7 +1,9 @@
 /** Cómo se cobra una comanda: por cantidad de prendas o por peso total. */
 export type ModalidadCobro = "PRENDA" | "KILO";
 
+/** Tope superior de precio por kilogramo (CLP) para prevenir errores de digitación. */
 export const PRECIO_KG_MAXIMO = 1_000_000;
+/** Largo máximo permitido para el nombre normalizado de una prenda. */
 export const PRENDA_NOMBRE_MAXIMO = 60;
 /** Línea que se guarda cuando una comanda por kg no detalla sus prendas. */
 export const PRENDA_POR_KILO = "ROPA POR KILO";
@@ -21,6 +23,7 @@ export function subtotalesPorKg(pesos: number[], precioKg: number): number[] {
   const base = exactos.map(Math.floor);
   const total = totalPorKg(pesos.reduce((s, kg) => s + kg, 0), precioKg);
   let faltante = total - base.reduce((s, v) => s + v, 0);
+  // Método del resto mayor: asigna $1 adicional a las líneas con mayor parte fraccionaria.
   const orden = exactos.map((v, i) => ({ i, resto: v - base[i] })).sort((a, b) => b.resto - a.resto);
   for (const { i } of orden) {
     if (faltante <= 0) break;
@@ -38,6 +41,7 @@ export function leerPrecioKg(texto: string): number | null {
   return precio > 0 && precio <= PRECIO_KG_MAXIMO ? precio : null;
 }
 
+// Clave insensible a tildes y mayúsculas para detectar prendas duplicadas en el catálogo.
 const claveCatalogo = (valor: string) =>
   valor.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLocaleLowerCase("es-CL");
 

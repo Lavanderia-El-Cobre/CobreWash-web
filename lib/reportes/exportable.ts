@@ -6,14 +6,20 @@ import {
 } from "./volumen";
 import type { FiltrosReporte, Reporte, VistaReporte } from "./modelo";
 
+/** Valor escalar admitido en una celda de exportación (PDF o Excel). */
 export type Celda = string | number;
+
+/** Representación tabular agnóstica del formato de exportación. */
 export type TablaExportable = {
   titulo: string;
   columnas: string[];
   filas: Celda[][];
 };
+
+/** Estructura normalizada de un reporte lista para serializarse en Excel o PDF. */
 export type ReporteExportable = {
   titulo: string;
+  /** Nombre base de archivo sin extensión. */
   nombre: string;
   generadoEn: Date;
   metadatos: [string, Celda][];
@@ -22,6 +28,14 @@ export type ReporteExportable = {
   detalle: TablaExportable;
 };
 
+/**
+ * Construye la representación exportable de un reporte (metadatos, indicadores,
+ * tabla de resumen con fila `TOTAL` y tabla de detalle).
+ * En la vista `"volumen"`, reemplaza el resumen por cuenta con la serie agrupada
+ * por periodo (`dia` o `mes`) y añade métricas de carga diaria.
+ *
+ * @param params - Vista activa, filtros aplicados, datos consolidados y etiquetas opcionales.
+ */
 export function prepararExportacion({
   vista,
   filtros,

@@ -59,7 +59,9 @@ export const INPUT_REPARTO = CAMPO_MODAL;
 
 export const LABEL_REPARTO = ETIQUETA_MODAL;
 
+/** Botón principal de 48 px de alto mínimo y ancho equitativo para uso táctil con una mano. */
 export const BOTON_PRIMARIO =
   "flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-brand px-5 py-3 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50";
 
+/** Variante secundaria adaptada a la misma altura mínima (`min-h-12`) y reparto parejo en el pie. */
 export const BOTON_SECUNDARIO = BOTON_MODAL_SECUNDARIO.replace("min-h-11", "min-h-12").replace(" sm:flex-none", "");

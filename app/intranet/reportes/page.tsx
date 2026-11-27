@@ -41,6 +41,12 @@ const boton =
 const input =
   "w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-3 text-sm dark:border-white/10 dark:bg-stone-800";
 
+/**
+ * Reportes analíticos del negocio (`/intranet/reportes`).
+ * Reservado al rol `admin`. Ofrece tres vistas (por cliente/empresa, por tipo de servicio
+ * y por volumen de prendas procesadas) filtradas en horario de Chile excluyendo anuladas,
+ * con exportación a PDF y Excel bajo demanda.
+ */
 export default function ReportesPage() {
   const permitido = useRoleGuard(["admin"]);
   const usuario = useUsuarioActualContext();
@@ -78,6 +84,7 @@ export default function ReportesPage() {
     [vista, datos, error, filtros.desde, filtros.hasta],
   );
   const resumen = vista === "volumen" ? periodos : (datos?.resumen ?? []);
+  // La clave de vista+filtros reinicia implícitamente la paginación y oculta avisos de descarga previos.
   const clave = JSON.stringify([vista, filtros]);
   const numeroPagina = pagina.clave === clave ? pagina.numero : 1;
   const actualizar = (campo: keyof FiltrosReporte, valor: string) =>
@@ -104,6 +111,7 @@ export default function ReportesPage() {
     setExportando(formato);
     setDescarga(null);
     try {
+      // Importación dinámica para excluir las librerías de generación PDF/Excel del bundle inicial.
       const { exportarReporte } = await import("@/lib/reportes/exportar");
       await exportarReporte(reporte, formato);
       setDescarga({

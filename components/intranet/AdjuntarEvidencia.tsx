@@ -3,10 +3,19 @@ import { useRef, useState } from "react";
 import { subirEvidencia } from "@/lib/vehiculos/evidencias";
 import { normalizarCodigoQr } from "@/lib/seguimiento/qr";
 
+/**
+ * Control para anexar una fotografía adicional a una inspección vehicular ya registrada.
+ * Respeta el tope operativo de 20 fotografías por inspección.
+ *
+ * @param inspeccionId - Identificador o código QR de la inspección destino.
+ * @param siguienteOrden - Posición correlativa de la nueva foto; si supera 20 bloquea nuevas cargas.
+ * @param alGuardar - Callback ejecutado tras confirmar la subida para refrescar la galería.
+ */
 export default function AdjuntarEvidencia({ inspeccionId, siguienteOrden, alGuardar }: { inspeccionId: string; siguienteOrden: number; alGuardar: () => Promise<void> }) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  // UUID estable por archivo seleccionado para que un reintento tras error de red no duplique la evidencia.
   const id = useRef("");
   if (siguienteOrden > 20) return <p className="text-xs">Se alcanzó el máximo de 20 fotografías.</p>;
   return <div className="mt-3 space-y-2 border-t border-stone-200 pt-3">

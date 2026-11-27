@@ -5,6 +5,12 @@ import QrCode from "@/components/ui/QrCode";
 import { obtenerEnlaceSeguimiento } from "@/lib/seguimiento/qr";
 import type { FormatoComanda } from "@/lib/seguimiento/exportar";
 
+/**
+ * Tarjeta con el código QR de seguimiento público de una comanda y acciones para descargarlo como imagen PNG o PDF.
+ *
+ * @param props.codigoQr - Token o código QR de la comanda; si es nulo o inválido, muestra un mensaje de respaldo.
+ * @param props.numeroComanda - Identificador legible mostrado junto al QR y usado en el archivo exportado.
+ */
 export default function QrPedido({ codigoQr, numeroComanda }: { codigoQr?: string | null; numeroComanda: string }) {
   const { url } = obtenerEnlaceSeguimiento(codigoQr);
   const contenedor = useRef<HTMLDivElement>(null);
@@ -16,6 +22,7 @@ export default function QrPedido({ codigoQr, numeroComanda }: { codigoQr?: strin
     if (!svg || preparando) return;
     setPreparando(formato); setError(""); setMensaje("");
     try {
+      // Importación diferida para no incluir el generador de PNG/PDF en el bundle inicial si no se descarga.
       const { exportarComandaQr } = await import("@/lib/seguimiento/exportar");
       await exportarComandaQr(svg, numeroComanda, formato);
       setMensaje(`Descarga de ${formato === "png" ? "imagen" : "PDF"} iniciada.`);

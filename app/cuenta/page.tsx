@@ -1,4 +1,5 @@
 "use client";
+// Client Component: requiere sesión Firebase Auth, redirecciones por rol y estado interactivo de filtros y vinculación.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,13 @@ const campo = "w-full rounded-xl border border-stone-200 bg-stone-50/60 px-4 py-
 const boton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-brand px-4 py-3 text-sm font-bold text-white shadow-premium transition-shadow hover:shadow-lg disabled:opacity-50";
 const vistas = [{ id: "todos", label: "Todos", icon: Layers3 }, { id: "activos", label: "Activos", icon: CircleDot }, { id: "historial", label: "Historial", icon: History }] as const;
 
+/**
+ * Portal privado de clientes (`/cuenta`).
+ * Restringe el acceso a clientes activos (redirige sin sesión al login y a roles
+ * internos a su vista de intranet), exige aceptar la versión vigente de términos
+ * y privacidad antes de cargar pedidos, y permite vincular comandas por correo
+ * verificado y descargar datos personales.
+ */
 export default function CuentaPage() {
   const router = useRouter();
   const { usuario, loading } = useUsuarioActual();
@@ -37,8 +45,10 @@ export default function CuentaPage() {
   const [mensaje, setMensaje] = useState("");
   const [errorAccion, setErrorAccion] = useState("");
   const pendienteAceptar = requiereAceptacion(usuario);
+  // Solo consulta pedidos cuando el cliente está activo y ya aceptó las condiciones vigentes.
   const { pedidos, total, cargando, error, actualizar } = usePedidosCliente(clienteActivo && !pendienteAceptar ? usuario.id : null, estado, pagina, vista);
 
+  // Redirige usuarios no autenticados al modal de inicio de sesión y al personal interno a su intranet.
   useEffect(() => {
     if (loading) return;
     if (!usuario) router.replace("/?login=1");
@@ -46,10 +56,13 @@ export default function CuentaPage() {
   }, [loading, usuario, router]);
 
   async function vincular(event: React.FormEvent) {
-    event.preventDefault(); setVinculando(true); setMensaje(""); setErrorAccion("");
+    event.preventDefault();
+    if (vinculando) return;
+    setVinculando(true); setMensaje(""); setErrorAccion("");
     try {
       await vincularPedido(numero);
       setNumero(""); setMensaje("Comanda vinculada a tu cuenta.");
+      // Si hay filtros o paginación activos, volver a la vista base dispara la recarga del hook; si no, se refresca manualmente.
       if (estado !== null || pagina !== 0 || vista !== "todos") { setEstado(null); setPagina(0); setVista("todos"); }
       else await actualizar();
     } catch (error) {
@@ -61,6 +74,7 @@ export default function CuentaPage() {
     setEnviando(true); setErrorAccion(""); setMensaje("");
     try {
       if (!auth.currentUser) throw new Error("Sin sesión");
+      // Recarga el perfil en Firebase y fuerza un nuevo ID token para reflejar `email_verified` de inmediato.
       await auth.currentUser.reload();
       await auth.currentUser.getIdToken(true);
       window.dispatchEvent(new Event("cobre:perfil-actualizado"));
@@ -70,6 +84,7 @@ export default function CuentaPage() {
     finally { setEnviando(false); }
   }
 
+  // Bloquea el renderizado hasta confirmar rol cliente activo o completar la aceptación legal pendiente.
   if (loading || !usuario || !clienteActivo) return <main className="flex min-h-screen items-center justify-center gap-3 text-sm text-stone-500"><Loader2 aria-label="Cargando cuenta" className="h-5 w-5 animate-spin text-brand-600" />Preparando tu cuenta…</main>;
   if (pendienteAceptar) return <AceptarCondicionesPendientes nombre={usuario.nombre} primeraVez={!usuario.versionTerminos && !usuario.versionPrivacidad} onSalir={() => { void signOut(auth).finally(() => router.replace("/")); }} />;
   const perfil = usuario.clientes_on_usuario[0];
@@ -86,7 +101,7 @@ export default function CuentaPage() {
       <div className="grid items-start gap-7 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="min-w-0 space-y-5">
           <section className="glass-card rounded-3xl bg-white/65 p-6 shadow-premium backdrop-blur-lg"><span className="mb-4 inline-flex rounded-2xl bg-gradient-brand p-3 text-white shadow-premium"><UserRound className="h-6 w-6" /></span><h2 className="font-display text-lg font-extrabold">Mi perfil</h2><p className="mt-1 text-[11px] font-bold text-brand-700">Cliente · {perfil ? (perfil.tipoCliente === "HOTEL" ? "Empresa" : "Particular") : "Ficha pendiente de validación"}</p><p className="mt-3 break-all text-xs text-stone-500">{usuario.email}</p><dl className="mt-5 space-y-3 border-t border-stone-100 pt-4 text-xs">{[["RUT", usuario.rut], ["Teléfono", usuario.telefono], ["Dirección", perfil?.direccion]].map(([label, value]) => <div key={label}><dt className="text-stone-400">{label}</dt><dd className="mt-1 break-words font-semibold text-stone-700">{value || "Sin registrar"}</dd></div>)}</dl></section>
-          <section className="glass-card space-y-4 rounded-3xl bg-white/65 p-6 shadow-premium backdrop-blur-lg"><span className="inline-flex rounded-xl bg-brand-50 p-2.5 text-brand-600"><Link2 className="h-5 w-5" /></span><h2 className="font-display text-base font-extrabold">Vincular una comanda anterior</h2><p className="text-xs leading-relaxed text-stone-500">Ingresa el número de tu comprobante. El correo registrado en recepción debe coincidir con el de tu cuenta y estar verificado.</p><form onSubmit={vincular} className="space-y-3"><label className="block text-xs font-bold text-stone-600">Número de comanda<input required maxLength={20} value={numero} onChange={e => setNumero(e.target.value)} placeholder="ELCOBRE-14R3 o 14r3" className={`${campo} mt-2`} /></label><button disabled={vinculando} className={`${boton} w-full`}>{vinculando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}{vinculando ? "Vinculando…" : "Vincular pedido"}</button></form><button disabled={enviando} onClick={() => void verificarCorreo()} className="inline-flex min-h-11 items-center gap-2 text-xs font-bold text-brand-700 underline underline-offset-4 disabled:opacity-50"><MailCheck className="h-4 w-4" />{enviando ? "Enviando…" : "Verificar mi correo"}</button>{mensaje && <p role="status" className="flex items-start gap-2 rounded-xl bg-green-50 p-3 text-xs leading-relaxed text-green-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{mensaje}</p>}</section>
+          <section className="glass-card space-y-4 rounded-3xl bg-white/65 p-6 shadow-premium backdrop-blur-lg"><span className="inline-flex rounded-xl bg-brand-50 p-2.5 text-brand-600"><Link2 className="h-5 w-5" /></span><h2 className="font-display text-base font-extrabold">Vincular una comanda anterior</h2><p className="text-xs leading-relaxed text-stone-500">Ingresa el número de tu comprobante. El correo registrado en recepción debe coincidir con el de tu cuenta y estar verificado.</p><form onSubmit={vincular} className="space-y-3"><label className="block text-xs font-bold text-stone-600">Número de comanda<input required disabled={vinculando} maxLength={20} value={numero} onChange={e => setNumero(e.target.value)} placeholder="ELCOBRE-14R3 o 14r3" className={`${campo} mt-2`} /></label><button disabled={vinculando} className={`${boton} w-full`}>{vinculando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}{vinculando ? "Vinculando…" : "Vincular pedido"}</button></form><button disabled={enviando} onClick={() => void verificarCorreo()} className="inline-flex min-h-11 items-center gap-2 text-xs font-bold text-brand-700 underline underline-offset-4 disabled:opacity-50"><MailCheck className="h-4 w-4" />{enviando ? "Enviando…" : "Verificar mi correo"}</button>{mensaje && <p role="status" className="flex items-start gap-2 rounded-xl bg-green-50 p-3 text-xs leading-relaxed text-green-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{mensaje}</p>}</section>
           <Link href="/privacidad/derechos" className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4 text-xs leading-relaxed text-stone-600"><ShieldCheck className="h-5 w-5 shrink-0 text-brand-600" /><span>¿Necesitas gestionar tus datos personales?<span className="mt-1 block font-bold text-brand-700">Ir al canal de derechos <ArrowUpRight className="inline h-3.5 w-3.5" /></span></span></Link>
           <DescargarMisDatos />
         </aside>

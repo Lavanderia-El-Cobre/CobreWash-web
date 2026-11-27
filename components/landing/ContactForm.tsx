@@ -9,6 +9,10 @@ import { validarTelefono } from "@/lib/telefonos";
 import AutorizacionDatos, { useAvisoPublicado } from "@/components/privacidad/AutorizacionDatos";
 import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
 
+/**
+ * Sección y formulario público de solicitud de cotización (`#contacto`).
+ * Valida teléfono y consentimiento de privacidad vigente antes de enviar a `/api/contacto`.
+ */
 export default function ContactForm() {
   const [formData, setFormData] = useState({
     nombre: "",
@@ -17,7 +21,9 @@ export default function ContactForm() {
     servicio: "",
     mensaje: "",
   });
+  // Clave de idempotencia reutilizada en reintentos de red para evitar solicitudes duplicadas.
   const solicitudId = useRef<string | null>(null);
+  // Bloqueo síncrono contra envíos simultáneos antes de que React aplique `isSubmitting`.
   const enviando = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -56,6 +62,7 @@ export default function ContactForm() {
       });
       const result = await response.json();
       if (!response.ok) {
+        // Un 409 indica conflicto de ID existente: se descarta para generar uno nuevo al reintentar.
         if (response.status === 409) solicitudId.current = null;
         throw new Error(result.error || "No se pudo guardar la solicitud.");
       }
@@ -76,13 +83,11 @@ export default function ContactForm() {
 
   return (
     <section id="contacto" className="py-20 bg-stone-50/50 relative overflow-hidden">
-      {/* Decorative glows */}
       <div className="absolute top-10 right-0 w-80 h-80 rounded-full bg-brand-50 blur-3xl opacity-50" />
       <div className="absolute bottom-10 left-0 w-80 h-80 rounded-full bg-copper-50 blur-3xl opacity-50" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
           <h2 className="text-xs uppercase tracking-widest text-brand-650 font-bold">Contacto</h2>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-stone-900">
@@ -96,7 +101,6 @@ export default function ContactForm() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
           
-          {/* Left Column: Direct Info Cards (5 columns) */}
           <div className="lg:col-span-5 space-y-8">
             <div className="space-y-4">
               <h4 className="text-2xl font-extrabold text-stone-900">¿Listo para comenzar o tienes alguna duda?</h4>
@@ -105,9 +109,7 @@ export default function ContactForm() {
               </p>
             </div>
 
-            {/* Information Grid Cards */}
             <div className="space-y-4 pt-4">
-              {/* Rapid response time */}
               <div className="flex items-start gap-4 p-5 glass-card bg-white/55 backdrop-blur-lg rounded-2xl shadow-premium">
                 <div className="p-3 bg-brand-50 text-brand-600 rounded-xl shrink-0">
                   <Clock className="w-5 h-5" />
@@ -120,7 +122,6 @@ export default function ContactForm() {
                 </div>
               </div>
 
-              {/* Hoteles support */}
               <div className="flex items-start gap-4 p-5 glass-card bg-white/55 backdrop-blur-lg rounded-2xl shadow-premium">
                 <div className="p-3 bg-brand-50 text-brand-600 rounded-xl shrink-0">
                   <Building2 className="w-5 h-5" />
@@ -133,7 +134,6 @@ export default function ContactForm() {
                 </div>
               </div>
 
-              {/* Direct channels */}
               <div className="flex items-start gap-4 p-5 glass-card bg-white/55 backdrop-blur-lg rounded-2xl shadow-premium">
                 <div className="p-3 bg-brand-50 text-brand-600 rounded-xl shrink-0">
                   <ShieldCheck className="w-5 h-5" />
@@ -148,7 +148,6 @@ export default function ContactForm() {
             </div>
           </div>
 
-          {/* Right Column: Form Container (7 columns) */}
           <div className="lg:col-span-7">
             <div className="glass-card bg-white/55 backdrop-blur-lg rounded-3xl p-6 sm:p-10 shadow-premium">
               
@@ -162,7 +161,6 @@ export default function ContactForm() {
                     onSubmit={handleSubmit}
                     className="space-y-6"
                   >
-                    {/* Error Box */}
                     {error && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
@@ -175,7 +173,6 @@ export default function ContactForm() {
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {/* Name input */}
                       <div className="space-y-2">
                         <label htmlFor="nombre" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                           Nombre Completo
@@ -191,7 +188,6 @@ export default function ContactForm() {
                         />
                       </div>
 
-                      {/* Phone input */}
                       <div className="space-y-2">
                         <label htmlFor="telefono" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                           Teléfono de Contacto (opcional)
@@ -206,7 +202,6 @@ export default function ContactForm() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {/* Email input */}
                       <div className="space-y-2">
                         <label htmlFor="correo" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                           Correo Electrónico
@@ -222,7 +217,6 @@ export default function ContactForm() {
                         />
                       </div>
 
-                      {/* Service Dropdown */}
                       <div className="space-y-2">
                         <label htmlFor="servicio" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                           Tipo de Servicio
@@ -237,7 +231,6 @@ export default function ContactForm() {
                       </div>
                     </div>
 
-                    {/* Message Input */}
                     <div className="space-y-2">
                       <label htmlFor="mensaje" className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
                         Mensaje o Detalles del Requerimiento
@@ -254,7 +247,6 @@ export default function ContactForm() {
                     </div>
 
                     <AutorizacionDatos finalidad="cotizacion" aceptada={autorizaDatos} onChange={setAutorizaDatos} publicada={avisoPublicado} />
-                    {/* Submit Button */}
                     <button
                       type="submit"
                       disabled={isSubmitting || !avisoPublicado || !autorizaDatos}

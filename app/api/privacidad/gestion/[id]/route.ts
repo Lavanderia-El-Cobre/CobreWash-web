@@ -1,6 +1,24 @@
 import { validarGestionDerecho } from "@/lib/privacidad/modelo";
 import { autorizarAdministrador, ErrorPrivacidad, errorPrivacidad, leerJsonLimitado, responder } from "@/lib/privacidad/servidor";
+// Requiere runtime Node.js para Firebase Admin SDK y verificación de sesión.
 export const runtime = "nodejs";
+
+/**
+ * Registra una actuación o cambio de estado sobre una solicitud de derechos ARCO+.
+ *
+ * - **Contrato HTTP**: `POST /api/privacidad/gestion/:id` con cuerpo JSON
+ *   validado por `validarGestionDerecho` más `revision` (entero seguro `>= 0`).
+ * - **Autenticación y roles**: solo administrador activo (`autorizarAdministrador`);
+ *   el `uid` queda auditado como `actorId`.
+ * - **Concurrencia optimista**: verifica `revision` en la mutación para evitar
+ *   sobrescribir cambios hechos en paralelo por otro administrador (`409`).
+ * - **Respuestas**:
+ *   - `200`: `{ ok: true }`.
+ *   - `400`: `:id` no es UUID, cuerpo inválido o `revision` fuera de rango.
+ *   - `401` / `403`: sesión inválida o sin rol administrador activo.
+ *   - `409`: conflicto de versión (`REVISION_PRIVACIDAD`); requiere refrescar la bandeja.
+ *   - `500` / `503`: error interno o de disponibilidad del backend.
+ */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { db, uid } = await autorizarAdministrador(request);

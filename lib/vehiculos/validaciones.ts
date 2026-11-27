@@ -47,6 +47,10 @@ export function normalizarPatente(valor: string): string {
   return valor.trim().toUpperCase().replace(/\s+/g, "-");
 }
 
+/**
+ * Verifica que una patente (tras normalizarla) cumpla alguno de los formatos
+ * chilenos vigentes (`AAAA-99`, `AA-9999` o `AAA-999`).
+ */
 export function esPatenteValida(valor: string): boolean {
   const normalizada = normalizarPatente(valor);
   return (
@@ -56,6 +60,16 @@ export function esPatenteValida(valor: string): boolean {
   );
 }
 
+/**
+ * Valida el formulario de creación o edición de un vehículo: formato y unicidad
+ * de patente, longitudes, rango de año (1980–2100) y prohibición de desactivar
+ * un vehículo con salida activa.
+ *
+ * @param input - Campos del formulario.
+ * @param existentes - Vehículos actuales para validar duplicidad de patente.
+ * @param tieneSalidaActiva - Indica si el vehículo tiene una salida en curso.
+ * @returns Mensaje de error en español, o `null` si todos los campos son válidos.
+ */
 export function validarFormularioVehiculo(
   input: {
     id?: string;
@@ -111,6 +125,14 @@ export function validarFormularioVehiculo(
   return null;
 }
 
+/**
+ * Valida las reglas de negocio previas a registrar una salida a terreno:
+ * vehículo y conductor seleccionados, prohibición de salir si está `NO_APTO` y
+ * odómetro no menor al último kilometraje conocido.
+ *
+ * @param input - Datos de la salida a validar.
+ * @returns Mensaje de error en español, o `null` si es válida.
+ */
 export function validarSalidaVehiculo(input: {
   vehiculoId: string;
   repartidorId: string;
@@ -135,6 +157,13 @@ export function validarSalidaVehiculo(input: {
   return null;
 }
 
+/**
+ * Valida el cierre de retorno de una salida, garantizando que el kilometraje
+ * final sea numérico y mayor o igual al kilometraje de salida.
+ *
+ * @param input - Identificador de salida y lecturas de odómetro.
+ * @returns Mensaje de error en español, o `null` si es válido.
+ */
 export function validarRetornoVehiculo(input: {
   salidaId: string;
   kilometrajeSalida: number;
@@ -153,6 +182,7 @@ export function validarRetornoVehiculo(input: {
   return null;
 }
 
+/** Busca la inspección correspondiente a la salida (`ANTES`) o al retorno (`DESPUES`). */
 export function obtenerInspeccionMomento(
   salida: Pick<SalidaFlota, "inspecciones">,
   momento: "ANTES" | "DESPUES",
@@ -160,6 +190,13 @@ export function obtenerInspeccionMomento(
   return salida.inspecciones.find((i) => i.momento === momento) ?? null;
 }
 
+/**
+ * Calcula los kilómetros recorridos en una salida cerrada a partir de las
+ * inspecciones `ANTES` y `DESPUES` (con un decimal), o `null` si faltan datos
+ * o la diferencia resulta negativa.
+ *
+ * @param salida - Salida con sus inspecciones asociadas.
+ */
 export function calcularKilometrosRecorridos(
   salida: Pick<SalidaFlota, "inspecciones">,
 ): number | null {
@@ -170,6 +207,15 @@ export function calcularKilometrosRecorridos(
   return delta >= 0 ? delta : null;
 }
 
+/**
+ * Consolida el estado operativo, kilometraje máximo y KPIs de la flota a partir
+ * de vehículos y salidas (asume que `salidas` llega ordenada de más reciente a
+ * más antigua para determinar `ultimaSalida`). Una salida activa (`EN_SERVICIO`
+ * o `PROGRAMADA`) marca al vehículo `"En ruta"` por encima de su flag `activo`.
+ *
+ * @param vehiculos - Catálogo completo de vehículos.
+ * @param salidas - Historial de salidas ordenadas descendentemente por fecha.
+ */
 export function construirResumenFlota(
   vehiculos: VehiculoFlota[],
   salidas: SalidaFlota[],

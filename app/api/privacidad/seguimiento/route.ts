@@ -1,7 +1,25 @@
 import { timingSafeEqual } from "node:crypto";
 import { serviciosAdmin } from "@/lib/firebase/admin";
 import { ErrorPrivacidad, errorPrivacidad, hash, leerJsonLimitado, responder } from "@/lib/privacidad/servidor";
+// Requiere runtime Node.js para `node:crypto` (`timingSafeEqual`) y Firebase Admin SDK.
 export const runtime = "nodejs";
+
+/**
+ * Consulta pública del estado de una solicitud de derechos ARCO+ mediante su
+ * comprobante privado (`id` + `secreto`).
+ *
+ * - **Contrato HTTP**: `POST /api/privacidad/seguimiento` con JSON limitado por
+ *   `leerJsonLimitado`: `{ id: UUID, secreto: hex64 }`.
+ * - **Autenticación y seguridad**: endpoint público sin sesión; compara el hash
+ *   SHA-256 del secreto en tiempo constante (`timingSafeEqual`) para evitar
+ *   ataques de temporización y responde `404` tanto si el ID no existe como si
+ *   el secreto no coincide (anti-enumeración).
+ * - **Respuestas**:
+ *   - `200`: `{ estado, recibidoEn, objetivoAtencion }` (sin datos personales).
+ *   - `400`: formato inválido de `id`, `secreto` o JSON.
+ *   - `404`: comprobante inexistente o secreto incorrecto.
+ *   - `500` / `503`: fallo de disponibilidad del backend.
+ */
 export async function POST(request: Request) {
   try {
     const b = await leerJsonLimitado(request);

@@ -1,6 +1,14 @@
 import { normalizarTelefono, validarTelefono } from "@/lib/telefonos";
 import { VERSION_PRIVACIDAD } from "@/lib/privacidad/modelo";
+/** Categorías de servicio aceptadas en el formulario público de contacto y cotización. */
 export const SERVICIOS_CONTACTO = ["industrial", "domestica", "retiro-entrega", "otro"];
+
+/**
+ * Valida y normaliza el cuerpo de una solicitud pública de contacto/cotización.
+ * Exige consentimiento de privacidad vigente, un UUID válido (usado para idempotencia),
+ * rechaza saltos de línea en el nombre para evitar inyección de cabeceras de correo
+ * y normaliza el teléfono cuando se informa.
+ */
 export function validarContacto(body: unknown) {
   if (!body || typeof body !== "object") throw new Error("Solicitud inválida.");
   const entrada = body as Record<string, unknown>;

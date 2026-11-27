@@ -103,6 +103,7 @@ const normalizarCatalogo = (value: string) =>
 
 
 
+// Extrae la cantidad recibida y la observación desde el formato estructurado usado por clientes tipo HOTEL.
 const leerDetalleHotel = (value?: string | null) => {
   const match = value?.match(/^Entregado: \d+ · Recibido: (\d+) · Pendiente: \d+(?: · (.*))?$/);
   return { recibido: match ? Number(match[1]) : 0, observacion: match?.[2] || value || "" };
@@ -112,7 +113,7 @@ const leerDetalleHotel = (value?: string | null) => {
 const prendasTotales = (c: Comanda) => c.detalle.reduce((s, d) => s + d.cantidad, 0);
 const valorTotal = (c: Comanda) => c.valorTotal;
 
-// Map de tipos DB a UI
+/** Modelo de vista de una comanda mapeado desde Data Connect para la interfaz de recepción. */
 export interface Comanda {
   id: string; // numeroComanda público, ej. "ELCOBRE-14r3"
   dbId: string; // UUID interno; nunca se muestra al usuario
@@ -211,6 +212,12 @@ const emptyForm: FormState = {
   observaciones: "",
 };
 
+/**
+ * Módulo de recepción y gestión de comandas (`/intranet/comandas`).
+ * Accesible para `admin` y `recepcionista`. Permite listar con filtros combinados y paginación
+ * en servidor, crear/editar comandas (cobro por prenda o por kg, creación de cliente al vuelo
+ * y estimación de insumos con IA), emitir comprobante QR, anular y marcar entregas.
+ */
 export default function ComandasPage() {
   const permitido = useRoleGuard(["admin", "recepcionista"]);
   const esAdmin = useUsuarioActualContext()?.rol.nombre === "admin";
@@ -229,6 +236,7 @@ export default function ComandasPage() {
 
   const [estadosSeleccionados, setEstadosSeleccionados] = useState<EstadoComanda[]>([]);
   const [search, setSearch] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [page, setPage] = useState(1);
@@ -237,15 +245,27 @@ export default function ComandasPage() {
   const [data, setData] = useState<GetComandasPaginadasData | null>(null);
   const [catData, setCatData] = useState<GetCatalogosComandaData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refrescando, setRefrescando] = useState(false);
+  const cargadoInicial = useRef(false);
   const solicitudActual = useRef(0);
+  // Idempotencia en creación: conserva UUID y número generados y el último payload enviado
+  // para verificar en servidor si el INSERT ya se concretó antes de reintentar tras un fallo de red.
   const creacion = useRef<{ id: string; numero: string } | null>(null);
   const guardando = useRef(false);
   const envioPendiente = useRef<CrearComandaConFlujoVariables | null>(null);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchDebounced(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const fetchData = useCallback(async (silencioso = false) => {
     const solicitud = ++solicitudActual.current;
     try {
-      if (!silencioso) setLoading(true);
+      if (!silencioso) {
+        if (!cargadoInicial.current) setLoading(true);
+        else setRefrescando(true);
+      }
       const [resComandas, resCatalogos] = await Promise.all([
         executeQuery(
           queryRef<GetComandasPaginadasData, GetComandasPaginadasVariables>(
@@ -255,7 +275,7 @@ export default function ComandasPage() {
               limit: PAGE_SIZE,
               offset: (page - 1) * PAGE_SIZE,
               estados: estadosSeleccionados.length ? estadosSeleccionados.map((estado) => ESTADO_DB[estado]) : undefined,
-              cliente: search.trim() || undefined,
+              cliente: searchDebounced.trim() || undefined,
               ...limitesFechasConsulta(fechaDesde, fechaHasta),
             },
           ),
@@ -266,13 +286,17 @@ export default function ComandasPage() {
       if (solicitud === solicitudActual.current) {
         setData(resComandas.data);
         setCatData(resCatalogos.data);
+        cargadoInicial.current = true;
       }
     } catch (error) {
       registrarError("Error fetching data:", error);
     } finally {
-      if (solicitud === solicitudActual.current) setLoading(false);
+      if (solicitud === solicitudActual.current) {
+        setLoading(false);
+        setRefrescando(false);
+      }
     }
-  }, [estadosSeleccionados, fechaDesde, fechaHasta, page, search]);
+  }, [estadosSeleccionados, fechaDesde, fechaHasta, page, searchDebounced]);
 
   useEffect(() => {
     void Promise.resolve().then(() => fetchData());
@@ -346,11 +370,11 @@ export default function ComandasPage() {
     );
   }
 
-  /* ── form helpers ── */
   const openCrear = () => {
     const servicio = catData?.tipoServicios[0];
     const cliente = catData?.clientes[0];
     const prendas = cliente?.tipoCliente === TipoCliente.HOTEL ? PRENDAS_HOTEL : PRENDAS_FORMULARIO;
+    setFormError(null);
     setFormData({
       ...emptyForm,
       clienteId: cliente?.id || "",
@@ -378,6 +402,7 @@ export default function ComandasPage() {
   };
   const openEditar = (c: Comanda) => {
     const fichaCliente = catData?.clientes.find((cliente) => cliente.nombre === c.cliente);
+    setFormError(null);
     setDetalle(null);
     setNuevoCliente(false);
     setFormData({
@@ -401,20 +426,26 @@ export default function ComandasPage() {
         : String(catData?.tipoServicios.find((s) => s.nombre === c.servicio)?.precioKg || ""),
       detalle: c.detalle.map((d) => {
         const hotel = leerDetalleHotel(d.detalle);
-        return { ...d, detalle: c.tipoCliente === TipoCliente.HOTEL ? hotel.observacion : d.detalle || "", recibido: hotel.recibido };
+        return { ...d, detalle: c.tipoCliente === TipoCliente.HOTEL ? hotel.observacion : d.detalle || "", recibido: Math.min(d.cantidad, hotel.recibido) };
       }),
       observaciones: c.observaciones || "",
     });
     void cargarModeloIa();
+    // Se captura `actualizadoEn` como versión para control de concurrencia optimista al editar.
     setForm({ mode: "editar", id: c.dbId, version: c.actualizadoEn });
   };
 
   const guardar = async () => {
     if (guardando.current) return;
+    setFormError(null);
     const porKg = formData.modalidad === "KILO";
     let detalleLimpio = formData.detalle.filter((d) => d.tipoPrenda.trim());
     if (!formData.cliente.trim() || (!porKg && detalleLimpio.length === 0)) {
       setFormError("Selecciona un cliente y agrega al menos una prenda.");
+      return;
+    }
+    if (detalleLimpio.some((d) => !Number.isInteger(d.cantidad) || d.cantidad < 1)) {
+      setFormError("La cantidad de cada prenda debe ser un número entero mayor que 0.");
       return;
     }
     const precioKg = porKg ? leerPrecioKg(formData.precioKg) : null;
@@ -439,7 +470,7 @@ export default function ComandasPage() {
       ? { precioUnitario: d.precioUnitario, subtotal: d.cantidad * d.precioUnitario }
       : { precioUnitario: precioKg, subtotal: subtotalesKg[indice] };
     const cobroComanda = precioKg === null
-      ? { modalidadCobro: UnidadCobro.PRENDA }
+      ? { modalidadCobro: UnidadCobro.PRENDA, precioKg: null }
       : { modalidadCobro: UnidadCobro.KILO, precioKg };
     if (nuevoCliente && !isValidRut(formData.rut)) {
       setFormError("Ingresa un RUT chileno válido para el cliente.");
@@ -522,16 +553,15 @@ export default function ComandasPage() {
         tiposServicioResueltos.set(clave, id);
         return id;
       };
-      // Resolver primero todas las claves foráneas. Así nunca se crea una
-      // cabecera de comanda si sus prendas no pueden relacionarse.
-      const lineasResueltas = await Promise.all(
-        detalleLimpio.map(async (linea) => ({
-          linea,
-          tipoPrendaId: await resolverTipoPrendaId(linea.tipoPrenda),
-          // Todas las líneas llevan el servicio elegido para la comanda.
-          tipoServicioId: await resolverTipoServicioId(formData.servicio || linea.servicio),
-        })),
-      );
+      // Resolver primero todas las claves foráneas en forma secuencial para
+      // reutilizar el caché de prendas/servicios recién creados sin duplicar `@unique`.
+      const lineasResueltas: { linea: FormLinea; tipoPrendaId: string; tipoServicioId: string }[] = [];
+      for (const linea of detalleLimpio) {
+        const tipoPrendaId = await resolverTipoPrendaId(linea.tipoPrenda);
+        // Todas las líneas llevan el servicio elegido para la comanda.
+        const tipoServicioId = await resolverTipoServicioId(formData.servicio || linea.servicio);
+        lineasResueltas.push({ linea, tipoPrendaId, tipoServicioId });
+      }
 
       if (form?.mode === "crear") {
         const identidad = creacion.current ??= { id: crypto.randomUUID(), numero: generarNumeroComanda() };
@@ -570,14 +600,17 @@ export default function ComandasPage() {
           proyecto: formData.proyecto.trim() || undefined,
           observaciones: formData.observaciones.trim() || undefined,
           ...cobroComanda,
-          detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => ({
-            tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
-            detalle: formData.tipoCliente === TipoCliente.HOTEL
-              ? `Entregado: ${d.cantidad} · Recibido: ${d.recibido} · Pendiente: ${Math.max(0, d.cantidad - d.recibido)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
-              : d.detalle.trim() || undefined,
-            pesoKg: pesos[indice],
-            ...cobroLinea(d, indice),
-          })),
+          detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => {
+            const recibidoClamped = Math.min(d.cantidad, Math.max(0, Math.trunc(d.recibido)));
+            return {
+              tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
+              detalle: formData.tipoCliente === TipoCliente.HOTEL
+                ? `Entregado: ${d.cantidad} · Recibido: ${recibidoClamped} · Pendiente: ${Math.max(0, d.cantidad - recibidoClamped)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
+                : d.detalle.trim() || undefined,
+              pesoKg: pesos[indice],
+              ...cobroLinea(d, indice),
+            };
+          }),
         };
         envioPendiente.current = variables;
         const idCreado = await guardarComandaConFlujo(variables);
@@ -587,19 +620,22 @@ export default function ComandasPage() {
           await editarComandaConDetalles({
             id: form.id,
             version: form.version,
-            empresa: formData.empresa.trim() || undefined,
-            proyecto: formData.proyecto.trim() || undefined,
-            observaciones: formData.observaciones.trim() || undefined,
+            empresa: formData.empresa.trim() || null,
+            proyecto: formData.proyecto.trim() || null,
+            observaciones: formData.observaciones.trim() || null,
             ...cobroComanda,
-            detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => ({
-              comandaId: form.id,
-              tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
-              detalle: formData.tipoCliente === TipoCliente.HOTEL
-                ? `Entregado: ${d.cantidad} · Recibido: ${d.recibido} · Pendiente: ${Math.max(0, d.cantidad - d.recibido)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
-                : d.detalle.trim() || undefined,
-              pesoKg: pesos[indice],
-              ...cobroLinea(d, indice),
-            })),
+            detalles: lineasResueltas.map(({ linea: d, tipoPrendaId, tipoServicioId }, indice) => {
+              const recibidoClamped = Math.min(d.cantidad, Math.max(0, Math.trunc(d.recibido)));
+              return {
+                comandaId: form.id,
+                tipoPrendaId, tipoServicioId, cantidad: d.cantidad,
+                detalle: formData.tipoCliente === TipoCliente.HOTEL
+                  ? `Entregado: ${d.cantidad} · Recibido: ${recibidoClamped} · Pendiente: ${Math.max(0, d.cantidad - recibidoClamped)}${d.detalle.trim() ? ` · ${d.detalle.trim()}` : ""}`
+                  : d.detalle.trim() || undefined,
+                pesoKg: pesos[indice],
+                ...cobroLinea(d, indice),
+              };
+            }),
           });
         }
         
@@ -617,8 +653,15 @@ export default function ComandasPage() {
     }
   };
 
+  const cerrarAnular = () => {
+    if (isSubmitting) return;
+    setAnular(null);
+    setMotivo("");
+    setAnularError(null);
+  };
+
   const confirmarAnular = async () => {
-    if (!anular) return;
+    if (!anular || isSubmitting) return;
     setIsSubmitting(true);
     setAnularError(null);
     try {
@@ -694,7 +737,6 @@ export default function ComandasPage() {
         }
       />
 
-      {/* Summary */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -728,7 +770,6 @@ export default function ComandasPage() {
         })}
       </motion.div>
 
-      {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -768,9 +809,10 @@ export default function ComandasPage() {
               placeholder="Buscar por comanda o cliente..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-9 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-white/5 rounded-xl text-sm text-stone-700 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-brand-500/50 transition-colors"
+              className="w-full pl-9 pr-9 py-2.5 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-white/5 rounded-xl text-sm text-stone-700 dark:text-stone-200 placeholder-stone-400 dark:placeholder-stone-600 focus:outline-none focus:border-brand-500/50 transition-colors"
             />
             <Search className="w-4 h-4 text-stone-400 dark:text-stone-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            {refrescando && <Loader2 className="w-4 h-4 text-brand-500 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />}
           </div>
           <label className="space-y-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
             Desde
@@ -786,7 +828,6 @@ export default function ComandasPage() {
         </div>
       </motion.div>
 
-      {/* Table */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -886,13 +927,12 @@ export default function ComandasPage() {
 
       <AnimatePresence>
         {notice && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} role="status" className="fixed bottom-5 right-5 z-[70] max-w-sm rounded-2xl bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-xl">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} role="status" className="fixed bottom-5 right-5 z-[120] max-w-sm rounded-2xl bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-xl">
             {notice}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Detalle modal (QR + comprobante) */}
       <AnimatePresence>
         {detalle && (
           <ComandaDetalle
@@ -911,7 +951,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Crear / Editar modal */}
       <AnimatePresence>
         {form && (
           <ModalIntranet
@@ -942,6 +981,20 @@ export default function ComandasPage() {
               </div>
 
               <div className="space-y-4">
+                {form.mode === "editar" ? (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3.5 text-xs dark:border-white/10 dark:bg-stone-800/60">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-bold text-stone-800 dark:text-stone-100">{formData.cliente}</span>
+                      <span className="rounded-full bg-brand-500/10 px-2.5 py-0.5 text-[10px] font-bold text-brand-700 dark:text-brand-300">
+                        {formData.tipoCliente === TipoCliente.HOTEL ? "Hotel" : "Particular / Empresa"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-stone-500 dark:text-stone-400">
+                      {[formData.rut && `RUT ${formData.rut}`, formData.telefono, formData.email, formData.direccion].filter(Boolean).join(" · ") || "Ficha de cliente (solo lectura al editar la comanda)"}
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Cliente</label>
@@ -1032,10 +1085,6 @@ export default function ComandasPage() {
                   <p className="text-xs text-stone-500 dark:text-stone-400"><strong>RUT:</strong> {formData.rut}</p>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <FieldInput label="Empresa" value={formData.empresa} onChange={(v) => setFormData({ ...formData, empresa: v })} placeholder="Empresa o mandante" />
-                  <FieldInput label="Proyecto" value={formData.proyecto} onChange={(v) => setFormData({ ...formData, proyecto: v })} placeholder="Proyecto, faena u orden" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label htmlFor="comanda-telefono" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Teléfono</label>
                     <TelefonoInput id="comanda-telefono" value={formData.telefono} onChange={(telefono) => setFormData((actual) => ({ ...actual, telefono }))} />
@@ -1043,6 +1092,12 @@ export default function ComandasPage() {
                   <FieldInput label={nuevoCliente && registrarCuenta ? "Correo (obligatorio)" : nuevoCliente ? "Correo (opcional)" : "Correo"} value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} placeholder="correo@ejemplo.com" />
                 </div>
                 <FieldInput label="Dirección" value={formData.direccion} onChange={(v) => setFormData({ ...formData, direccion: v })} placeholder="Dirección de retiro / entrega" />
+                  </>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FieldInput label="Empresa" value={formData.empresa} onChange={(v) => setFormData({ ...formData, empresa: v })} placeholder="Empresa o mandante" />
+                  <FieldInput label="Proyecto" value={formData.proyecto} onChange={(v) => setFormData({ ...formData, proyecto: v })} placeholder="Proyecto, faena u orden" />
+                </div>
                 {/* Modalidad de cobro: por prendas (cantidad × precio) o por kg (peso × $/kg) */}
                 <div className="space-y-1.5">
                   <span id="modalidad-cobro" className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Cobro</span>
@@ -1116,7 +1171,6 @@ export default function ComandasPage() {
                     />
                   )}
                 </div>
-                {/* Detalle lines */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -1157,9 +1211,9 @@ export default function ComandasPage() {
                         options={opcionesPrenda}
                         nuevaOpcion={{ placeholder: "Escribir otra prenda…", normalizar: normalizarPrendaNueva }}
                       />
-                      <input type="number" min={1} value={d.cantidad} aria-label="Cantidad" onChange={(e) => updateLinea(i, { cantidad: Math.max(1, +e.target.value) })} className="w-14 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
+                      <input type="number" min={1} step={1} value={d.cantidad} aria-label="Cantidad" onChange={(e) => { const cantidad = Math.max(1, Math.trunc(+e.target.value) || 1); updateLinea(i, { cantidad, recibido: Math.min(cantidad, d.recibido) }); }} className="w-14 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
                       {formData.tipoCliente === TipoCliente.HOTEL && <>
-                        <input type="number" min={0} max={d.cantidad} value={d.recibido} onChange={(e) => updateLinea(i, { recibido: Math.min(d.cantidad, Math.max(0, +e.target.value)) })} aria-label="Cantidad recibida" className="w-16 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
+                        <input type="number" min={0} max={d.cantidad} step={1} value={d.recibido} onChange={(e) => updateLinea(i, { recibido: Math.min(d.cantidad, Math.max(0, Math.trunc(+e.target.value) || 0)) })} aria-label="Cantidad recibida" className="w-16 px-2 py-2 rounded-lg border border-stone-200 dark:border-white/10 bg-stone-50 dark:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs text-center focus:outline-none focus:border-brand-500" />
                         <output aria-label="Cantidad pendiente" className="w-16 px-2 py-2 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs text-center font-bold">{Math.max(0, d.cantidad - d.recibido)}</output>
                       </>}
                       <input value={d.detalle} onChange={(e) => updateLinea(i, { detalle: e.target.value })} placeholder="Detalle de la prenda" className="min-w-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-800 focus:border-brand-500 focus:outline-none dark:border-white/10 dark:bg-stone-800 dark:text-stone-200" />
@@ -1201,11 +1255,11 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Anular modal */}
       <AnimatePresence>
         {anular && (
           <ModalIntranet
-            onCerrar={() => setAnular(null)}
+            onCerrar={cerrarAnular}
+            bloqueado={isSubmitting}
             tamano="sm"
             tono="peligro"
             icono={Ban}
@@ -1214,9 +1268,10 @@ export default function ComandasPage() {
             subtitulo="Esta acción marcará la comanda como anulada permanentemente."
             pie={
               <>
-                <button onClick={() => setAnular(null)} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
-                <button onClick={confirmarAnular} className={BOTON_MODAL_PELIGRO}>
-                  Anular comanda
+                <button onClick={cerrarAnular} disabled={isSubmitting} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+                <button onClick={confirmarAnular} disabled={isSubmitting} className={BOTON_MODAL_PELIGRO}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? "Anulando..." : "Anular comanda"}
                 </button>
               </>
             }
@@ -1243,7 +1298,6 @@ export default function ComandasPage() {
         )}
       </AnimatePresence>
 
-      {/* Entregar modal */}
       <AnimatePresence>
         {entregar && (
           <ModalIntranet

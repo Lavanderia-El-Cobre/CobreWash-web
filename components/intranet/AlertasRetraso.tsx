@@ -9,11 +9,19 @@ import { detectarAlertas, type ComandaAlerta } from "@/lib/produccion/alertas";
 import { formatearDuracion } from "@/lib/produccion/duracion";
 
 const Contexto = createContext({ alertas: [] as ReturnType<typeof detectarAlertas>, error: "", cargando: false, refrescar: () => {} });
+
+/** Devuelve el estado global de alertas de retraso en producción para el administrador. */
 export const useAlertasRetraso = () => useContext(Contexto);
 
+/**
+ * Proveedor de alertas de retraso en etapas de producción.
+ * Mantiene una única suscripción compartida entre la barra superior, el menú lateral
+ * y el banner de alertas; solo consulta cuando la sesión activa pertenece a un `admin`.
+ */
 export function AlertasRetrasoProvider({ children }: { children: React.ReactNode }) {
   const usuario = useUsuarioActualContext();
   const adminId = usuario?.rol.nombre === "admin" ? usuario.id : null;
+  // Se guarda el usuarioId junto a las comandas para descartar datos de una sesión anterior.
   const [datos, setDatos] = useState<{ usuarioId: string; comandas: ComandaAlerta[] } | null>(null);
   const [ahora, setAhora] = useState(0);
   const [error, setError] = useState("");
@@ -24,6 +32,7 @@ export function AlertasRetrasoProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!adminId) return;
     let vigente = true;
+    // Evita disparar consultas superpuestas cuando coinciden focus, visibilitychange y el intervalo.
     let pendiente = false;
     const cargar = async () => {
       if (pendiente || document.visibilityState === "hidden") return;
@@ -42,6 +51,7 @@ export function AlertasRetrasoProvider({ children }: { children: React.ReactNode
       }
     };
     void cargar();
+    // Polling de red cada 30 s; reloj local cada 10 s para actualizar minutos excedidos sin consultar al servidor.
     const timer = window.setInterval(() => void cargar(), 30_000);
     const reloj = window.setInterval(() => { if (document.visibilityState === "visible") setAhora(Date.now()); }, 10_000);
     const actualizar = () => void cargar();
@@ -57,6 +67,10 @@ export function AlertasRetrasoProvider({ children }: { children: React.ReactNode
   return <Contexto.Provider value={{ alertas, error: adminId ? error : "", cargando, refrescar }}>{children}</Contexto.Provider>;
 }
 
+/**
+ * Banner global que informa al administrador sobre comandas con tiempo de etapa excedido.
+ * No renderiza nada para otros roles ni cuando no existen alertas ni errores pendientes.
+ */
 export default function AlertasRetraso() {
   const usuario = useUsuarioActualContext();
   const { alertas, error, cargando, refrescar } = useAlertasRetraso();

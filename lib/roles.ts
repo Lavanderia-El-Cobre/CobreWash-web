@@ -23,10 +23,12 @@ import {
  */
 export type Rol = "admin" | "recepcionista" | "operario" | "repartidor" | "conductor" | "cliente";
 
+/** Elemento del menú lateral de la intranet. */
 export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Cuando es `true`, solo marca el enlace activo si la ruta coincide exactamente (evita que `/intranet` quede siempre activo). */
   exact?: boolean;
   badge?: number;
 }
@@ -114,17 +116,22 @@ export const LANDING_POR_ROL: Record<Rol, string> = {
 /** Roles que usan el shell interno (sidebar oscuro) de la intranet. */
 export const ROLES_INTERNOS: Rol[] = ["admin", "recepcionista", "operario", "repartidor", "conductor"];
 
+/** Indica si el rol pertenece al personal interno de la intranet (excluye clientes y valores indefinidos). */
 export function esRolInterno(rol: string | undefined): boolean {
   return !!rol && ROLES_INTERNOS.includes(rol as Rol);
 }
 
-/** Devuelve la ruta correspondiente al rol actual dentro de una sección. */
+/**
+ * Indica si un rol tiene permiso para acceder a `pathname` según `ACCESO_POR_RUTA`.
+ * Usa la regla de prefijo más específica para soportar subrutas y deniega por defecto
+ * si no hay rol o si la ruta no está declarada.
+ */
 export function rutaPermitida(rol: string | undefined, pathname: string): boolean {
   if (!rol) return false;
   // Coincidencia por prefijo para rutas anidadas.
   const entry = Object.entries(ACCESO_POR_RUTA)
     .filter(([ruta]) => pathname === ruta || pathname.startsWith(ruta + "/"))
-    // la ruta más específica (más larga) gana
+    // La ruta más específica (más larga) tiene prioridad sobre `/intranet`.
     .sort((a, b) => b[0].length - a[0].length)[0];
   if (!entry) return false;
   return entry[1].includes(rol as Rol);

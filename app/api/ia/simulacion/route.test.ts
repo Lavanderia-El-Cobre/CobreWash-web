@@ -83,6 +83,8 @@ it("borra un lote por id o todos los datos simulados", async () => {
   expect(m.mutation).toHaveBeenLastCalledWith("BorrarSimulacionIa", { id });
   expect(await (await DELETE(pedir("DELETE", {}))).json()).toEqual({ borrado: "todos" });
   expect(m.mutation).toHaveBeenLastCalledWith("BorrarSimulacionesIa");
+  expect(await (await DELETE(pedir("DELETE"))).json()).toEqual({ borrado: "todos" });
+  expect(m.mutation).toHaveBeenLastCalledWith("BorrarSimulacionesIa");
 });
 
 it("valida el id y avisa si el lote ya no existe", async () => {

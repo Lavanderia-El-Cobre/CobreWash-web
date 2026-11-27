@@ -9,6 +9,10 @@ const estados = {
   ANULADA: { icon: CircleX, titulo: "Pedido anulado", texto: "Si necesitas información sobre la anulación, contacta a recepción." },
 };
 
+/**
+ * Tarjeta de estado general de una comanda (pendiente, en proceso, finalizada, entregada o anulada).
+ * Se comparte entre el seguimiento público y el portal autenticado de clientes.
+ */
 export function EstadoPedido({ estado }: { estado: string }) {
   const dato = estados[estado as keyof typeof estados];
   const Icon = dato?.icon || Package;
@@ -18,7 +22,11 @@ export function EstadoPedido({ estado }: { estado: string }) {
   </div>;
 }
 
+/**
+ * Línea de tiempo y barra de progreso accesible (`role="progressbar"`) con el avance por etapas de una comanda.
+ */
 export default function AvancePedido({ vista, estado }: { vista: ReturnType<typeof presentarPedido>; estado: string }) {
+  // En estados terminales ninguna etapa puede seguir activa: las `EN_PROCESO` pasan a mostrarse como interrumpidas o sin cierre.
   const terminal = ["FINALIZADA", "ENTREGADA", "ANULADA"].includes(estado);
   return <section className="space-y-5" aria-label="Avance del pedido">
     <div className="flex items-center justify-between gap-3"><h3 className="font-display text-lg font-extrabold text-stone-900">El recorrido de tus prendas</h3>{vista.progreso !== null && <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700">{vista.progreso}% registrado</span>}</div>

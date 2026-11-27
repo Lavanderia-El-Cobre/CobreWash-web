@@ -1,9 +1,29 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para el módulo de privacidad
+ * y ejercicio de derechos (Ley 21.719).
+ *
+ * Valida recepción de solicitudes y comprobantes exclusivos del servidor, autorización de
+ * administración activa, bloqueo de sobrescrituras concurrentes vía `revision` optimista,
+ * exigencia de evidencias y carácter definitivo del cierre, registro de versiones legales en
+ * altas y cotizaciones, y purga de contadores técnicos vencidos sin borrar solicitudes.
+ *
+ * Invocación:
+ *   node scripts/test-privacidad.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+// Guardia de seguridad: restringe las pruebas al emulador local aislado en 9499.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST || "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = `http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string = UID autenticado con correo verificado).
+ */
 async function execute(query, operationName, variables = {}, user) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user, email: `${user}@example.test`, email_verified: true } } : undefined;
   const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, operationName, variables, extensions: { impersonate } }) });

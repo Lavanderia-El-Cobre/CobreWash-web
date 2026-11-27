@@ -11,6 +11,14 @@ import { registrarError } from "@/lib/registro-seguro";
 import GlassSelect from "@/components/ui/GlassSelect";
 
 const TAMANO = 20;
+
+/**
+ * Historial paginado de entradas y salidas de inventario con filtros por insumo, tipo
+ * y rango de fechas, más exportación completa a CSV.
+ *
+ * @param insumos - Catálogo de insumos disponible para el selector de filtro.
+ * @param revision - Token externo que fuerza la recarga tras cambios en otras secciones.
+ */
 export default function HistorialInventario({ insumos, revision }: {
   insumos: { id: string; nombre: string }[]; revision: string;
 }) {
@@ -24,6 +32,7 @@ export default function HistorialInventario({ insumos, revision }: {
   const [exportando, setExportando] = useState(false);
   const [error, setError] = useState("");
   const [reintento, setReintento] = useState(0);
+  // Contador monotónico para ignorar respuestas lentas que llegan tras cambiar filtros o página.
   const solicitud = useRef(0);
   const filtros = useCallback(() => ({
     insumoId: insumoId || undefined, tipo: tipo || undefined,
@@ -68,6 +77,7 @@ export default function HistorialInventario({ insumos, revision }: {
       const enlace = document.createElement("a");
       enlace.href = url; enlace.download = `movimientos-inventario-${ahora.slice(0, 10)}.csv`;
       document.body.appendChild(enlace); enlace.click(); enlace.remove();
+      // Se retrasa la revocación para dar margen al navegador a iniciar la descarga del blob.
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { registrarError("No se pudo exportar el historial", e); setError("No se pudo descargar el historial completo. Intenta nuevamente."); }
     finally { setExportando(false); }

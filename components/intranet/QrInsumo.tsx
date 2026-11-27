@@ -4,6 +4,10 @@ import { FileDown, ImageDown, Loader2, QrCode as QrIcon } from "lucide-react";
 import QrCode from "@/components/ui/QrCode";
 import ModalIntranet from "@/components/intranet/ModalIntranet";
 
+/**
+ * Modal que muestra el código QR de un insumo de inventario y permite descargar
+ * su etiqueta lista para impresión en formato PDF o imagen PNG.
+ */
 export default function QrInsumo({ insumo, cerrar }: {
   insumo: { nombre: string; codigoQr: string; unidadMedida: string }; cerrar: () => void;
 }) {
@@ -16,6 +20,7 @@ export default function QrInsumo({ insumo, cerrar }: {
     if (!svg || preparando) return;
     setPreparando(formato); setError(""); setMensaje("");
     try {
+      // Carga diferida para evitar incluir las utilidades de generación de PDF/PNG en el bundle inicial.
       const { exportarEtiquetaInsumo } = await import("@/lib/inventario/etiqueta");
       await exportarEtiquetaInsumo(svg, insumo, formato);
       setMensaje("Descarga iniciada. Puedes imprimir la etiqueta desde el PDF.");

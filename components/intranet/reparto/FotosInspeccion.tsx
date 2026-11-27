@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
 import type { EvidenciaFotoInput } from "@/lib/vehiculos/modelo";
 
+/** Tope operativo de fotografías permitidas por inspección vehicular. */
 export const MAX_FOTOS_INSPECCION = 20;
 
 /**
@@ -29,12 +30,14 @@ export default function FotosInspeccion({
   const urls = useRef(new Set<string>());
 
   useEffect(() => {
+    // Revoca al desmontar todos los ObjectURL de previsualización aún activos para evitar fugas de memoria.
     const creadas = urls.current;
     return () => { creadas.forEach((u) => URL.revokeObjectURL(u)); creadas.clear(); };
   }, []);
 
   const agregar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivos = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+    // Limpia el input para permitir volver a seleccionar el mismo archivo tras eliminarlo.
     e.target.value = "";
     const cupo = MAX_FOTOS_INSPECCION - fotos.length;
     const nuevas = archivos.slice(0, Math.max(0, cupo)).map((archivo, i): EvidenciaFotoInput => {

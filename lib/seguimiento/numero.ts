@@ -1,6 +1,10 @@
 const ALFABETO = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-/** Cuatro caracteres aleatorios, siempre con al menos una letra y un número. */
+/**
+ * Genera un número de comanda con formato `ELCOBRE-XXXX` usando entropía
+ * criptográfica (`crypto.getRandomValues`). El sufijo de cuatro caracteres
+ * siempre contiene al menos una letra y un dígito.
+ */
 export function generarNumeroComanda(): string {
   for (;;) {
     const bytes = crypto.getRandomValues(new Uint8Array(4));

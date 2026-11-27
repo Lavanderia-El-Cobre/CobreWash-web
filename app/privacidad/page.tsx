@@ -3,9 +3,15 @@ import { AlertCircle, UserRound, Database, FileCheck2, Building2, MessageSquareT
 import PaginaLegal, { SeccionLegal } from "@/components/privacidad/PaginaLegal";
 import { configuracionLegal } from "@/lib/privacidad/configuracion";
 
+// Renderizado dinámico para leer la configuración legal vigente en runtime sin reconstruir el bundle.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Privacidad y Tratamiento de Datos | Lavandería El Cobre", robots: { index: false, follow: true } };
 
+/**
+ * Página del Aviso de Privacidad y Protección de Datos (Ley N° 19.628 reformada
+ * por la Ley N° 21.719). Si la configuración legal aún no está marcada como
+ * publicada, muestra un banner indicando que corresponde a un borrador técnico.
+ */
 export default function PrivacidadPage() {
   const c = configuracionLegal();
   const razonSocial = c.razonSocial || "Lavandería El Cobre SpA";
@@ -30,7 +36,6 @@ export default function PrivacidadPage() {
         </p>
       )}
 
-      {/* 1. Responsable del Tratamiento */}
       <SeccionLegal titulo="1. Responsable del Tratamiento y Datos de Contacto" icon={UserRound}>
         <p>
           El responsable del tratamiento de los datos personales tratados a través de este portal y en el marco de la prestación de nuestros servicios de lavandería es <strong>{razonSocial}</strong>, RUT <strong>{rut}</strong>, con domicilio legal en <strong>{domicilio}</strong>. Representante legal: <strong>{representante}</strong>.
@@ -43,7 +48,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 2. Categorías de Datos Recopilados */}
       <SeccionLegal titulo="2. Datos Personales que Tratamos y Obligatoriedad de su Entrega" icon={Database}>
         <p>
           En estricta observancia del principio de minimización (Artículo 3° letra c de la Ley N° 21.719), solo solicitamos y tratamos los datos estrictamente pertinentes y necesarios para la adecuada atención y prestación del servicio:
@@ -76,7 +80,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 3. Finalidades y Bases de Licitud */}
       <SeccionLegal titulo="3. Finalidades Específicas y Bases de Licitud" icon={FileCheck2}>
         <p>
           Las siguientes bases de licitud corresponden a los artículos 12 y 13 de la Ley N° 19.628, en su texto reformado por la Ley N° 21.719, cuyas modificaciones entran en vigor el 1 de diciembre de 2026:
@@ -100,7 +103,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 4. Plazos y Criterios de Conservación */}
       <SeccionLegal titulo="4. Plazos y Criterios de Conservación de Datos" icon={Building2}>
         <p>
           En aplicación del principio de limitación del plazo de conservación (Artículo 3° letra c), los datos personales se mantienen únicamente durante el tiempo estrictamente necesario para cumplir las finalidades que motivaron su recolección o para responder a requerimientos legales:
@@ -127,7 +129,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 5. Destinatarios, Servidores y Transferencias Internacionales */}
       <SeccionLegal titulo="5. Destinatarios, Regiones de Servidores y Transferencias Internacionales" icon={Building2}>
         <p>
           Tus datos personales no son comercializados, arrendados ni cedidos a terceros con fines publicitarios. El acceso interno a la información se restringe estrictamente a nuestro personal operativo y administrativo en razón de sus funciones, bajo obligación contractual de secreto y confidencialidad permanente (Artículo 14 bis de la Ley N° 21.719), deber que subsiste indefinidamente incluso tras la extinción de la relación laboral.
@@ -157,7 +158,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 6. Derechos del Titular y Reclamación ante la Agencia */}
       <SeccionLegal titulo="6. Tus Derechos Legales y Plazos de Atención" icon={MessageSquareText}>
         <p>
           La Ley N° 21.719 reconoce a toda persona los siguientes derechos sobre sus datos personales (Derechos ARCO+):
@@ -191,7 +191,6 @@ export default function PrivacidadPage() {
         </p>
       </SeccionLegal>
 
-      {/* 7. Medidas de Seguridad de la Información */}
       <SeccionLegal titulo="7. Medidas de Seguridad y Protección de la Información" icon={LockKeyhole}>
         <p>
           En conformidad con el Artículo 14 quinquies de la Ley N° 21.719, aplicamos medidas técnicas, humanas y organizativas de seguridad proporcionales a los riesgos del tratamiento para garantizar la confidencialidad, integridad, disponibilidad y resiliencia de los datos:

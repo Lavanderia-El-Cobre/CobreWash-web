@@ -4,11 +4,19 @@ import AuthGuard from "@/components/intranet/AuthGuard";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import AlertasRetraso, { AlertasRetrasoProvider } from "@/components/intranet/AlertasRetraso";
 
+/** Metadatos base compartidos por todas las rutas del panel interno. */
 export const metadata = {
   title: "Intranet | Lavandería El Cobre",
   description: "Panel de administración interno",
 };
 
+/**
+ * Layout raíz de `/intranet`.
+ * Envuelve las vistas en `ThemeProvider`, exige sesión válida mediante `AuthGuard`
+ * y provee el contexto global de `AlertasRetraso` junto a la barra lateral y superior.
+ *
+ * @param props - Contenido de la ruta activa de la intranet.
+ */
 export default function IntranetLayout({ children }: { children: React.ReactNode }) {
   return (
     <>

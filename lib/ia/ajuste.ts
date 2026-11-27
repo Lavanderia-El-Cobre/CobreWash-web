@@ -33,6 +33,7 @@ export function ajustarTasas(observaciones: Observacion[], servicios: TasaServic
   const X = observaciones.map((o) => activos.map((s) => o.kgPorServicio[s.servicioId] ?? 0));
   const y = observaciones.map((o) => o.consumo);
   const n = activos.length;
+  // Forma normal (matriz de Gram G = XᵀX y vector h = Xᵀy) con regularización hacia θ0.
   const G = activos.map((_, i) => activos.map((__, j) => X.reduce((s, fila) => s + fila[i] * fila[j], 0)));
   const h = activos.map((_, i) => X.reduce((s, fila, p) => s + fila[i] * y[p], 0));
   const escala = G.reduce((s, fila, i) => s + fila[i], 0) / (n * observaciones.length);
@@ -59,6 +60,7 @@ export function ajustarInsumo(insumoId: string, observaciones: Observacion[], se
     return { insumoId, tasas, observaciones: 0, mae: null, mape: null, desviacionRelativa: DESVIACION_PREVIA, metodoError: "sin-datos" };
   }
   const metodoError: MetodoError = propias.length >= MINIMO_VALIDACION ? "validacion-cruzada" : "ajuste";
+  // Con validación cruzada (LOOCV) cada período se predice reajustando sin él.
   const predicciones = propias.map((o, i) =>
     consumoModelo(o.kgPorServicio, metodoError === "ajuste" ? tasas : ajustarTasas(propias.filter((_, k) => k !== i), servicios, lambda)),
   );
@@ -66,6 +68,7 @@ export function ajustarInsumo(insumoId: string, observaciones: Observacion[], se
   const conConsumo = propias.flatMap((o, i) => (o.consumo > 0 ? [Math.abs(errores[i]) / o.consumo] : []));
   const relativos = predicciones.flatMap((p, i) => (p > 0 ? [errores[i] / p] : []));
   const rms = relativos.length ? Math.sqrt(media(relativos.map((r) => r * r))) : DESVIACION_PREVIA;
+  // Combina la desviación empírica con la previa (peso = PESO_PREVIA períodos) para evitar rangos falsamente estrechos con pocos datos.
   const desviacion = Math.sqrt((PESO_PREVIA * DESVIACION_PREVIA ** 2 + relativos.length * rms ** 2) / (PESO_PREVIA + relativos.length));
   return {
     insumoId,
@@ -78,12 +81,14 @@ export function ajustarInsumo(insumoId: string, observaciones: Observacion[], se
   };
 }
 
+/** Métricas globales agregadas de un ajuste sobre todos los insumos modelables. */
 export interface ResumenAjuste {
   observaciones: number;
   /** Promedio de los MAE de cada insumo. Cada uno está en la unidad de su insumo. */
   mae: number | null;
   /** MAPE ponderado por la cantidad de períodos de cada insumo. */
   mape: number | null;
+  /** Desviación relativa global ponderada por observaciones, usada como respaldo. */
   desviacionRelativa: number;
 }
 

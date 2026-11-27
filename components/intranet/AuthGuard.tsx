@@ -8,10 +8,16 @@ import { esRolInterno } from "@/lib/roles";
 
 const UsuarioActualContext = createContext<UsuarioActual | null>(null);
 
+/** Obtiene el perfil autenticado provisto por `AuthGuard` dentro de la intranet. */
 export function useUsuarioActualContext() {
   return useContext(UsuarioActualContext);
 }
 
+/**
+ * Guarda de sesión para todo el shell de la intranet.
+ * Verifica autenticación y pertenencia a un rol interno antes de renderizar `children`
+ * para evitar destellos de vistas protegidas, y expone al usuario vía contexto.
+ */
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { usuario, loading } = useUsuarioActual();

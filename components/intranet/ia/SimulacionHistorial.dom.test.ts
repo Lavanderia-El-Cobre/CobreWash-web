@@ -2,10 +2,10 @@
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi, type Mock } from "vitest";
-const api = vi.hoisted(() => ({ token: vi.fn(), historial: vi.fn() }));
+const api = vi.hoisted(() => ({ token: vi.fn(), historial: vi.fn(), config: vi.fn() }));
 vi.mock("@/lib/firebase/client", () => ({ dataConnect: {}, auth: { currentUser: { getIdToken: api.token } } }));
 vi.mock("@/lib/registro-seguro", () => ({ registrarError: () => {} }));
-vi.mock("@/src/dataconnect-generated", () => ({ getHistorialAjustesIa: api.historial }));
+vi.mock("@/src/dataconnect-generated", () => ({ getHistorialAjustesIa: api.historial, guardarConfiguracionIa: api.config }));
 import SimulacionIa from "./SimulacionIa";
 import HistorialIa from "./HistorialIa";
 import GraficoLineas, { COLORES_SERIE } from "./GraficoLineas";
@@ -35,7 +35,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it("genera una simulación con los parámetros convertidos y avisa cuánto bajó el error", async () => {
   fetchMock.mockResolvedValue({ ok: true, json: async () => ({ conteos: 26, errorTasasInicial: 24.4, errorTasasFinal: 3.2 }) });
   render(createElement(SimulacionIa, { panel: panel({ simulaciones: [] }), recargar, avisar }));
-  expect(screen.getByText(/no afectan al modelo hasta que actives/)).toBeTruthy();
+  expect(screen.getByText(/no afectan la predicción real hasta que los actives/)).toBeTruthy();
   fireEvent.change(screen.getByRole("textbox", { name: /Semanas/ }), { target: { value: "8" } });
   fireEvent.change(screen.getByRole("textbox", { name: /Ruido/ }), { target: { value: "15" } });
   fireEvent.change(screen.getByRole("textbox", { name: /Semilla/ }), { target: { value: "42" } });
@@ -46,6 +46,17 @@ it("genera una simulación con los parámetros convertidos y avisa cuánto bajó
   expect(opciones.method).toBe("POST");
   expect(opciones.headers.Authorization).toBe("Bearer token-admin");
   expect(JSON.parse(opciones.body)).toEqual({ semanas: 8, kgSemanalMin: 6000, kgSemanalMax: 9000, ruido: 0.15, desvioTasas: 0.3, semilla: 42 });
+  expect(recargar).toHaveBeenCalled();
+});
+
+it("permite activar simulados y recalcular en un solo clic", async () => {
+  api.config.mockResolvedValue({});
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ version: "v3", observaciones: 12, mape: 4.5 }) });
+  render(createElement(SimulacionIa, { panel: panel(), recargar, avisar }));
+  fireEvent.click(screen.getByRole("button", { name: "Activar simulados y recalcular" }));
+  await waitFor(() => expect(avisar).toHaveBeenCalledWith(expect.stringContaining("Ajuste v3 listo con simulados"), "success"));
+  expect(api.config).toHaveBeenCalledWith({}, { margenSeguridad: 0.15, lambda: 1, incluirSimulado: true });
+  expect(fetchMock).toHaveBeenCalledWith("/api/ia/recalcular", expect.objectContaining({ method: "POST" }));
   expect(recargar).toHaveBeenCalled();
 });
 

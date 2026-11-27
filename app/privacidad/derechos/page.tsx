@@ -1,7 +1,12 @@
 import { ShieldCheck, FileText, UserRoundCheck } from "lucide-react";
 import PaginaLegal from "@/components/privacidad/PaginaLegal";
 import FormularioDerechos from "@/components/privacidad/FormularioDerechos";
+/** Metadatos del canal de derechos ARCO+; desindexado para evitar rastreo del formulario. */
 export const metadata = { title: "Mis datos personales | Lavandería El Cobre", robots: { index: false, follow: false } };
+/**
+ * Página del canal digital de ejercicio de derechos sobre datos personales (ARCO+).
+ * Disponible para cualquier titular, cuente o no con una cuenta en el portal.
+ */
 export default function DerechosPage() {
   return <PaginaLegal titulo="Solicitudes sobre tus datos personales" descripcion="Un canal para consultar y gestionar tu información, tengas o no una cuenta en el portal." actual="/privacidad/derechos">
     <div className="grid gap-3 sm:grid-cols-3">{[

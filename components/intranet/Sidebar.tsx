@@ -30,6 +30,11 @@ const rolLabel: Record<Rol, string> = {
   cliente: "Cliente",
 };
 
+/**
+ * Navegación lateral principal de la intranet, adaptada al rol autenticado.
+ * En escritorio es colapsable; en móvil se presenta como barra superior fija con cajón
+ * deslizable. Incluye contador vivo de comandas activas y acceso rápido a alertas de retraso.
+ */
 export default function IntranetSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -57,6 +62,7 @@ export default function IntranetSidebar() {
   }, [puedeVerComandas]);
 
   useEffect(() => {
+    // Mantiene actualizado el badge de comandas activas cada 10 s y al volver a la pestaña.
     void Promise.resolve().then(cargarComandasActivas);
     const intervalo = window.setInterval(cargarComandasActivas, 10_000);
     window.addEventListener("focus", cargarComandasActivas);
@@ -79,7 +85,6 @@ export default function IntranetSidebar() {
 
   const renderSidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="flex flex-col h-full">
-      {/* Logo */}
       <div className="flex items-center gap-3 p-5 pb-5 border-b border-stone-200 dark:border-white/5">
         <Image
           src="/logo.webp"
@@ -116,7 +121,6 @@ export default function IntranetSidebar() {
         )}
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
         <AnimatePresence>
           {(!collapsed || isMobile) && (
@@ -223,7 +227,6 @@ export default function IntranetSidebar() {
         )}
       </AnimatePresence>
 
-      {/* Bottom Section */}
       <div className="p-3 border-t border-stone-200 dark:border-white/5 space-y-1">
         {/* Acceso rápido a notificaciones cuando la barra está colapsada */}
         {rol === "admin" && collapsed && !isMobile && (
@@ -277,13 +280,11 @@ export default function IntranetSidebar() {
 
   return (
     <>
-      {/* Desktop Sidebar */}
       <motion.aside
         animate={{ width: collapsed ? 72 : 248 }}
         transition={{ duration: 0.25, ease: "easeInOut" }}
         className="relative hidden lg:flex flex-col glass-shell border-r border-stone-200/70 dark:border-white/5 h-screen sticky top-0 shrink-0 z-40"
       >
-        {/* Collapse Toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3.5 top-[4.5rem] z-10 bg-white dark:bg-stone-800 border border-stone-200 dark:border-white/10 rounded-full p-1 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-stone-700 transition-all shadow-lg"
@@ -298,7 +299,6 @@ export default function IntranetSidebar() {
         {renderSidebarContent({})}
       </motion.aside>
 
-      {/* Mobile Topbar trigger */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 glass-shell border-b border-stone-200/70 dark:border-white/5 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setMobileOpen(true)}
@@ -312,7 +312,6 @@ export default function IntranetSidebar() {
         </span>
       </div>
 
-      {/* Mobile Sidebar Drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>

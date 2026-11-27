@@ -6,11 +6,18 @@ import { etapaActualProduccion, progresoProduccion, fechaProduccion, type EtapaV
 
 type Props = {
   etapas: EtapaVisible[];
+  /** Habilita el bloque de acción para marcar como completada la etapa en curso. */
   puedeCompletar?: boolean;
+  /** Deshabilita el botón mientras persiste la transición en curso. */
   completando?: boolean;
   onCompletar?: (etapa: EtapaVisible) => void;
 };
 
+/**
+ * Visualiza el avance lineal de las etapas de producción de una comanda, su bitácora
+ * de fechas/responsables en horario de Chile y, opcionalmente, el botón para completar
+ * la etapa activa.
+ */
 export default function FlujoProduccion({ etapas, puedeCompletar = false, completando = false, onCompletar }: Props) {
   if (!etapas.length) return <p className="text-sm text-stone-500">Esta comanda no tiene un flujo de producción asociado.</p>;
   const porcentaje = progresoProduccion(etapas);
@@ -27,6 +34,7 @@ export default function FlujoProduccion({ etapas, puedeCompletar = false, comple
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500">Estado global de producción</p>
         <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-[10px] font-extrabold text-brand-600 dark:text-brand-400">{porcentaje}%</span>
       </div>
+      {/* Expone el porcentaje de avance a lectores de pantalla sin alterar el diseño de tarjetas. */}
       <div role="progressbar" aria-label="Etapas completadas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={porcentaje} className="sr-only" />
       <ol className="flex snap-x items-stretch gap-1 overflow-x-auto pb-2 sm:gap-2">
         {etapas.map((etapa, index) => {

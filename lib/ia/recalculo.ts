@@ -4,7 +4,9 @@ import { clasificarMovimiento, construirObservaciones, type ClaseMovimiento } fr
 import { consumoDiarioEstimado, consumoDiarioReciente } from "./prediccion";
 import { convertirTasa, tasasPorInsumo } from "./tasas";
 
+/** Nombre descriptivo registrado en el historial de versiones de ModeloIa. */
 export const NOMBRE_MODELO = "Regresión regularizada no negativa";
+// Límite de períodos descartados incluidos en tasasJson para mantener acotado el tamaño del registro.
 const MAXIMO_DESCARTADOS = 50;
 
 /** Datos que entrega GetDatosEntrenamientoIa. */
@@ -48,6 +50,7 @@ export interface DetalleAjuste {
 const uuid = (id: string) => id.replaceAll("-", "").toLowerCase();
 const redondear = (v: number) => Math.round(v * 1e4) / 1e4;
 
+/** Valores por defecto si aún no existe una fila en ConfiguracionIa. */
 export const CONFIGURACION_INICIAL = { margenSeguridad: 0.15, lambda: 1, incluirSimulado: false };
 
 /**
@@ -78,6 +81,7 @@ export function prepararRecalculo(datos: DatosRecalculo, opciones: { id: string;
 
   const { observaciones, descartados } = construirObservaciones({ conteos, compras, produccion }, { incluirSimulado: config.incluirSimulado });
   const { insumos: resultados, resumen } = ajustarModelo(observaciones, tasas, config.lambda);
+  // Los días de stock se proyectan solo con operación real, incluso si el ajuste incluyó lotes simulados.
   const reales = observaciones.filter((o) => o.origen === "REAL");
   const nombreInsumo = new Map(insumos.map((i) => [i.id, i]));
   const filaTasa = new Map(filas.map((f) => [`${f.servicioId}|${f.insumoId}`, f]));

@@ -17,7 +17,7 @@ query GetPanelIa @auth(level: USER) {
     rol { nombre @check(expr: "this == 'admin'", message: "Acceso reservado a administración") }
   }
   configuracionIa(id: "global") { margenSeguridad lambda incluirSimulado actualizadoEn }
-  tasaConsumos {
+  tasaConsumos(limit: 5000) {
     tipoServicioId insumoId tasaInicial tasaActual unidad fuente actualizadoEn
     tipoServicio { id nombre }
     insumo { id nombre unidadMedida }
@@ -25,12 +25,13 @@ query GetPanelIa @auth(level: USER) {
   modeloVigente: modeloIas(where: { activo: { eq: true } }, orderBy: [{ fechaEntrenamiento: DESC }, { id: DESC }], limit: 1) {
     id version fechaEntrenamiento mae mape desviacionRelativa observaciones lambda margenSeguridad incluyeSimulado tasasJson
   }
-  insumos(where: { activo: { eq: true } }, orderBy: [{ nombre: ASC }, { id: ASC }]) {
+  insumos(where: { activo: { eq: true } }, orderBy: [{ nombre: ASC }, { id: ASC }], limit: 1000) {
     id nombre unidadMedida stockActual stockMinimo revisionStock
   }
-  tipoServicios(where: { activo: { eq: true } }, orderBy: [{ nombre: ASC }, { id: ASC }]) { id nombre unidadCobro }
+  tipoServicios(where: { activo: { eq: true } }, orderBy: [{ nombre: ASC }, { id: ASC }], limit: 1000) { id nombre unidadCobro }
   conteosReales: conteoInventarios(where: { estado: { eq: APROBADO }, origen: { eq: REAL } }) { _count }
   conteosSimulados: conteoInventarios(where: { estado: { eq: APROBADO }, origen: { eq: SIMULADO } }) { _count }
+  ultimoConteoReal: conteoInventarios(where: { estado: { eq: APROBADO }, origen: { eq: REAL } }, orderBy: [{ fechaConteo: DESC }, { creadoEn: DESC }], limit: 1) { fechaConteo creadoEn }
   simulaciones: simulacionIas(orderBy: [{ creadoEn: DESC }, { id: DESC }], limit: 20) { id semanas creadoEn parametrosJson tasasVerdaderasJson }
 }
 

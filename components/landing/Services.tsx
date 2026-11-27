@@ -4,6 +4,9 @@ import Image from "next/image";
 import { Building2, Shirt, Truck, Check } from "lucide-react";
 import { motion } from "framer-motion";
 
+/**
+ * Catálogo de líneas de servicio (`#servicios`) de la landing: industrial, doméstico y logística.
+ */
 export default function Services() {
   const services = [
     {
@@ -72,7 +75,6 @@ export default function Services() {
   return (
     <section id="servicios" className="py-20 bg-stone-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
           <h2 className="text-xs uppercase tracking-widest text-brand-650 font-bold">Nuestra Especialidad</h2>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-stone-900">
@@ -84,7 +86,6 @@ export default function Services() {
           </p>
         </div>
 
-        {/* Services Grid */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -100,7 +101,6 @@ export default function Services() {
                 variants={cardVariants}
                 className="glass-card bg-white/55 backdrop-blur-lg rounded-2xl overflow-hidden shadow-premium shadow-premium-hover flex flex-col h-full"
               >
-                {/* Image Section */}
                 <div className="relative h-60 w-full overflow-hidden">
                   <div className="absolute top-4 left-4 z-10">
                     <span className="bg-brand-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
@@ -117,10 +117,8 @@ export default function Services() {
                   />
                 </div>
 
-                {/* Content Section */}
                 <div className="p-6 sm:p-8 flex flex-col flex-1 justify-between">
                   <div>
-                    {/* Header with Icon */}
                     <div className="flex items-center gap-4 mb-4">
                       <div className="p-3 bg-brand-50 text-brand-650 rounded-xl">
                         <IconComponent className="w-6 h-6" />
@@ -134,7 +132,6 @@ export default function Services() {
                       {service.description}
                     </p>
 
-                    {/* Features List */}
                     <ul className="space-y-2.5 mb-8">
                       {service.features.map((feature, fIndex) => (
                         <li key={fIndex} className="flex items-start gap-2.5 text-stone-750 text-sm">
@@ -145,7 +142,6 @@ export default function Services() {
                     </ul>
                   </div>
 
-                  {/* CTA inside card */}
                   <div className="pt-4 border-t border-stone-100">
                     <a
                       href="#contacto"

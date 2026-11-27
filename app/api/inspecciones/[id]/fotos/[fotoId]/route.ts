@@ -1,8 +1,32 @@
 import { autorizarInspeccion, ErrorEvidencia, hashFoto, leerFoto, respuestaErrorEvidencia, rutaFoto, UUID_FOTO } from "@/lib/vehiculos/evidencias-servidor";
 
+// Requiere runtime Node.js para `sharp`, Firebase Admin SDK y Cloud Storage.
 export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string; fotoId: string }> };
 
+/**
+ * Sube y registra una fotografía JPEG como evidencia de una inspección vehicular.
+ *
+ * - **Contrato HTTP**: `PUT /api/inspecciones/:id/fotos/:fotoId?orden=1..20&descripcion=...`
+ *   con cuerpo binario JPEG (validado y limitado por `leerFoto`).
+ * - **Autenticación y roles**: validada por `autorizarInspeccion(request, id)`
+ *   (personal autorizado con acceso a la inspección).
+ * - **Validaciones y saneamiento**: exige `:fotoId` UUID, `orden` entero `1..20`,
+ *   `descripcion` de hasta 200 caracteres y re-codifica con `sharp` (máx. 40 MP,
+ *   redimensionado a 2000×2000, calidad 85) para purgar metadatos EXIF/GPS y
+ *   descartar archivos corruptos.
+ * - **Cupo e idempotencia**: reserva el cupo (máx. 20 fotos por inspección) antes
+ *   de escribir en Storage; sube con `ifGenerationMatch: 0` y, ante `412`, valida
+ *   que el `sha256` coincida para aceptar reintentos del mismo archivo y rechazar
+ *   sobrescrituras con contenido distinto (`409`). Confirma el registro solo tras
+ *   asegurar la escritura en el bucket.
+ * - **Respuestas**:
+ *   - `200`: `{ rutaStorage }`.
+ *   - `400`: parámetros inválidos o imagen JPEG ilegible.
+ *   - `401` / `403` / `404`: sin sesión, sin permisos o inspección inexistente.
+ *   - `409`: cupo de 20 fotografías alcanzado o `fotoId` ya usado por otra imagen.
+ *   - `413` / `500` / `503`: archivo excede tamaño o fallo de Storage/BD.
+ */
 export async function PUT(request: Request, context: Context) {
   try {
     const { id, fotoId } = await context.params;
@@ -43,6 +67,20 @@ export async function PUT(request: Request, context: Context) {
   } catch (error) { return respuestaErrorEvidencia(error); }
 }
 
+/**
+ * Descarga una fotografía de evidencia de inspección desde Cloud Storage.
+ *
+ * - **Contrato HTTP**: `GET /api/inspecciones/:id/fotos/:fotoId`.
+ * - **Autenticación y roles**: validada por `autorizarInspeccion(request, id)`.
+ * - **Seguridad**: devuelve `image/jpeg` con `Cache-Control: private, no-store`
+ *   y `X-Content-Type-Options: nosniff` para evitar almacenamiento en cachés compartidas.
+ * - **Respuestas**:
+ *   - `200`: bytes JPEG de la evidencia.
+ *   - `400`: `:fotoId` no es un UUID válido.
+ *   - `401` / `403`: sesión ausente, inválida o sin acceso a la inspección.
+ *   - `404`: inspección o archivo de evidencia inexistente en Storage.
+ *   - `500` / `503`: fallo de infraestructura al descargar.
+ */
 export async function GET(request: Request, context: Context) {
   try {
     const { id, fotoId } = await context.params;

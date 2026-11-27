@@ -1,6 +1,15 @@
 import { isValidRut } from "@/lib/validators";
 import { VERSION_PRIVACIDAD } from "./modelo";
 
+/**
+ * Lee y valida las variables de entorno del aviso de privacidad y datos del
+ * responsable del tratamiento.
+ *
+ * El aviso solo se marca como `publicada` cuando están completos los datos de
+ * identidad, conservación y transferencias, y además `LEGAL_AVISO_APROBADO_VERSION`
+ * coincide con `VERSION_PRIVACIDAD` para evitar publicar cambios legales sin
+ * aprobación explícita.
+ */
 export function configuracionLegal() {
   const razonSocial = process.env.LEGAL_RAZON_SOCIAL?.trim() || "";
   const rut = process.env.LEGAL_RUT?.trim() || "";

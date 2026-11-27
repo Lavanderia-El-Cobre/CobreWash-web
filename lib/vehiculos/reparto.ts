@@ -2,11 +2,15 @@ import { EstadoVehiculo, type GetPanelRepartidorData } from "@/src/dataconnect-g
 import type { EvidenciaFotoInput } from "./modelo";
 import { validarRetornoVehiculo, validarSalidaVehiculo } from "./validaciones";
 
+/** Vehículo visible en el panel operativo del repartidor. */
 export type VehiculoReparto = GetPanelRepartidorData["vehiculos"][number];
+/** Salida propia registrada en el panel del repartidor. */
 export type SalidaReparto = GetPanelRepartidorData["misSalidas"][number];
 
+/** Disponibilidad del vehículo desde la perspectiva del repartidor autenticado. */
 export type DisponibilidadVehiculo = "Disponible" | "En ruta" | "Contigo";
 
+/** Opción de vehículo enriquecida con disponibilidad, odómetro y conductor actual. */
 export interface OpcionVehiculoReparto {
   vehiculo: VehiculoReparto;
   disponibilidad: DisponibilidadVehiculo;
@@ -16,6 +20,7 @@ export interface OpcionVehiculoReparto {
   conductorActual: string | null;
 }
 
+/** Estado estructurado del panel del repartidor (flota, salida activa e historial). */
 export interface PanelReparto {
   vehiculos: OpcionVehiculoReparto[];
   /** Salida propia en curso (a lo más una). */
@@ -26,6 +31,12 @@ export interface PanelReparto {
 const nombre = (p: { nombre: string; apellido?: string | null }) =>
   `${p.nombre} ${p.apellido ?? ""}`.trim();
 
+/**
+ * Obtiene el mayor kilometraje registrado en las inspecciones recientes de un vehículo,
+ * usado como piso mínimo al iniciar una nueva salida.
+ *
+ * @param vehiculo - Vehículo con sus salidas recientes e inspecciones.
+ */
 export function kilometrajeActualVehiculo(vehiculo: Pick<VehiculoReparto, "recientes">): number {
   let max = 0;
   for (const salida of vehiculo.recientes) {
@@ -37,8 +48,11 @@ export function kilometrajeActualVehiculo(vehiculo: Pick<VehiculoReparto, "recie
 }
 
 /**
- * Ordena la vista del repartidor: primero el vehículo que tiene en uso, luego
- * los disponibles y al final los que otra persona tiene en ruta.
+ * Arma y ordena la vista del repartidor: primero el vehículo que tiene en uso
+ * (`Contigo`), luego los `Disponible` y al final los que otra persona tiene `En ruta`.
+ *
+ * @param data - Respuesta cruda de `GetPanelRepartidor`.
+ * @param usuarioId - ID del repartidor autenticado.
  */
 export function construirPanelReparto(data: GetPanelRepartidorData, usuarioId: string | undefined): PanelReparto {
   const salidaEnCurso = data.misSalidas.find((s) => s.estado === "EN_SERVICIO") ?? null;
@@ -66,6 +80,7 @@ export function construirPanelReparto(data: GetPanelRepartidorData, usuarioId: s
   };
 }
 
+/** Formatea la etiqueta legible de un vehículo (`PATENTE · Marca Modelo`). */
 export function etiquetaVehiculo(v: Pick<VehiculoReparto, "patente" | "marca" | "modelo">): string {
   return `${v.patente} · ${v.marca} ${v.modelo}`;
 }
@@ -86,8 +101,13 @@ export interface FormMovimiento {
 }
 
 /**
- * Reglas de la salida y el regreso de flota, más una del repartidor: si el
- * vehículo no está apto debe describir lo que observó.
+ * Valida el formulario de salida o regreso del repartidor aplicando las reglas
+ * generales de flota más la obligatoriedad de describir hallazgos cuando el
+ * estado del vehículo es distinto de `APTO`.
+ *
+ * @param form - Estado actual del formulario de movimiento.
+ * @param usuarioId - ID del repartidor autenticado.
+ * @returns Mensaje de error en español, o `null` si el formulario es válido.
  */
 export function validarFormMovimiento(form: FormMovimiento, usuarioId: string): string | null {
   const error = form.tipo === "salida"

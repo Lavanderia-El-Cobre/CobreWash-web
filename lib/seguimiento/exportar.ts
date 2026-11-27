@@ -1,3 +1,4 @@
+/** Formato de salida disponible para descargar la tarjeta QR de una comanda. */
 export type FormatoComanda = "png" | "pdf";
 
 const ANCHO = 1200, ALTO = 1600;
@@ -5,6 +6,7 @@ const ANCHO = 1200, ALTO = 1600;
 async function cargarImagen(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const imagen = new Image();
+    // Límite de 15 s para evitar promesas colgadas si falla la carga del logo o del SVG serializado.
     const timer = window.setTimeout(() => terminar(new Error("La imagen tardó demasiado en cargar")), 15_000);
     function terminar(error?: Error) {
       window.clearTimeout(timer);
@@ -17,7 +19,13 @@ async function cargarImagen(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Render propio: usa únicamente el QR visible y el número, nunca datos privados del cliente. */
+/**
+ * Compone la tarjeta descargable de la comanda en un `<canvas>` de 1200×1600 px.
+ * Render propio: usa únicamente el QR visible y el número, nunca datos privados del cliente.
+ *
+ * @param svg - Elemento SVG del código QR renderizado en pantalla.
+ * @param numeroComanda - Código visible de la comanda (p. ej. `ELCOBRE-A1B2`).
+ */
 export async function crearTarjetaComanda(svg: SVGSVGElement, numeroComanda: string): Promise<HTMLCanvasElement> {
   await document.fonts?.ready;
   const estilos = getComputedStyle(document.documentElement);
@@ -75,6 +83,14 @@ export async function crearTarjetaComanda(svg: SVGSVGElement, numeroComanda: str
   return lienzo;
 }
 
+/**
+ * Exporta y descarga la tarjeta QR de la comanda como imagen PNG o documento PDF
+ * (ancho de 148 mm proporcional al lienzo, importando `jspdf` bajo demanda).
+ *
+ * @param svg - Elemento SVG del código QR visible.
+ * @param numeroComanda - Número de comanda usado en la tarjeta y nombre de archivo.
+ * @param formato - Formato de descarga deseado (`"png"` o `"pdf"`).
+ */
 export async function exportarComandaQr(svg: SVGSVGElement, numeroComanda: string, formato: FormatoComanda): Promise<void> {
   const lienzo = await crearTarjetaComanda(svg, numeroComanda);
   let contenido: Blob;
@@ -93,5 +109,6 @@ export async function exportarComandaQr(svg: SVGSVGElement, numeroComanda: strin
   enlace.download = `comanda-${numeroComanda.replace(/[^a-z0-9_-]/gi, "").slice(0, 64) || "pedido"}.${formato}`;
   document.body.appendChild(enlace);
   try { enlace.click(); }
+  // Se difiere la revocación para no cortar descargas asíncronas en navegadores que leen el blob tras el click.
   finally { enlace.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
 }

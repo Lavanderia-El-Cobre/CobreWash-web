@@ -2059,6 +2059,10 @@ export interface GetPanelIaData {
   conteosSimulados: ({
     _count: number;
   })[];
+  ultimoConteoReal: ({
+    fechaConteo?: TimestampString | null;
+    creadoEn: TimestampString;
+  })[];
   simulaciones: ({
     id: UUIDString;
     semanas: number;

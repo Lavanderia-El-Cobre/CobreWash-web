@@ -1,4 +1,4 @@
-import { limitesFechasConsulta } from "@/lib/reportes/fechas";
+import { instanteChile } from "@/lib/reportes/fechas";
 
 /**
  * Lectura y validación de CSV de conteos físicos o compras antes de guardar.
@@ -11,8 +11,10 @@ import { limitesFechasConsulta } from "@/lib/reportes/fechas";
  *   compra a mediodía, para que la compra quede antes del conteo de ese día.
  */
 
+/** Tipo de importación histórica soportada por el cargador CSV. */
 export type TipoCsv = "conteos" | "compras";
 
+/** Fila validada y normalizada, lista para verificar duplicados e insertar. */
 export interface FilaCsv {
   linea: number;
   insumoId: string;
@@ -21,14 +23,17 @@ export interface FilaCsv {
   fecha: string;
 }
 
+/** Error de validación o duplicado asociado a una línea del CSV (base 1). */
 export interface ErrorCsv {
   linea: number;
   mensaje: string;
 }
 
+/** Tope de filas por carga para evitar timeouts y abusos de memoria. */
 export const MAXIMO_FILAS_CSV = 2000;
 const MAXIMO_CANTIDAD = 9_999_999_999.99;
 
+/** Normaliza encabezados y nombres de insumos quitando tildes, mayúsculas y espacios extra. */
 export const normalizarTexto = (v: string) =>
   v.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -50,9 +55,11 @@ export function separarLinea(linea: string, separador: string): string[] {
   return campos.map((v) => v.trim());
 }
 
+/** Interpreta una cantidad numérica en formato local o internacional; null si no es válida. */
 export function leerCantidad(valor: string): number | null {
   let v = valor.replace(/\s/g, "");
   if (!/^-?[\d.,]+$/.test(v)) return null;
+  // Con coma se asume formato chileno (punto = miles, coma = decimal); sin coma, grupos de 3 dígitos son miles.
   if (v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
   else if (/^-?\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, "");
   const n = Number(v);
@@ -64,18 +71,25 @@ export function leerFecha(valor: string, tipo: TipoCsv): string | null {
   const m = valor.trim().match(/^(?:(\d{4})-(\d{2})-(\d{2})|(\d{2})[-/](\d{2})[-/](\d{4}))(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!m) return null;
   const dia = m[1] ? `${m[1]}-${m[2]}-${m[3]}` : `${m[6]}-${m[5]}-${m[4]}`;
-  let inicio: string | undefined;
-  try { inicio = limitesFechasConsulta(dia, dia).fechaDesde; } catch { return null; }
   const [h, min, s] = m[7] !== undefined
     ? [Number(m[7]), Number(m[8]), Number(m[9] ?? 0)]
     : tipo === "conteos" ? [23, 59, 59] : [12, 0, 0];
   if (h > 23 || min > 59 || s > 59) return null;
-  return new Date(Date.parse(inicio!) + ((h * 60 + min) * 60 + s) * 1000).toISOString();
+  try { return instanteChile(dia, h, min, s); } catch { return null; }
 }
 
+/**
+ * Parsea y valida un CSV de conteos o compras contra los insumos activos.
+ *
+ * @param texto - Contenido crudo del archivo CSV (puede incluir BOM UTF-8).
+ * @param tipo - Define reglas de signo y hora por defecto cuando falta HH:MM.
+ * @param insumos - Catálogo de insumos activos aceptados por nombre.
+ * @param ahora - Referencia temporal para rechazar fechas futuras.
+ */
 export function leerCsv(texto: string, tipo: TipoCsv, insumos: { id: string; nombre: string }[], ahora = new Date()) {
   const filas: FilaCsv[] = [];
   const errores: ErrorCsv[] = [];
+  // Elimina BOM UTF-8 que suele anteponer Excel al exportar.
   const lineas = texto.replace(/^﻿/, "").split(/\r?\n/).map((contenido, i) => ({ contenido, linea: i + 1 })).filter((l) => l.contenido.trim());
   if (!lineas.length) return { filas, errores: [{ linea: 1, mensaje: "El archivo está vacío." }] };
 

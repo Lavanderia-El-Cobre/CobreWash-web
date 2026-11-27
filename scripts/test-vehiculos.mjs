@@ -1,8 +1,23 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para el módulo de flota y
+ * vehículos (RF-VE01 a RF-VE04 y panel de repartidores).
+ *
+ * Valida registro y validación de patentes, salidas con inspección inicial bloqueando vehículos
+ * `NO_APTO` o doble salida simultánea, carga de evidencias en dos fases exclusiva del servidor,
+ * odómetro no decreciente al retorno, historial con inspecciones ANTES/DESPUES y aislamiento
+ * del panel y operaciones de repartidores frente a administración.
+ *
+ * Invocación:
+ *   node scripts/test-vehiculos.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-// Pruebas de integración en el emulador aislado de Data Connect (Sprint 08 - Vehículos).
+// Guardia de seguridad: restringe la suite al emulador local aislado en 9499.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = `http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
@@ -11,6 +26,10 @@ const queries = await readFile("dataconnect/example/vehiculos-queries.gql", "utf
 const mutations = await readFile("dataconnect/example/vehiculos-mutations.gql", "utf8");
 const evidencias = await readFile("dataconnect/example/evidencias.gql", "utf8");
 
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string = UID autenticado).
+ */
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate =
     user === null

@@ -45,14 +45,24 @@ function resolverLibres(G: number[][], h: number[], libres: boolean[]): number[]
   return s;
 }
 
+/**
+ * Resuelve el problema de mínimos cuadrados no negativos (NNLS) mediante el
+ * método de conjunto activo de Lawson–Hanson en forma de Gram.
+ *
+ * @param G - Matriz simétrica semidefinida positiva (G = XᵀX + regularización).
+ * @param h - Vector del lado derecho (h = Xᵀy + regularización·θ0).
+ * @returns Vector solución θ ≥ 0 que minimiza ½·θᵀGθ − hᵀθ.
+ */
 export function nnlsGram(G: number[][], h: number[]): number[] {
   const n = h.length;
   const x = new Array<number>(n).fill(0);
   const libres = new Array<boolean>(n).fill(false);
   const tol = 1e-10 * Math.max(1, ...h.map(Math.abs));
+  // Gradiente negativo de ½·θᵀGθ − hᵀθ: w[i] > 0 indica que aumentar x[i] reduce el costo.
   const gradiente = () => h.map((hi, i) => hi - G[i].reduce((s, g, j) => s + g * x[j], 0));
   let w = gradiente();
   let iter = 0;
+  // Tope defensivo contra ciclos por redondeo en problemas casi singulares.
   const maxIter = 30 * Math.max(1, n);
 
   while (iter++ < maxIter) {
@@ -67,6 +77,7 @@ export function nnlsGram(G: number[][], h: number[]): number[] {
       w[j] = 0;
       continue;
     }
+    // Bucle interno: si alguna variable libre se vuelve ≤ 0, interpola hasta la frontera del cono θ ≥ 0.
     while (libres.some((libre, i) => libre && s[i] <= 0) && iter++ < maxIter) {
       let alfa = Infinity;
       for (let i = 0; i < n; i++) if (libres[i] && s[i] <= 0) alfa = Math.min(alfa, x[i] / (x[i] - s[i]));

@@ -2,6 +2,11 @@
 
 import { QRCodeSVG } from "qrcode.react";
 
+/**
+ * Renderiza un código QR vectorial de alto contraste sobre fondo blanco.
+ * Fija corrección de errores nivel M sin escalado automático (`boostLevel={false}`) y zona silenciosa
+ * de 4 módulos (`marginSize={4}`) para mantener lectura confiable en pantalla e impresión.
+ */
 export default function QrCode({ value, size = 160, className = "", title = "Escanea para seguir tu pedido" }: {
   value: string;
   size?: number;

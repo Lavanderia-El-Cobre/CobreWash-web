@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { signOut } from "firebase/auth";
 import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, MapPin, AlertCircle, Search, MailCheck, RefreshCw } from "lucide-react";
@@ -41,17 +41,21 @@ const tipoClienteOptions = [
   { value: TipoCliente.HOTEL, label: "Empresa / Hotel" },
 ];
 
+/**
+ * Barra de navegación pública fija con acceso a seguimiento de comandas y flujo completo
+ * de autenticación (ingreso, registro público de clientes, verificación de correo y recuperación).
+ *
+ * @param props.paginaInterior - Cuando es `true`, prefija `/` en los anclajes `#seccion` para navegar de vuelta a la landing desde páginas internas (p. ej. legales).
+ */
 export default function Navbar({ paginaInterior = false }: { paginaInterior?: boolean } = {}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // Modal States
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
 
-  // Seguimiento (tracking) modal — solo pide el código y redirige al portal
-  // público de seguimiento, donde se muestra el estado real de la comanda.
+  // El modal de seguimiento solo captura el código y redirige al portal público `/seguimiento`.
   const [trackingCode, setTrackingCode] = useState("");
   const [trackingError, setTrackingError] = useState("");
 
@@ -72,7 +76,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     router.push(`/seguimiento?codigo=${encodeURIComponent(trackingCode.trim())}`);
   };
 
-  // Auth Form States
+  // Vistas del flujo de acceso:
   // "verificar": la cuenta espera la verificación del correo.
   // "completar": correo verificado, falta crear el perfil de cliente.
   const [authView, setAuthView] = useState<"login" | "register" | "forgot" | "verificar" | "completar">("login");
@@ -90,11 +94,13 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   const [authConfirmPass, setAuthConfirmPass] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
+  const verificandoRef = useRef(false);
+  const forgotTimerRef = useRef<number | null>(null);
   const [autorizaDatos, setAutorizaDatos] = useState(false);
   const avisoPublicado = useAvisoPublicado();
   const [authError, setAuthError] = useState("");
 
-  // Register-only fields (Usuario / Cliente). El registro público siempre
+  // Campos exclusivos de registro y completado. El registro público siempre
   // crea cuentas de tipo "cliente" — el resto de roles se crean desde la intranet.
   const [authApellido, setAuthApellido] = useState("");
   const [authRut, setAuthRut] = useState("");
@@ -139,6 +145,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       catch { /* Se mantiene el formulario de ingreso. */ }
     });
     return () => { vigente = false; window.clearTimeout(timeoutId); };
+    // Solo debe evaluarse al montar para leer los query params iniciales y retomar el flujo una sola vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -154,7 +161,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   }, [bloqueoIngreso]);
   const esperaIngreso = bloqueoIngreso && bloqueoIngreso > reloj ? bloqueoIngreso - reloj : 0;
 
-  // Lock body scroll when the modal is open
+  // Bloquea el scroll del documento mientras haya un modal abierto.
   useEffect(() => {
     if (isLoginOpen || isTrackingOpen) {
       document.body.style.overflow = "hidden";
@@ -166,7 +173,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     };
   }, [isLoginOpen, isTrackingOpen]);
 
-  // Handle scroll header background change
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 20) {
@@ -216,20 +222,43 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   }
 
   const comprobarVerificacion = useCallback(async (manual: boolean) => {
+    if (verificandoRef.current) return;
     const user = auth.currentUser;
     if (!user) { setAuthView("login"); return; }
-    await user.reload().catch(() => undefined);
-    if (!user.emailVerified) {
-      if (manual) setAuthError("Aún no vemos tu correo verificado. Abre el enlace que te enviamos y vuelve a intentarlo.");
-      return;
+    verificandoRef.current = true;
+    try {
+      await user.reload().catch(() => undefined);
+      if (!user.emailVerified) {
+        if (manual) setAuthError("Aún no vemos tu correo verificado. Abre el enlace que te enviamos y vuelve a intentarlo.");
+        return;
+      }
+      setAuthError("");
+      setAuthLoading(true);
+      try { await continuarIngreso(await resolverIngreso({ auth, dataConnect })); }
+      catch (err) { setAuthError(mapAuthError(err)); }
+      finally { setAuthLoading(false); }
+    } finally {
+      verificandoRef.current = false;
     }
-    setAuthError("");
-    setAuthLoading(true);
-    try { await continuarIngreso(await resolverIngreso({ auth, dataConnect })); }
-    catch (err) { setAuthError(mapAuthError(err)); }
-    finally { setAuthLoading(false); }
+    // `continuarIngreso` se recrea en cada render, pero aquí solo se invoca tras verificar correo con setters estables.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cancela el retorno automático desde "forgot" al cerrar el modal, cambiar de vista o desmontar.
+  useEffect(() => {
+    if (!isLoginOpen || authView !== "forgot") {
+      if (forgotTimerRef.current !== null) {
+        window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (forgotTimerRef.current !== null) {
+        window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = null;
+      }
+    };
+  }, [isLoginOpen, authView]);
 
   // Mientras se espera la verificación, se revisa cada pocos segundos.
   useEffect(() => {
@@ -291,9 +320,9 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
     }
   };
 
-  // Auth Submission (Firebase Auth + Data Connect)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authLoading) return;
     setAuthError("");
     setAuthInfo("");
 
@@ -399,7 +428,9 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         await requestPasswordReset(auth, authEmail);
         setAuthLoading(false);
         setAuthSuccess(true);
-        setTimeout(() => {
+        if (forgotTimerRef.current !== null) window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = window.setTimeout(() => {
+          forgotTimerRef.current = null;
           setAuthView("login");
           setAuthSuccess(false);
         }, 3000);
@@ -430,7 +461,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo + Text */}
             <div className="flex-shrink-0 flex items-center">
               <a
                 href={paginaInterior ? "/#inicio" : "#inicio"}
@@ -451,7 +481,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
               </a>
             </div>
 
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               <div className="flex items-baseline gap-6">
                 {navLinks.map((link) => (
@@ -466,9 +495,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                 ))}
               </div>
 
-              {/* CTAs Group */}
               <div className="flex items-center gap-3">
-                {/* Seguimiento CTA → abre el modal de seguimiento */}
                 <button
                   onClick={openTracking}
                   className="flex items-center justify-center gap-2 bg-white border border-stone-250 text-stone-700 hover:border-stone-400 hover:text-stone-900 px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all duration-200 hover:scale-[1.02] cursor-pointer"
@@ -477,7 +504,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                   <span>Seguimiento</span>
                 </button>
 
-                {/* Iniciar Sesión CTA */}
                 <button
                   onClick={() => { void abrirIngreso(); }}
                   disabled={comprobandoSesion}
@@ -490,7 +516,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
               </div>
             </div>
 
-            {/* Mobile Menu Button */}
             <div className="md:hidden">
               <button
                 onClick={() => setIsOpen(!isOpen)}
@@ -503,7 +528,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer */}
         <AnimatePresence>
           {isOpen && (
             <motion.div
@@ -548,9 +572,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         </AnimatePresence>
       </nav>
 
-      {/* MODALS SECTION */}
       <AnimatePresence>
-        {/* Tracking Modal — pide el código y lleva al portal de seguimiento */}
         {isTrackingOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
@@ -623,10 +645,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
           </div>
         )}
 
-        {/* Login / Register / Forgot Password Modal */}
         {isLoginOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -635,7 +655,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
               className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
             />
 
-            {/* Modal Box */}
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -643,7 +662,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
               transition={{ type: "spring", duration: 0.4 }}
               className="glass-modal bg-white/70 backdrop-blur-2xl backdrop-saturate-150 rounded-3xl p-6 sm:p-8 w-full max-w-md border border-white/60 relative z-10 max-h-[90vh] overflow-y-auto"
             >
-              {/* Close Button */}
               <button
                 onClick={() => setIsLoginOpen(false)}
                 className="absolute top-4 right-4 p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-all"
@@ -652,7 +670,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
               </button>
 
               <div className="space-y-6">
-                {/* Header Logo */}
                 <div className="flex flex-col items-center text-center space-y-3">
                   <Image
                     src="/logo.webp"
@@ -677,7 +694,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                   </p>
                 </div>
 
-                {/* Form Logic */}
                 <AnimatePresence mode="wait">
                   {authSuccess ? (
                     <motion.div
@@ -711,7 +727,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                       exit={{ opacity: 0, x: -10 }}
                       onSubmit={handleAuthSubmit}
                       className="space-y-4"
-                      noValidate // Disable browser validation balloons
+                      noValidate // Desactiva tooltips nativos para mostrar validaciones personalizadas en el bloque `role="alert"`.
                     >
                       {authError && (
                         <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-755 text-xs font-semibold rounded-xl">
@@ -739,7 +755,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         <p className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-xs font-semibold text-green-700"><CheckCircle2 className="h-4 w-4 shrink-0" /><span className="break-all">Correo verificado: {correoPendiente}</span></p>
                       )}
 
-                      {/* Register-only fields */}
                       {(authView === "register" || authView === "completar") && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
@@ -828,7 +843,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         </>
                       )}
 
-                      {/* Common Email Input */}
                       {authView !== "verificar" && authView !== "completar" && <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Correo Electrónico</label>
                         <div className="relative">
@@ -843,7 +857,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         </div>
                       </div>}
 
-                      {/* Password input for Login / Register */}
                       {(authView === "login" || authView === "register") && (
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Contraseña</label>
@@ -884,7 +897,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         </label>
                       )}
 
-                      {/* Confirm Password input for Register */}
                       {authView === "register" && (
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold uppercase tracking-wider text-stone-600">Confirmar Contraseña</label>
@@ -908,7 +920,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         <AceptacionTerminos aceptada={aceptaTerminos} onChange={setAceptaTerminos} disabled={!avisoPublicado} />
                         <AutorizacionDatos finalidad="cuenta" aceptada={autorizaDatos} onChange={setAutorizaDatos} publicada={avisoPublicado} />
                       </>}
-                      {/* Submit Button */}
                       <button
                         type="submit"
                         disabled={authLoading || (authView === "login" && esperaIngreso > 0) || ((authView === "register" || authView === "completar") && (!avisoPublicado || !autorizaDatos || !aceptaTerminos))}
@@ -927,7 +938,6 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
                         )}
                       </button>
 
-                      {/* Footer Actions (Toggles) */}
                       <div className="pt-4 border-t border-stone-100 flex flex-col items-center gap-2 text-xs">
                         {/* Al final del orden de tabulación: de correo se pasa directo a contraseña. */}
                         {authView === "login" && (

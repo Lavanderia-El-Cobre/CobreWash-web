@@ -9,6 +9,7 @@ import type { TasaServicio } from "./modelo";
  * con la misma semilla.
  */
 
+/** Configuración de un lote sintético reproducible para validar el aprendizaje del modelo. */
 export interface ParametrosSimulacion {
   semanas: number;
   kgSemanalMin: number;
@@ -22,6 +23,7 @@ export interface ParametrosSimulacion {
   inicio: string;
 }
 
+/** Rangos válidos permitidos para los parámetros de simulación en UI y API. */
 export const LIMITES_SIMULACION = {
   semanas: [1, 52],
   kgSemanal: [6000, 9000],
@@ -29,6 +31,7 @@ export const LIMITES_SIMULACION = {
   desvioTasas: [0, 0.5],
 } as const;
 
+/** Valores sugeridos por defecto al abrir el generador de simulación. */
 export const PARAMETROS_SIMULACION_INICIALES: Omit<ParametrosSimulacion, "inicio" | "semilla"> = {
   semanas: 12,
   kgSemanalMin: 6000,
@@ -37,6 +40,7 @@ export const PARAMETROS_SIMULACION_INICIALES: Omit<ParametrosSimulacion, "inicio
   desvioTasas: 0.3,
 };
 
+/** Valida los parámetros de simulación contra `LIMITES_SIMULACION`; devuelve mensaje de error o null si todo es válido. */
 export function validarParametrosSimulacion(p: ParametrosSimulacion): string | null {
   const entre = (v: number, [a, b]: readonly [number, number]) => Number.isFinite(v) && v >= a && v <= b;
   if (!Number.isInteger(p.semanas) || !entre(p.semanas, LIMITES_SIMULACION.semanas)) return "Las semanas deben ser un número entero entre 1 y 52.";
@@ -63,6 +67,7 @@ export function crearAzar(semilla: number) {
   return { u, normal };
 }
 
+/** Series generadas por una corrida de simulación junto con las tasas ocultas usadas. */
 export interface ResultadoSimulacion {
   /** Tasas ocultas por insumo y servicio, en unidad del insumo por kg. */
   tasasVerdaderas: Record<string, Record<string, number>>;
@@ -74,6 +79,11 @@ export interface ResultadoSimulacion {
 const DIA = 86_400_000;
 const redondear = (v: number, decimales = 2) => Math.round(v * 10 ** decimales) / 10 ** decimales;
 
+/**
+ * Ejecuta la simulación semana a semana: sortea tasas verdaderas, genera
+ * producción diaria (+0,5 día), reposiciones matutinas (+0,25 día) y conteos
+ * semanales al cierre de cada período.
+ */
 export function generarSimulacion(entrada: { parametros: ParametrosSimulacion; tasas: Record<string, TasaServicio[]> }): ResultadoSimulacion {
   const error = validarParametrosSimulacion(entrada.parametros);
   if (error) throw new Error(error);

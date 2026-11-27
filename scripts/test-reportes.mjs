@@ -1,11 +1,29 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para el módulo de reportes.
+ *
+ * Valida agregaciones por cliente y empresa excluyendo comandas anuladas y respetando límites
+ * exactos de fecha, filtros y paginación sin duplicados, desglose de comandas mixtas por
+ * servicio, cálculo de volumen por fecha de primer cierre y restricción exclusiva a
+ * administradores activos.
+ *
+ * Invocación:
+ *   node scripts/test-reportes.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-// Fixtures y escrituras exclusivamente en el emulador aislado.
+// Guardia de seguridad: fixtures y escrituras exclusivamente en el emulador aislado.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = `http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
 const queries = await readFile("dataconnect/example/reportes-queries.gql", "utf8");
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string = UID autenticado).
+ */
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user, firebase: { sign_in_provider: "password" } } } : undefined;
   const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, operationName, variables, extensions: { impersonate } }) });

@@ -9,11 +9,15 @@
 
 import type { EtapaVisible } from "@/lib/produccion/modelo";
 
+/** Secuencia ordenada de las 5 etapas operativas de una comanda. */
 export const ETAPAS = ["Recepción", "Lavado", "Secado", "Planchado", "Entrega"] as const;
+/** Nombre visible de una etapa de producción. */
 export type Etapa = (typeof ETAPAS)[number];
 
+/** Estado visible de una comanda en las vistas de la intranet. */
 export type EstadoComanda = "Pendiente" | "En proceso" | "Listo" | "Entregado" | "Anulado";
 
+/** Línea de detalle de prendas o servicios dentro de una comanda. */
 export interface PrendaLinea {
   tipoPrenda: string;
   servicio: string;
@@ -58,6 +62,7 @@ export interface Comanda {
   motivoAnulacion?: string;
 }
 
+/** Suma total de unidades de prendas declaradas en todas las líneas de la comanda. */
 export const prendasTotales = (c: Comanda) =>
   c.detalle.reduce((s, d) => s + d.cantidad, 0);
 
@@ -68,6 +73,7 @@ export const pesoTotal = (c: Comanda) =>
 /** Subtotal de una línea: el guardado o, en datos antiguos, cantidad × precio. */
 export const subtotalLinea = (d: PrendaLinea) => d.subtotal ?? d.cantidad * d.precioUnitario;
 
+/** Monto total de la comanda: usa `valorTotal` persistido o lo recalcula desde el detalle. */
 export const valorTotal = (c: Comanda) =>
   c.valorTotal ?? c.detalle.reduce((s, d) => s + d.cantidad * d.precioUnitario, 0);
 
@@ -82,9 +88,11 @@ export const progreso = (c: Comanda) => {
 /** Umbral de horas a partir del cual una etapa se considera estancada. */
 export const UMBRAL_ESTANCADA = 6;
 
+/** Indica si una comanda activa superó el umbral de permanencia en su etapa actual. */
 export const estaEstancada = (c: Comanda) =>
   c.estado === "En proceso" && (c.horasEnEtapa ?? 0) >= UMBRAL_ESTANCADA;
 
+/** Clases Tailwind de badge y punto indicador para cada estado de comanda. */
 export const estadoConfig: Record<
   EstadoComanda,
   { bg: string; text: string; dot: string }

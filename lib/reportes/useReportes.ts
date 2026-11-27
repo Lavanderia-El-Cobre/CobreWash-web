@@ -1,3 +1,4 @@
+// Requiere estado y efectos de React para gestionar consultas reactivas en el cliente.
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -5,6 +6,16 @@ import { consultarFiltrosReportes, consultarReporte } from "./consultar";
 import { errorRango } from "./fechas";
 import type { FiltrosReporte, Reporte, VistaReporte } from "./modelo";
 
+/**
+ * Gestiona la carga de catálogos de filtros y datos del reporte activo en la intranet.
+ * Valida el rango de fechas antes de consultar y asocia cada respuesta a una `clave`
+ * compuesta para descartar resultados desfasados al cambiar de vista, filtros o usuario.
+ *
+ * @param usuarioId - Identificador del usuario autenticado; evita cruzar caché entre sesiones.
+ * @param habilitado - Activa o pausa las consultas (p. ej. mientras se validan permisos).
+ * @param vista - Vista analítica seleccionada.
+ * @param filtros - Filtros activos de fechas, cliente, empresa y servicio.
+ */
 export function useReportes(
   usuarioId: string | undefined,
   habilitado: boolean,
@@ -69,6 +80,7 @@ export function useReportes(
     };
   }, [clave, usuarioId, habilitado, vista, filtrosEstables, validacion]);
 
+  // Solo expone datos si coinciden exactamente con la consulta/sesión vigente.
   const actual = habilitado && resultado?.clave === clave ? resultado : null;
   const filtrosActuales =
     habilitado && catalogos?.usuarioId === usuarioId ? catalogos : null;

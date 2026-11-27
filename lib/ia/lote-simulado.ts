@@ -17,6 +17,7 @@ export interface DatosSimulacion {
   insumos: { id: string; nombre: string; unidadMedida: string }[];
 }
 
+/** Parámetros de entrada del lote desde la UI; `inicio` se calcula hacia atrás desde `ahora`. */
 export type ParametrosLote = Omit<ParametrosSimulacion, "inicio">;
 
 /** Un punto de la curva: cómo queda el modelo con los primeros `periodos` de datos. */
@@ -28,6 +29,7 @@ export interface PuntoCurva {
   errorTasas: number;
 }
 
+/** Comparación entre la tasa inicial y la tasa oculta generada en una simulación. */
 export interface TasaVerdadera {
   insumo: string;
   servicio: string;

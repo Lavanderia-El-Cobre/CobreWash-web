@@ -9,12 +9,20 @@ import ResumenIa from "./ResumenIa";
 import type { Avisar } from "./ui";
 
 const DET = "10000000-0000-4000-8000-000000000001";
+const CLO = "10000000-0000-4000-8000-000000000002";
 const detalle = {
-  insumos: [{
-    insumoId: DET.replaceAll("-", ""), nombre: "Detergente", unidad: "L", observaciones: 6, mae: 0.8, mape: 6.25, desviacionRelativa: 0.12,
-    metodoError: "validacion-cruzada", consumoDiario: 2, fuenteConsumo: "conteos",
-    tasas: [{ servicioId: "s", servicio: "Lavado", unidad: "ml", inicial: 12, anterior: 12, resultado: 10.2 }],
-  }],
+  insumos: [
+    {
+      insumoId: DET.replaceAll("-", ""), nombre: "Detergente", unidad: "L", observaciones: 6, mae: 0.8, mape: 6.25, desviacionRelativa: 0.12,
+      metodoError: "validacion-cruzada", consumoDiario: 2, fuenteConsumo: "conteos",
+      tasas: [{ servicioId: "s", servicio: "Lavado", unidad: "ml", inicial: 12, anterior: 12, resultado: 10.2 }],
+    },
+    {
+      insumoId: CLO.replaceAll("-", ""), nombre: "Cloro", unidad: "L", observaciones: 6, mae: 0.2, mape: 5.0, desviacionRelativa: 0.1,
+      metodoError: "validacion-cruzada", consumoDiario: 3, fuenteConsumo: "conteos",
+      tasas: [{ servicioId: "s", servicio: "Lavado", unidad: "ml", inicial: 5, anterior: 5, resultado: 5 }],
+    },
+  ],
   descartados: [{ insumo: "Detergente", desde: "2026-09-01T23:00:00Z", hasta: "2026-09-08T23:00:00Z", motivo: "Consumo negativo: puede faltar registrar una compra" }],
   totalDescartados: 1,
 };
@@ -22,8 +30,11 @@ const base = {
   configuracionIa: null,
   tasaConsumos: [{ tipoServicioId: "s", insumoId: DET, tasaInicial: 12, tasaActual: 10.2, unidad: "ml", fuente: null, actualizadoEn: "", tipoServicio: { id: "s", nombre: "Lavado" }, insumo: { id: DET, nombre: "Detergente", unidadMedida: "L" } }],
   modeloVigente: [] as unknown[],
-  insumos: [{ id: DET, nombre: "Detergente", unidadMedida: "L", stockActual: 80, stockMinimo: 10, revisionStock: 0 }],
-  tipoServicios: [], conteosReales: [{ _count: 7 }], conteosSimulados: [{ _count: 0 }], simulaciones: [],
+  insumos: [
+    { id: DET, nombre: "Detergente", unidadMedida: "L", stockActual: 80, stockMinimo: 10, revisionStock: 0 },
+    { id: CLO, nombre: "Cloro", unidadMedida: "L", stockActual: 12, stockMinimo: 15, revisionStock: 0 },
+  ],
+  tipoServicios: [], conteosReales: [{ _count: 7 }], conteosSimulados: [{ _count: 0 }], ultimoConteoReal: [], simulaciones: [],
 };
 const conModelo = { ...base, modeloVigente: [{ id: "m", version: "v4", fechaEntrenamiento: "2026-10-01T15:00:00Z", mae: 0.8, mape: 6.25, desviacionRelativa: 0.12, observaciones: 6, lambda: 1, margenSeguridad: 0.15, incluyeSimulado: true, tasasJson: JSON.stringify(detalle) }] };
 
@@ -36,23 +47,34 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-it("sin ajustes invita a recalcular y muestra igual la comparación de tasas", () => {
+it("sin ajustes muestra la guía rápida de 3 pasos y mantiene los detalles técnicos accesibles", () => {
   render(createElement(ResumenIa, { panel: base as never, recargar, avisar }));
+  expect(screen.getByText("Cómo empezar en 3 pasos")).toBeTruthy();
   expect(screen.getByText(/Aún no hay ajustes/)).toBeTruthy();
   expect(screen.getByText("Error medio (MAPE)").nextElementSibling!.textContent).toBe("—");
   expect(screen.getByText("Conteos reales").nextElementSibling!.textContent).toBe("7");
   expect(screen.getByText("-15%")).toBeTruthy();
 });
 
-it("muestra el error, los días de stock y los períodos descartados del ajuste vigente", () => {
-  render(createElement(ResumenIa, { panel: conModelo as never, recargar, avisar }));
+it("ordena insumos por urgencia, sugiere reposición a 14 días y expone métricas técnicas y descartes", () => {
+  render(createElement(ResumenIa, { panel: conModelo as never, recargar, avisar, hayCambiosPendientes: true }));
   expect(screen.getByText(/Ajuste v4 del/)).toBeTruthy();
   expect(screen.getByText("Incluye datos simulados")).toBeTruthy();
+  expect(screen.getByText("Hay datos nuevos sin incluir en la predicción")).toBeTruthy();
+  expect(screen.getByText("Insumos por reponer").nextElementSibling!.textContent).toBe("1");
   expect(screen.getByText("Rango de estimación").nextElementSibling!.textContent).toBe("±12%");
-  const fila = screen.getAllByText("Detergente").map((e) => e.closest("tr")!).find((tr) => tr.textContent!.includes("L/día"))!;
-  expect(fila.textContent).toContain("6,3%");
-  expect(fila.textContent).toContain("2 L/día");
-  expect(fila.lastElementChild!.textContent).toBe("40");
+
+  const tablaCobertura = screen.getByText("Cobertura de insumos").closest("section")!.querySelector("tbody")!;
+  const filas = Array.from(tablaCobertura.querySelectorAll("tr"));
+  // Cloro (4 días) debe aparecer antes que Detergente (40 días).
+  expect(filas[0].textContent).toContain("Cloro");
+  expect(filas[0].textContent).toContain("Bajo mínimo");
+  expect(filas[0].textContent).toContain("Comprar ~30 L");
+  expect(filas[1].textContent).toContain("Detergente");
+  expect(filas[1].textContent).toContain("2 L/día");
+  expect(filas[1].textContent).toContain("40");
+  expect(filas[1].textContent).toContain("Stock suficiente");
+
   expect(screen.getByText(/Períodos descartados \(1\)/)).toBeTruthy();
   expect(screen.getByText(/puede faltar registrar una compra/)).toBeTruthy();
 });

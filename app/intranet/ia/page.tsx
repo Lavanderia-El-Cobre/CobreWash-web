@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Database, FlaskConical, Gauge, History, Loader2, Table2 } from "lucide-react";
 import { QueryFetchPolicy } from "firebase/data-connect";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
@@ -9,28 +9,36 @@ import HistorialIa from "@/components/intranet/ia/HistorialIa";
 import ResumenIa from "@/components/intranet/ia/ResumenIa";
 import SimulacionIa from "@/components/intranet/ia/SimulacionIa";
 import TasasIa from "@/components/intranet/ia/TasasIa";
-import { AvisoFlotante, type Aviso } from "@/components/intranet/ia/ui";
+import { AvisoFlotante, type Aviso, type PestanaIa } from "@/components/intranet/ia/ui";
 import EncabezadoSeccion from "@/components/intranet/EncabezadoSeccion";
 import { dataConnect } from "@/lib/firebase/client";
 import { registrarError } from "@/lib/registro-seguro";
 import { getPanelIa, type GetPanelIaData } from "@/src/dataconnect-generated";
 
-const PESTANAS = [
-  { id: "resumen", etiqueta: "Resumen", icono: Gauge },
-  { id: "tasas", etiqueta: "Tasas", icono: Table2 },
-  { id: "datos", etiqueta: "Datos", icono: Database },
-  { id: "simulacion", etiqueta: "Simulación", icono: FlaskConical },
-  { id: "historial", etiqueta: "Historial", icono: History },
-] as const;
-type Pestana = (typeof PESTANAS)[number]["id"];
+const PESTANAS: readonly { id: PestanaIa; etiqueta: string; icono: React.ElementType }[] = [
+  { id: "resumen", etiqueta: "Predicción y stock", icono: Gauge },
+  { id: "tasas", etiqueta: "Dosis por servicio", icono: Table2 },
+  { id: "datos", etiqueta: "Cargar datos", icono: Database },
+  { id: "laboratorio", etiqueta: "Pruebas e historial", icono: FlaskConical },
+];
 
+type SubLaboratorio = "historial" | "simulacion";
+
+/**
+ * Módulo de inteligencia y predicción de consumo de insumos (`/intranet/ia`).
+ * Reservado al rol `admin`. Organiza cobertura de stock, dosis por servicio, carga de datos
+ * y laboratorio/historial en 4 pestañas accesibles por teclado.
+ */
 export default function ModuloIaPage() {
   const permitido = useRoleGuard(["admin"]);
-  const [pestana, setPestana] = useState<Pestana>("resumen");
+  const [pestana, setPestana] = useState<PestanaIa>("resumen");
+  const [subLab, setSubLab] = useState<SubLaboratorio>("historial");
   const [panel, setPanel] = useState<GetPanelIaData | null>(null);
   const [error, setError] = useState(false);
   const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [cambiosSesion, setCambiosSesion] = useState(false);
   const temporizador = useRef<number | undefined>(undefined);
+  // Evita que una consulta lenta sobreescriba una recarga más reciente.
   const solicitud = useRef(0);
 
   const avisar = useCallback((texto: string, tipo: Aviso["tipo"] = "success") => {
@@ -55,6 +63,21 @@ export default function ModuloIaPage() {
     return () => window.clearTimeout(temporizador.current);
   }, [permitido, recargar]);
 
+  // Detecta conteos reales más recientes que el último ajuste o cambios realizados en la sesión.
+  const hayCambiosPendientes = useMemo(() => {
+    if (cambiosSesion) return true;
+    if (!panel || !panel.tasaConsumos.length) return false;
+    const ultimo = panel.ultimoConteoReal?.[0];
+    const fechaConteo = ultimo ? Date.parse(ultimo.fechaConteo ?? ultimo.creadoEn) : NaN;
+    if (!Number.isFinite(fechaConteo)) return false;
+    const modelo = panel.modeloVigente[0];
+    if (!modelo) return true;
+    return fechaConteo > Date.parse(modelo.fechaEntrenamiento);
+  }, [cambiosSesion, panel]);
+
+  const marcarPendiente = useCallback(() => setCambiosSesion(true), []);
+  const limpiarPendiente = useCallback(() => setCambiosSesion(false), []);
+
   // Navegación con flechas entre pestañas, según el patrón ARIA de tabs.
   const moverConTeclado = (e: React.KeyboardEvent, indice: number) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -72,11 +95,11 @@ export default function ModuloIaPage() {
       <AvisoFlotante aviso={aviso} />
       <EncabezadoSeccion
         antetitulo="Inteligencia · Predicción de insumos"
-        titulo="Módulo IA"
-        descripcion="Estima el consumo de insumos por comanda y aprende de cada conteo físico. Nunca modifica el stock."
+        titulo="Predicción de insumos"
+        descripcion="Estima cuántos días duran tus insumos y cuánto gasta cada servicio por kg. El cálculo automático nunca cambia el stock; solo los conteos y compras del día actualizan el inventario."
       />
 
-      <div role="tablist" aria-label="Secciones del módulo IA" className="flex gap-2 overflow-x-auto">
+      <div role="tablist" aria-label="Secciones del módulo de predicción" className="flex gap-2 overflow-x-auto">
         {PESTANAS.map((p, i) => (
           <button
             key={p.id} id={`pestana-ia-${p.id}`} role="tab" type="button"
@@ -96,11 +119,49 @@ export default function ModuloIaPage() {
         </div>
       ) : (
         <div role="tabpanel" id={`panel-ia-${pestana}`} aria-labelledby={`pestana-ia-${pestana}`}>
-          {pestana === "resumen" && <ResumenIa panel={panel} recargar={recargar} avisar={avisar} />}
-          {pestana === "tasas" && <TasasIa panel={panel} recargar={recargar} avisar={avisar} />}
-          {pestana === "datos" && <DatosIa panel={panel} recargar={recargar} avisar={avisar} />}
-          {pestana === "simulacion" && <SimulacionIa panel={panel} recargar={recargar} avisar={avisar} />}
-          {pestana === "historial" && <HistorialIa revision={panel.modeloVigente[0]?.id ?? ""} />}
+          {pestana === "resumen" && (
+            <ResumenIa
+              panel={panel}
+              recargar={recargar}
+              avisar={avisar}
+              hayCambiosPendientes={hayCambiosPendientes}
+              onRecalculado={limpiarPendiente}
+              irAPestana={setPestana}
+            />
+          )}
+          {pestana === "tasas" && (
+            <TasasIa panel={panel} recargar={recargar} avisar={avisar} onCambioDatos={marcarPendiente} />
+          )}
+          {pestana === "datos" && (
+            <DatosIa panel={panel} recargar={recargar} avisar={avisar} onCambioDatos={marcarPendiente} irAPestana={setPestana} />
+          )}
+          {pestana === "laboratorio" && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSubLab("historial")}
+                  aria-pressed={subLab === "historial"}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${subLab === "historial" ? "bg-stone-900 text-white dark:bg-white dark:text-stone-900" : "bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-400"}`}
+                >
+                  <History className="h-3.5 w-3.5" />Historial de ajustes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubLab("simulacion")}
+                  aria-pressed={subLab === "simulacion"}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${subLab === "simulacion" ? "bg-stone-900 text-white dark:bg-white dark:text-stone-900" : "bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-400"}`}
+                >
+                  <FlaskConical className="h-3.5 w-3.5" />Simulador de pruebas
+                </button>
+              </div>
+              {subLab === "historial" ? (
+                <HistorialIa revision={panel.modeloVigente[0]?.id ?? ""} />
+              ) : (
+                <SimulacionIa panel={panel} recargar={recargar} avisar={avisar} onRecalculado={limpiarPendiente} />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

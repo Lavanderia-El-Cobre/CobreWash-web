@@ -1,5 +1,11 @@
 import { getFlotaVehiculos, type GetFlotaVehiculosData } from "@/src/dataconnect-generated";
 import { dataConnect } from "@/lib/firebase/client";
+
+/**
+ * Carga el estado completo de la flota (vehículos, conductores y todas las salidas).
+ * Pagina las salidas de a 200 registros forzando `SERVER_ONLY`, deduplica por `id`
+ * ante cambios concurrentes entre páginas y conserva los catálogos de la primera carga.
+ */
 export async function consultarFlotaCompleta() {
   let resultado: GetFlotaVehiculosData | null = null;
   const salidas = new Map<string, GetFlotaVehiculosData["salidas"][number]>();

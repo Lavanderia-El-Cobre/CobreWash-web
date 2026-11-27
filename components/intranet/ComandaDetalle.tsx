@@ -41,7 +41,16 @@ function cobroPorKg(comanda: Comanda) {
   return `${kg(pesoTotal(comanda))} × ${clp(comanda.precioKg)}/kg`;
 }
 
-/* ─────────────────────────  DETALLE  ───────────────────────── */
+/**
+ * Modal de detalle completo de una comanda: datos del cliente, desglose de prendas,
+ * código QR de seguimiento público, avance de producción y acceso al comprobante imprimible.
+ * Mientras el comprobante está abierto bloquea su propio cierre para no cerrarse junto a él.
+ *
+ * @param comanda - Comanda seleccionada a inspeccionar.
+ * @param onClose - Callback para cerrar el modal de detalle.
+ * @param onEditar - Acción opcional disponible únicamente cuando la comanda está en estado "Pendiente".
+ * @param onAnular - Acción opcional disponible mientras la comanda no esté anulada ni entregada.
+ */
 export default function ComandaDetalle({
   comanda,
   onClose,
@@ -105,9 +114,7 @@ export default function ComandaDetalle({
       }
     >
         <div className="grid sm:grid-cols-[1fr_auto] gap-6">
-          {/* Left: client + detail */}
           <div className="space-y-5 min-w-0">
-            {/* Client */}
             <div className="bg-stone-50 dark:bg-white/5 rounded-2xl p-4 space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-600">
                 Cliente
@@ -130,7 +137,6 @@ export default function ComandaDetalle({
               </div>
             </div>
 
-            {/* Detail table */}
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-600 mb-2">
                 Detalle de prendas
@@ -189,7 +195,6 @@ export default function ComandaDetalle({
             )}
           </div>
 
-          {/* Right: QR + meta */}
           <div className="flex sm:flex-col items-center gap-4 shrink-0">
             <div className="flex flex-col items-center gap-1.5">
               {qr.url ? <>
@@ -210,7 +215,7 @@ export default function ComandaDetalle({
           </div>
         </div>
 
-        {/* Progress — ocupa todo el ancho para mantener legibles las cinco etapas. */}
+        {/* El avance de producción ocupa todo el ancho para mantener legibles las cinco etapas. */}
         {comanda.estado !== "Anulado" && comanda.etapas !== undefined && (
           <div className="mt-6"><FlujoProduccion etapas={comanda.etapas} /></div>
         )}
@@ -236,7 +241,6 @@ export default function ComandaDetalle({
           </div>
         )}
 
-      {/* Comprobante */}
       <AnimatePresence>
         {comprobante && <ComprobanteModal comanda={comanda} onClose={() => setComprobante(false)} />}
       </AnimatePresence>
@@ -244,11 +248,16 @@ export default function ComandaDetalle({
   );
 }
 
-/* ─────────────────────────  COMPROBANTE  ───────────────────────── */
+/**
+ * Vista imprimible del comprobante de recepción de una comanda con QR de seguimiento.
+ * Se monta en `document.body` con `z-[110]` para superponerse a `ModalIntranet` (`z-[100]`)
+ * y se estiliza siempre sobre fondo blanco para reflejar fielmente el ticket impreso.
+ */
 export function ComprobanteModal({ comanda, onClose }: { comanda: Comanda; onClose: () => void }) {
   const total = valorTotal(comanda);
   const qr = obtenerEnlaceSeguimiento(comanda.codigoQr);
   const ticketRef = useRef<HTMLDivElement>(null);
+  // Se fija al montar el modal para que la marca de generación no cambie en re-renders.
   const [fechaGeneracion] = useState(() => new Intl.DateTimeFormat("es-CL", {
     timeZone: "America/Santiago", dateStyle: "medium", timeStyle: "medium", hourCycle: "h23",
   }).format(new Date()));

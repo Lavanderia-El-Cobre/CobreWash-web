@@ -1,9 +1,28 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para invariantes de estabilización.
+ *
+ * Valida idempotencia y concurrencia en salidas de flota, reserva/confirmación en dos fases de
+ * fotos de inspección (límite de 20 fotos y unicidad de ID), rate-limit concurrente en bandeja de
+ * contacto, vinculación segura de fichas históricas mediante correo verificado y protección contra
+ * transiciones inválidas en flujos legados de vehículos.
+ *
+ * Invocación:
+ *   node scripts/test-estabilizacion.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
+// Guardia de seguridad: impide ejecutar fixtures fuera del emulador local aislado.
 const host=(process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST??'127.0.0.1:9499').replace(/^http:\/\//,'');
 assert.match(host,/^(127\.0\.0\.1|localhost):9499$/);
 const endpoint=`http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string u objeto `{ uid, email, verified }` = usuario autenticado).
+ */
 async function execute(query,operationName,variables={},user){
  const impersonate=user===null?{unauthenticated:true}:user?{authClaims:{sub:user.uid??user,email:user.email??'fixture@example.test',email_verified:user.verified??false,firebase:{sign_in_provider:'password'}}}:undefined;
  const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query,operationName,variables,extensions:{impersonate}})});

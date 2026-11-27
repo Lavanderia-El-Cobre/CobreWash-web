@@ -1,8 +1,21 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para el módulo de avisos internos.
+ *
+ * Valida publicación administrativa, control de acceso por rol y estado de perfil,
+ * límites de longitud/campos vacíos, paginación sin duplicados, segmentación por equipo
+ * (operario, recepción, reparto/conductor) y exclusión de avisos inactivos.
+ *
+ * Invocación:
+ *   node scripts/test-avisos.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-// Solo se ejecuta contra el emulador aislado; nunca escribe en Cloud SQL.
+// Guardia de seguridad: solo se ejecuta contra el emulador local en 9499; nunca escribe en Cloud SQL.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = `http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
@@ -16,6 +29,11 @@ const roles = {
 };
 let count = 0;
 
+/**
+ * Ejecuta una operación GraphQL contra el emulador suplantando identidad:
+ * `user === undefined` usa privilegios de administrador del emulador (solo para fixtures),
+ * `user === null` simula tráfico anónimo y un string simula ese UID autenticado.
+ */
 async function execute(query, operationName, variables = {}, user = undefined) {
   const impersonate = user === null ? { unauthenticated: true }
     : user ? { authClaims: { sub: user, firebase: { sign_in_provider: "password" } } } : undefined;
@@ -120,7 +138,10 @@ await check("el equipo de reparto recibe los avisos generales y los dirigidos a 
   assert(!(await listarEquipo("operario", "test-operario")).avisos.some(a => a.contenido === contenido));
   const conductor = await listarEquipo("conductor", "test-conductor");
   assert(conductor.avisos.every(a => !a.rolDestinatario));
-  for (const [rol, user] of [["operario", "test-repartidor"], ["repartidor", "test-conductor"], ["repartidor", "test-operario"]]) {
+  const conductorReparto = await listarEquipo("repartidor", "test-conductor");
+  assert(conductorReparto.avisos.some(a => a.contenido === contenido));
+  assert(conductorReparto.avisos.every(a => !a.rolDestinatario || a.rolDestinatario.nombre === "repartidor"));
+  for (const [rol, user] of [["operario", "test-repartidor"], ["operario", "test-conductor"], ["recepcionista", "test-conductor"], ["repartidor", "test-operario"]]) {
     await assert.rejects(listarEquipo(rol, user), undefined, `Acceso indebido: ${rol}/${user}`);
   }
 });

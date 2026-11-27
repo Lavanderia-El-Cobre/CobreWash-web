@@ -4,6 +4,10 @@ import Image from "next/image";
 import { WashingMachine, Wind, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 
+/**
+ * Sección de equipamiento industrial (`#maquinaria`) de la landing.
+ * Alterna la posición imagen/texto por fila con animaciones de aparición en cliente.
+ */
 export default function Machinery() {
   const machineryItems = [
     {
@@ -49,12 +53,10 @@ export default function Machinery() {
 
   return (
     <section id="maquinaria" className="py-20 bg-white relative overflow-hidden">
-      {/* Background blurs */}
       <div className="absolute top-1/3 left-0 w-80 h-80 rounded-full bg-brand-50 blur-3xl opacity-60" />
       <div className="absolute bottom-1/4 right-0 w-80 h-80 rounded-full bg-copper-50 blur-3xl opacity-60" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
           <h2 className="text-xs uppercase tracking-widest text-brand-650 font-bold">Nuestra Tecnología</h2>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-stone-900">
@@ -66,7 +68,6 @@ export default function Machinery() {
           </p>
         </div>
 
-        {/* Machinery Items Showcase (Alternating Layouts) */}
         <div className="space-y-24 md:space-y-32">
           {machineryItems.map((item, index) => {
             const isEven = index % 2 === 0;
@@ -77,7 +78,6 @@ export default function Machinery() {
                 key={item.id}
                 className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center"
               >
-                {/* Image side - Alternating left/right order */}
                 <motion.div
                   initial={{ opacity: 0, x: isEven ? -40 : 40 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -86,7 +86,6 @@ export default function Machinery() {
                   className={`lg:col-span-6 ${isEven ? "lg:order-1" : "lg:order-2"}`}
                 >
                   <div className="relative group">
-                    {/* Shadow overlay and borders */}
                     <div className="absolute -inset-3 rounded-2xl bg-gradient-to-tr from-brand-400 to-amber-500 opacity-10 group-hover:opacity-15 blur-md transition-opacity duration-300" />
                     
                     <div className="overflow-hidden rounded-2xl border-4 border-stone-100 shadow-xl relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3]">
@@ -101,7 +100,6 @@ export default function Machinery() {
                   </div>
                 </motion.div>
 
-                {/* Text content side */}
                 <motion.div
                   initial={{ opacity: 0, x: isEven ? 40 : -40 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -109,7 +107,6 @@ export default function Machinery() {
                   transition={{ duration: 0.6 }}
                   className={`lg:col-span-6 space-y-6 ${isEven ? "lg:order-2" : "lg:order-1"}`}
                 >
-                  {/* Top Badge */}
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-brand-50 text-brand-600 rounded-xl">
                       <IconComponent className="w-5 h-5" />
@@ -119,7 +116,6 @@ export default function Machinery() {
                     </span>
                   </div>
 
-                  {/* Title & Description */}
                   <h4 className="text-2xl sm:text-3xl font-extrabold text-stone-900 leading-tight">
                     {item.title}
                   </h4>
@@ -127,7 +123,6 @@ export default function Machinery() {
                     {item.description}
                   </p>
 
-                  {/* Specs & Quality Points */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-stone-100">
                     {item.details.map((detail, dIndex) => (
                       <div key={dIndex} className="space-y-1">

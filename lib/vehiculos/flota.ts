@@ -1,3 +1,4 @@
+import { limitesFechasInclusivos } from "@/lib/reportes/fechas";
 import type {
   EstadoOperativoVehiculo,
   ResumenVehiculo,
@@ -5,8 +6,17 @@ import type {
 } from "./modelo";
 import { calcularKilometrosRecorridos, obtenerInspeccionMomento } from "./validaciones";
 
-export const UMBRAL_DEMORA_MINUTOS = 480; // 8 horas en ruta
+/** Tiempo en ruta (en minutos) a partir del cual se marca alerta visual de demora (8 horas). */
+export const UMBRAL_DEMORA_MINUTOS = 480;
 
+/**
+ * Filtra el resumen de la flota por estado operativo y coincidencia parcial en
+ * patente, marca, modelo, descripción, año o nombre del conductor activo.
+ *
+ * @param resumen - Lista de resúmenes por vehículo.
+ * @param busqueda - Texto libre de búsqueda.
+ * @param estado - Filtro de estado operativo o `"Todos"`.
+ */
 export function filtrarResumenFlota(
   resumen: ResumenVehiculo[],
   busqueda: string,
@@ -33,6 +43,12 @@ export function filtrarResumenFlota(
   });
 }
 
+/**
+ * Traduce errores técnicos o restricciones de base de datos/Data Connect a
+ * mensajes de negocio claros para la interfaz de vehículos y reparto.
+ *
+ * @param error - Excepción capturada al ejecutar una mutación de flota.
+ */
 export function mapearErrorVehiculos(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
   if (/Ya existe un vehículo|Ya existe otro vehículo|unique constraint|already_exists/i.test(msg)) {
@@ -68,6 +84,12 @@ export function mapearErrorVehiculos(error: unknown): string {
   return "No fue posible guardar los cambios. Verifica los datos e intenta nuevamente.";
 }
 
+/**
+ * Formatea una fecha ISO en `DD-MM-YYYY HH:mm` (24 h) en horario de Chile,
+ * devolviendo `"—"` cuando falta o es inválida.
+ *
+ * @param iso - Marca temporal ISO o valor nulo/indefinido.
+ */
 export function formatearFechaHoraVehiculo(iso?: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
@@ -83,6 +105,13 @@ export function formatearFechaHoraVehiculo(iso?: string | null): string {
   }).format(date);
 }
 
+/**
+ * Calcula los minutos completos transcurridos desde el inicio de una salida
+ * hasta `ahoraMs` (nunca negativo).
+ *
+ * @param fechaSalida - Marca temporal ISO de salida.
+ * @param ahoraMs - Referencia actual en milisegundos.
+ */
 export function calcularMinutosEnRuta(
   fechaSalida?: string | null,
   ahoraMs: number = Date.now(),
@@ -93,6 +122,11 @@ export function calcularMinutosEnRuta(
   return Math.max(0, Math.floor((ahoraMs - inicio) / 60_000));
 }
 
+/**
+ * Formatea una duración en ruta a formato compacto (`45 min`, `2 h`, `2 h 15 min`).
+ *
+ * @param minutos - Cantidad entera de minutos en ruta.
+ */
 export function formatearDuracionRuta(minutos: number): string {
   if (minutos < 60) return `${minutos} min`;
   const horas = Math.floor(minutos / 60);
@@ -100,6 +134,7 @@ export function formatearDuracionRuta(minutos: number): string {
   return resto > 0 ? `${horas} h ${resto} min` : `${horas} h`;
 }
 
+/** Criterios de filtrado para el historial de salidas de la flota. */
 export interface FiltrosHistorialVehiculo {
   vehiculoId: string;
   repartidorId: string;
@@ -108,12 +143,29 @@ export interface FiltrosHistorialVehiculo {
   hasta: string;
 }
 
+/**
+ * Filtra en memoria el historial de salidas por vehículo, conductor, estado
+ * y rango de fechas sobre `fechaSalida` (o `creadoEn` si aún no registra salida).
+ *
+ * @param salidas - Lista completa de salidas obtenidas de la flota.
+ * @param filtros - Filtros activos en el panel de historial.
+ */
 export function filtrarSalidasHistorial(
   salidas: SalidaFlota[],
   filtros: FiltrosHistorialVehiculo,
 ): SalidaFlota[] {
-  const desdeMs = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00-03:00`) : null;
-  const hastaMs = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999-03:00`) : null;
+  let desdeMs: number | null = null;
+  let hastaMs: number | null = null;
+  if (filtros.desde || filtros.hasta) {
+    try {
+      const limites = limitesFechasInclusivos(filtros.desde, filtros.hasta);
+      desdeMs = limites.fechaDesde ? Date.parse(limites.fechaDesde) : null;
+      hastaMs = limites.fechaHasta ? Date.parse(limites.fechaHasta) : null;
+    } catch {
+      desdeMs = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00-03:00`) : null;
+      hastaMs = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999-03:00`) : null;
+    }
+  }
 
   return salidas.filter((salida) => {
     if (filtros.vehiculoId && salida.vehiculo.id !== filtros.vehiculoId) {
@@ -137,6 +189,13 @@ export function filtrarSalidasHistorial(
   });
 }
 
+/**
+ * Genera el contenido CSV del historial de salidas listo para descargar.
+ * Incluye BOM UTF-8 (`\uFEFF`) para compatibilidad con Excel y antepone apóstrofe
+ * a valores que inicien con `=`, `+`, `-` o `@` para prevenir inyección de fórmulas.
+ *
+ * @param salidas - Salidas filtradas a exportar.
+ */
 export function crearCsvHistorialVehiculos(salidas: SalidaFlota[]): string {
   const escapar = (val: string | number | null | undefined) => {
     const str = String(val ?? "");

@@ -4,6 +4,11 @@ import { auth } from "@/lib/firebase/client";
 import { cambiarContrasena } from "@/lib/firebase/seguridad-cuenta";
 import { mapAuthError } from "@/lib/firebase/errors";
 
+/**
+ * Formulario de cambio de contraseña para el usuario autenticado.
+ * Exige la contraseña actual para reautenticar en Firebase Auth y traduce códigos de error
+ * del SDK a mensajes legibles para el usuario.
+ */
 export default function CambiarContrasena() {
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
@@ -18,6 +23,7 @@ export default function CambiarContrasena() {
       await cambiarContrasena(auth, actual, nueva, confirmacion);
       setActual(""); setNueva(""); setConfirmacion(""); setMensaje("Tu contraseña se actualizó correctamente.");
     } catch (cause) {
+      // Distingue errores tipados de Firebase Auth (`code`) de validaciones locales de negocio.
       setError(cause && typeof cause === "object" && "code" in cause ? mapAuthError(cause) : cause instanceof Error ? cause.message : "No se pudo actualizar tu contraseña.");
     } finally { setGuardando(false); }
   }}>

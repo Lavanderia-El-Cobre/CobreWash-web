@@ -5,6 +5,7 @@ import type { EtapaVisible } from "@/lib/produccion/modelo";
 import GlassSelect from "@/components/ui/GlassSelect";
 import ModalIntranet, { BOTON_MODAL_PRIMARIO, BOTON_MODAL_SECUNDARIO } from "@/components/intranet/ModalIntranet";
 
+/** Estado controlado del formulario de asignación o reasignación de operario en una comanda. */
 export type AsignacionOperario = { comandaId: string; numero: string; etapaId: string; etapas: EtapaVisible[]; operarioId: string; motivo: string };
 type Props = {
   valor: AsignacionOperario;
@@ -16,6 +17,11 @@ type Props = {
 };
 const inputStyle = "mt-1.5 w-full rounded-xl border border-stone-200/80 bg-stone-50/50 px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-brand-500/50 focus:bg-white dark:border-white/10 dark:bg-stone-800/50 dark:focus:bg-stone-900";
 
+/**
+ * Modal controlado para asignar o reasignar un operario a una etapa pendiente o en curso.
+ * Las etapas ya completadas se excluyen de la selección y cambiar de etapa reinicia el
+ * operario elegido para evitar asignaciones accidentales.
+ */
 export default function AsignarOperarioModal({ valor, operarios, guardando, error, onChange, onSubmit, onCerrar }: Props) {
   const actual = valor.etapas.find((e) => e.id === valor.etapaId);
   return <ModalIntranet

@@ -4,6 +4,7 @@ import { crearClienteConCuenta, TipoCliente } from "@/src/dataconnect-generated"
 import { createSecondaryFirebaseContext } from "@/lib/firebase/secondary";
 import { contrasenaTemporal, enviarInvitacion } from "@/lib/firebase/verificacion";
 
+/** Datos mínimos para dar de alta una ficha de cliente con cuenta desde recepción. */
 export interface FichaClienteNueva {
   nombre: string;
   tipoCliente: TipoCliente;
@@ -13,6 +14,7 @@ export interface FichaClienteNueva {
   direccion?: string;
 }
 
+/** Resultado del alta de un cliente con cuenta desde recepción. */
 export interface ResultadoClienteConCuenta {
   id: string;
   /** "creada": se creó la cuenta e invitó al cliente; "existente": el correo ya tenía cuenta. */
@@ -77,6 +79,7 @@ export async function registrarClienteConCuenta(dataConnect: DataConnect, ficha:
     const invitacionEnviada = await enviarInvitacion(contexto.auth, email).then(() => true, () => false);
     return { id: resultado.data.cliente_insert.id, cuenta: "creada", invitacionEnviada };
   } catch (error) {
+    // Rollback: si falla la mutación en Data Connect se borra la identidad creada para evitar cuentas huérfanas.
     if (credencial) await credencial.user.delete().catch(() => undefined);
     throw error;
   } finally {

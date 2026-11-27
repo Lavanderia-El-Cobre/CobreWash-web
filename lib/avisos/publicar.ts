@@ -2,6 +2,11 @@ import { crearAviso, getRoles } from "@/src/dataconnect-generated";
 import { dataConnect } from "@/lib/firebase/client";
 import { validarAviso, type FormularioAviso } from "./modelo";
 
+/**
+ * Valida y publica un aviso interno en Data Connect.
+ * Cuando `destinatario` es `"todos"`, guarda `rolDestinatarioId = null`; en otro
+ * caso resuelve el ID del rol directamente desde el servidor.
+ */
 export async function publicarAviso(form: FormularioAviso) {
   const { titulo, contenido, destinatario } = validarAviso(form);
   let rolDestinatarioId: string | null = null;

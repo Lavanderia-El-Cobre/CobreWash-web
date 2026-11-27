@@ -6,9 +6,11 @@ export class ErrorIa extends Error {
   constructor(public status: number, message: string, public detalle?: unknown) { super(message); }
 }
 
+/** Devuelve JSON sin caché compartida ni almacenamiento local para endpoints privados del módulo IA. */
 export const responder = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 
+/** Traduce excepciones del módulo IA a respuestas HTTP seguras sin filtrar detalles internos. */
 export function errorIa(error: unknown) {
   if (error instanceof ErrorIa) return responder({ error: error.message, ...(error.detalle ? { errores: error.detalle } : {}) }, error.status);
   return responder({ error: "No se pudo completar la operación. Intenta nuevamente." }, 503);

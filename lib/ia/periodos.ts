@@ -1,5 +1,6 @@
 import type { Compra, Conteo, Observacion, Origen, PeriodoDescartado, Produccion } from "./modelo";
 
+/** Clasificación semántica de un movimiento de inventario para separar compras reales de ajustes. */
 export type ClaseMovimiento = "COMPRA" | "AJUSTE_CONTEO" | "STOCK_INICIAL" | "CONSUMO" | "OTRO";
 
 /**
@@ -19,6 +20,7 @@ const ms = (fecha: string) => Date.parse(fecha);
 /** Pertenece al período (desde, hasta]: lo ocurrido junto al conteo final cuenta en ese período. */
 const dentro = (fecha: string, desde: string, hasta: string) => ms(fecha) > ms(desde) && ms(fecha) <= ms(hasta);
 
+/** Series crudas necesarias para reconstruir el consumo entre conteos consecutivos. */
 export interface DatosEntrenamiento {
   conteos: Conteo[];
   compras: Compra[];
@@ -58,6 +60,7 @@ export function construirObservaciones(datos: DatosEntrenamiento, opciones: { in
         const comprado = compras
           .filter((c) => c.insumoId === insumoId && dentro(c.fecha, anterior.fecha, actual.fecha))
           .reduce((s, c) => s + c.cantidad, 0);
+        // Balance de masa del período: lo que había + reposiciones − lo que quedó contado.
         const consumo = anterior.cantidad + comprado - actual.cantidad;
         const kgPorServicio: Record<string, number> = {};
         for (const p of produccion) {

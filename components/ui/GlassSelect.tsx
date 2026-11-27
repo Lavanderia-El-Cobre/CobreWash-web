@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check, Plus, Search } from "lucide-react";
 
+/** Opción individual mostrada en el menú desplegable de `GlassSelect`. */
 export interface GlassSelectOption {
   value: string;
   label: string;
@@ -54,6 +55,7 @@ export default function GlassSelect({
   const [nuevo, setNuevo] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
+  // Normaliza sin diacríticos ni distinción de mayúsculas (es-CL) para filtrar y evitar duplicados al agregar opciones.
   const normalizedSearch = search
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -138,6 +140,7 @@ export default function GlassSelect({
             exit={{ opacity: 0, y: haciaArriba ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className={`absolute z-[70] w-full ${haciaArriba ? "bottom-full mb-2 origin-bottom" : "mt-2 origin-top"} max-h-[min(14rem,45dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-white/60 dark:border-white/10 bg-white/95 dark:bg-stone-900/95 backdrop-blur-xl p-1.5 shadow-premium`}
+            // Prefijo explícito para asegurar el desenfoque de fondo en Safari/iOS.
             style={{ WebkitBackdropFilter: "blur(20px)" }}
           >
             {searchable && (
@@ -149,7 +152,17 @@ export default function GlassSelect({
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }}
+                    // Evita envío accidental del `<form>` padre con Enter, selecciona la primera coincidencia y deja pasar Escape.
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        if (filteredOptions.length > 0) {
+                          onChange(filteredOptions[0].value);
+                          setOpen(false);
+                        }
+                      }
+                      if (event.key !== "Escape") event.stopPropagation();
+                    }}
                     placeholder={searchPlaceholder}
                     aria-label={searchPlaceholder}
                     className="w-full rounded-lg border border-stone-200 bg-stone-50 py-2 pl-8 pr-3 text-sm text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-200"

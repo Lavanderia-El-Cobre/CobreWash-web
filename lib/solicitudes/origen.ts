@@ -1,6 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 
+/**
+ * Error lanzado cuando no es posible autenticar la IP de origen de una solicitud
+ * pública (`403` si la firma/IP es inválida o expiró; `503` si falta configuración del proxy).
+ */
 export class ErrorOrigenSolicitud extends Error {
   constructor(public status: number) {
     super("No se pudo verificar el origen de la solicitud. Utiliza los canales de contacto indicados en el sitio.");
@@ -8,12 +12,22 @@ export class ErrorOrigenSolicitud extends Error {
 }
 
 function normalizarIp(valor: string | null) {
+  // Rechaza espacios, zonas IPv6 (`%eth0`) o listas separadas por coma.
   if (!valor || valor !== valor.trim() || valor.includes("%") || !isIP(valor)) throw new ErrorOrigenSolicitud(403);
   // URL normaliza compresión y mayúsculas de IPv6; no admite listas ni puertos.
   return isIP(valor) === 6 ? new URL(`http://[${valor}]/`).hostname.slice(1, -1) : valor;
 }
 
-/** Nunca se confía en un X-Forwarded-For enviado directamente por el cliente. */
+/**
+ * Extrae y verifica la dirección IP real del cliente para aplicar rate-limiting.
+ * Nunca se confía en un `X-Forwarded-For` enviado directamente por el cliente:
+ * - En Vercel (`VERCEL=1`) lee `x-vercel-forwarded-for`.
+ * - En otros entornos exige IP firmada con HMAC-SHA256 (`CONTACT_PROXY_SECRET` >= 32 chars)
+ *   y marca temporal dentro de una ventana anti-replay de ±60 segundos.
+ *
+ * @param request - Solicitud HTTP recibida por el Route Handler.
+ * @returns Dirección IPv4 o IPv6 normalizada.
+ */
 export function origenSolicitud(request: Request): string {
   // VERCEL es configuración del servidor, no una cabecera de la solicitud.
   // https://vercel.com/docs/headers/request-headers#x-vercel-forwarded-for
@@ -31,6 +45,7 @@ export function origenSolicitud(request: Request): string {
   const firma = request.headers.get("x-cobre-client-signature") ?? "";
   if (!/^\d{10,11}$/.test(timestamp) || !/^[\da-f]{64}$/i.test(firma)) throw new ErrorOrigenSolicitud(403);
   const instante = Number(timestamp);
+  // Ventana de ±60 s para mitigar ataques de repetición tolerando mínima deriva de reloj.
   if (!Number.isSafeInteger(instante) || Math.abs(Math.floor(Date.now() / 1000) - instante) > 60) throw new ErrorOrigenSolicitud(403);
   const direccion = normalizarIp(ip);
   // Se firma la representación recibida; la normalización solo fija la clave del contador.

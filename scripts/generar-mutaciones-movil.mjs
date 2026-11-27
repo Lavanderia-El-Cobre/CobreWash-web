@@ -1,21 +1,28 @@
-// Genera dataconnect/example/movil.gql: variantes "…Movil" de las mutaciones que la app
-// móvil puede encolar sin conexión. Cada variante es la mutación original, más:
-//   - $idOperacion (UUID generado en el dispositivo), $ocurridoEn (hora original de la
-//     acción) y $relojDudoso;
-//   - un rechazo "OPERACION_YA_APLICADA" si ese id ya se registró (reintento sin duplicar);
-//   - un rechazo "HORA_FUERA_DE_RANGO" si la hora original tiene más de 72 h o está más
-//     de 5 min en el futuro respecto de la hora del servidor;
-//   - el registro en OperacionMovil dentro de la misma transacción.
-// Las mutaciones originales no cambian: las apps instaladas siguen usándolas.
-//
-// Uso: node scripts/generar-mutaciones-movil.mjs   (y --check para verificar en CI)
+/**
+ * Genera `dataconnect/example/movil.gql` con variantes `…Movil` de las mutaciones que
+ * la app móvil puede encolar sin conexión.
+ *
+ * Cada variante conserva la lógica y permisos de la mutación original y agrega:
+ * - `$idOperacion` (UUID generado en el dispositivo), `$ocurridoEn` (hora original) y `$relojDudoso`;
+ * - rechazo `OPERACION_YA_APLICADA` para garantizar idempotencia ante reintentos;
+ * - rechazo `HORA_FUERA_DE_RANGO` si la marca temporal supera 72 h de atraso o 5 min de adelanto;
+ * - registro de trazabilidad en `OperacionMovil` dentro de la misma transacción.
+ *
+ * Las mutaciones originales no se modifican para mantener compatibilidad con apps instaladas.
+ *
+ * Invocación:
+ *   node scripts/generar-mutaciones-movil.mjs           # Regenera el archivo
+ *   node scripts/generar-mutaciones-movil.mjs --check   # Verifica en CI que esté al día
+ *
+ * Variables de entorno requeridas: ninguna.
+ */
 import { readFile, writeFile } from "node:fs/promises";
 
 const DESTINO = "dataconnect/example/movil.gql";
 const MAX_ATRASO = "72h";
 const MAX_ADELANTO = "5m";
 
-/** [mutación, archivo, expresión del id afectado] */
+/** Tuplas `[nombreMutacion, archivoFuente, expresionIdEntidad]` a transformar. */
 const OPERACIONES = [
   ["CompletarEtapaComanda", "dataconnect/example/produccion-mutations.gql", "vars.comandaId"],
   ["RegistrarIncidenciaComanda", "dataconnect/example/produccion-mutations.gql", "vars.comandaId"],
@@ -26,6 +33,7 @@ const OPERACIONES = [
   ["RegistrarConteoInventario", "dataconnect/example/inventario-conteos.gql", "vars.id"],
 ];
 
+/** Extrae el bloque completo `mutation <nombre> ... }` desde un archivo `.gql`. */
 function extraer(texto, nombre) {
   const inicio = texto.search(new RegExp(`^mutation ${nombre}[ (]`, "m"));
   if (inicio < 0) throw new Error(`No se encontró la mutación ${nombre}`);
@@ -45,6 +53,10 @@ function llaveDeBloque(texto, desde) {
   throw new Error("Bloque sin llave de apertura");
 }
 
+/**
+ * Construye la variante `<nombre>Movil` inyectando variables, controles `@check`
+ * de idempotencia/ventana horaria y el `operacionMovil_insert` final.
+ */
 function variante(original, nombre, entidad) {
   let m = original.replace(new RegExp(`^mutation ${nombre}`), `mutation ${nombre}Movil`);
   const vars = "\n  $idOperacion: UUID!\n  $ocurridoEn: Timestamp!\n  $relojDudoso: Boolean! = false";

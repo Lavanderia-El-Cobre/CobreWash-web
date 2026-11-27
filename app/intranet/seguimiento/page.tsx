@@ -22,11 +22,22 @@ import { ComandaEstado, getSeguimientoProduccion, getEtapasProduccion, configura
 const PAGE_SIZE = 20;
 type EtapaCatalogo = GetEtapasProduccionData["etapaProduccions"][number];
 const inputStyle = "mt-1.5 w-full rounded-xl border border-stone-200/80 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-850 outline-none transition-colors focus:border-brand-500/50 focus:bg-white dark:border-white/10 dark:bg-stone-800/50 dark:text-stone-100 dark:focus:bg-stone-900";
+/**
+ * Tablero de seguimiento de producción por etapas (`/intranet/seguimiento`).
+ * Accesible para `admin`, `recepcionista` y `operario` con acciones acotadas por rol:
+ * - `admin` y `recepcionista` pueden asociar el flujo a comandas pendientes sin etapas.
+ * - `admin` y `operario` pueden completar etapas secuenciales.
+ * - `operario` puede reportar incidencias de producción.
+ * - `admin` puede configurar el catálogo de 5 etapas y reasignar operarios.
+ *
+ * Envuelve el contenido en `<Suspense>` por requisito de `useSearchParams` en Next.js.
+ */
 export default function SeguimientoPage() {
   return <Suspense fallback={<div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin" /></div>}><SeguimientoRuta /></Suspense>;
 }
 function SeguimientoRuta() {
   const params = useSearchParams();
+  // `key={params.toString()}` reinicia el filtro y la comanda expandida al navegar desde alertas con query params.
   return <SeguimientoContenido key={params.toString()} buscarInicial={params.get("buscar") ?? ""} comandaInicial={params.get("comanda")} />;
 }
 function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial: string; comandaInicial: string | null }) {
@@ -49,10 +60,12 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
   const [configuracion, setConfiguracion] = useState(false);
   const [editar, setEditar] = useState<EtapaCatalogo | null>(null);
   const [incidencia, setIncidencia] = useState<{ id: string; numero: string; cliente: string } | null>(null);
+  const [errorIncidencia, setErrorIncidencia] = useState("");
   const [motivoIncidencia, setMotivoIncidencia] = useState<MotivoIncidencia>(MOTIVOS_INCIDENCIA[0]);
   const [descripcionIncidencia, setDescripcionIncidencia] = useState("");
   const [reasignacion, setReasignacion] = useState<AsignacionOperario | null>(null);
   const solicitud = useRef(0);
+  // Bloquea acciones de mutación simultáneas (asociar, completar, reasignar, incidencias) sobre las comandas.
   const operacion = useRef(false);
   const cargar = useCallback(async (silencioso = false) => {
     if (!permitido) return;
@@ -100,6 +113,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
     if (operacion.current) return;
     operacion.current = true; setBusy(comandaId); setError(""); setNotice("");
     try {
+      // Al completar la etapa 4 (Planchado) la comanda queda FINALIZADA (lista); la etapa 5 (Entrega) la marca ENTREGADA.
       await completarEtapaComanda(dataConnect, {
         comandaId,
         etapaId: etapa.id,
@@ -128,7 +142,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
     event.preventDefault();
     if (!incidencia || !puedeReportarIncidencia) return;
     if (operacion.current) return;
-    operacion.current = true; setBusy(incidencia.id); setError("");
+    operacion.current = true; setBusy(incidencia.id); setErrorIncidencia("");
     try {
       await registrarIncidenciaComanda(dataConnect, {
         comandaId: incidencia.id,
@@ -137,7 +151,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
       });
       setIncidencia(null); setDescripcionIncidencia(""); setMotivoIncidencia(MOTIVOS_INCIDENCIA[0]);
       setNotice(`Incidencia registrada correctamente en ${incidencia.numero}.`);
-    } catch { setError("No se pudo registrar la incidencia. Verifica que la comanda siga activa."); }
+    } catch { setErrorIncidencia("No se pudo registrar la incidencia. Verifica que la comanda siga activa."); }
     finally { operacion.current = false; setBusy(null); }
   }
   async function guardarReasignacion(event: React.FormEvent) {
@@ -195,7 +209,7 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
                 <FlujoProduccion etapas={etapas} puedeCompletar={puedeCompletar} completando={busy === c.id} onCompletar={(etapa) => void completar(c.id, etapa)} />
                 {admin && etapas.some((etapa) => etapa.estado !== "COMPLETADA") && <button onClick={() => { setError(""); setReasignacion({ comandaId: c.id, numero: c.numeroComanda, etapaId: etapas.find((etapa) => etapa.estado !== "COMPLETADA")?.id ?? "", etapas, operarioId: "", motivo: "" }); }} className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-bold text-brand-700 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-300"><UserRoundPen className="h-4 w-4" />Asignar operario</button>}
                 {admin && (c.reasignacionOperarios_on_comanda?.length ?? 0) > 0 && <details className="rounded-xl border border-stone-200 p-3 text-xs dark:border-white/10"><summary className="flex cursor-pointer items-center gap-2 font-bold"><History className="h-4 w-4" />Historial de asignaciones ({c.reasignacionOperarios_on_comanda?.length ?? 0})</summary><div className="mt-3 space-y-2">{c.reasignacionOperarios_on_comanda?.map((r) => <p key={r.id} className="text-stone-500"><strong>{r.etapa.nombre}:</strong> {r.operarioAnterior ? `${r.operarioAnterior.nombre} ${r.operarioAnterior.apellido ?? ""}`.trim() : "Sin asignar"} → {`${r.operarioNuevo.nombre} ${r.operarioNuevo.apellido ?? ""}`.trim()} · {new Date(r.fecha).toLocaleString("es-CL")}{r.motivo ? ` · ${r.motivo}` : ""}</p>)}</div></details>}
-                {puedeReportarIncidencia && <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => setIncidencia({ id: c.id, numero: c.numeroComanda, cliente: c.cliente.nombre })} className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"><AlertTriangle className="h-4 w-4" />Reportar incidencia</motion.button>}
+                {puedeReportarIncidencia && <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} onClick={() => { setErrorIncidencia(""); setIncidencia({ id: c.id, numero: c.numeroComanda, cliente: c.cliente.nombre }); }} className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"><AlertTriangle className="h-4 w-4" />Reportar incidencia</motion.button>}
                 {!etapas.length && c.estado === "PENDIENTE" && puedeAsociar && <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} disabled={busy != null || catalogo.length !== 5} onClick={() => void asociar(c.id)} className="rounded-xl bg-gradient-brand px-4 py-2.5 text-sm font-bold text-white shadow-premium transition-all hover:shadow-lg disabled:opacity-50">{busy === c.id ? "Asociando..." : "Asociar flujo de producción"}</motion.button>}
                 {!etapas.length && c.estado !== "PENDIENTE" && <p className="text-xs text-stone-500">Comanda anterior sin registro de etapas. Su estado se conserva.</p>}
               </div>
@@ -210,7 +224,8 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
       {incidencia && puedeReportarIncidencia && (
         <ModalIntranet
           key="incidencia"
-          onCerrar={() => setIncidencia(null)}
+          onCerrar={() => { setErrorIncidencia(""); setIncidencia(null); }}
+          bloqueado={busy != null}
           onSubmit={guardarIncidencia}
           icono={AlertTriangle}
           tono="peligro"
@@ -219,8 +234,9 @@ function SeguimientoContenido({ buscarInicial, comandaInicial }: { buscarInicial
           idTitulo="titulo-incidencia"
           etiquetaCerrar="Cerrar incidencia"
           claseCuerpo="space-y-5"
-          pie={<><button type="button" onClick={() => setIncidencia(null)} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button><button disabled={busy != null} className={BOTON_MODAL_PRIMARIO}>{busy === incidencia.id && <Loader2 className="h-4 w-4 animate-spin" />}Registrar incidencia</button></>}
+          pie={<><button type="button" disabled={busy != null} onClick={() => { setErrorIncidencia(""); setIncidencia(null); }} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button><button disabled={busy != null} className={BOTON_MODAL_PRIMARIO}>{busy === incidencia.id && <Loader2 className="h-4 w-4 animate-spin" />}Registrar incidencia</button></>}
         >
+        {errorIncidencia && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{errorIncidencia}</p>}
         <div className="grid gap-3 rounded-2xl bg-stone-50 p-4 text-sm sm:grid-cols-2 dark:bg-white/5"><div><p className="text-xs text-stone-400">Comanda</p><p className="font-bold text-brand-600 dark:text-brand-400">{incidencia.numero}</p></div><div><p className="text-xs text-stone-400">Cliente</p><p className="font-semibold">{incidencia.cliente}</p></div></div>
         <div className="space-y-2 text-sm font-semibold"><p>Motivo <span className="text-red-500">*</span></p><GlassSelect ariaLabel="Motivo" value={motivoIncidencia} onChange={(valor) => setMotivoIncidencia(valor as MotivoIncidencia)} options={MOTIVOS_INCIDENCIA.map((motivo) => ({ value: motivo, label: motivo }))} /></div>
         <label className="block text-sm font-semibold">Descripción <span className="font-normal text-stone-400">(opcional)</span><textarea value={descripcionIncidencia} onChange={(event) => setDescripcionIncidencia(event.target.value)} maxLength={300} rows={4} placeholder="Describe qué ocurrió, cuántas prendas afecta o qué acción realizaste..." className="mt-2 w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-3 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-stone-950" /><span className="mt-1 block text-right text-[10px] text-stone-400">{descripcionIncidencia.length}/300</span></label>

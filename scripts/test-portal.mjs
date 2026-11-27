@@ -1,12 +1,33 @@
+/**
+ * Suite de integración contra el emulador aislado de Data Connect para el portal de clientes,
+ * seguimiento público y registro/gestión de cuentas cliente.
+ *
+ * Valida aislamiento de comandas propias, vinculación de pedidos por correo verificado,
+ * paginación y filtros por estado, seguimiento anónimo por número/QR sin fuga de campos privados,
+ * imposición del rol `cliente` en el alta pública (sin escalación de privilegios), aceptación
+ * obligatoria de aviso de privacidad y términos vigentes, y alta de clientes con cuenta desde
+ * recepción/administración.
+ *
+ * Invocación:
+ *   node scripts/test-portal.mjs   (con el emulador aislado activo en el puerto 9499)
+ *
+ * Variables de entorno opcionales:
+ *   - `FIREBASE_DATA_CONNECT_EMULATOR_HOST`: por defecto `127.0.0.1:9499`.
+ */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+// Guardia de seguridad: restringe las pruebas al emulador local aislado en 9499.
 const host = (process.env.FIREBASE_DATA_CONNECT_EMULATOR_HOST ?? "127.0.0.1:9499").replace(/^http:\/\//, "");
 assert.match(host, /^(127\.0\.0\.1|localhost):9499$/);
 const endpoint = `http://${host}/v1/projects/demo-production/locations/southamerica-west1/services/lavanderia-el-cobre:executeGraphql`;
 const portal = await readFile("dataconnect/example/portal-cliente.gql", "utf8");
 const publico = await readFile("dataconnect/example/seguimiento-queries.gql", "utf8");
 let checks = 0;
+/**
+ * Ejecuta una operación GraphQL en el emulador (`user` `undefined` = privilegios de servidor,
+ * `null` = anónimo, string u objeto `{ uid, email, verified }` = usuario autenticado).
+ */
 async function execute(query, operationName, variables = {}, user) {
   const impersonate = user === null ? { unauthenticated: true } : user ? { authClaims: { sub: user.uid ?? user, email: user.email ?? "cliente@example.test", email_verified: user.verified ?? false, firebase: { sign_in_provider: "password" } } } : undefined;
   const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, operationName, variables, extensions: { impersonate } }) });
