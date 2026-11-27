@@ -138,7 +138,10 @@ await check("el equipo de reparto recibe los avisos generales y los dirigidos a 
   assert(!(await listarEquipo("operario", "test-operario")).avisos.some(a => a.contenido === contenido));
   const conductor = await listarEquipo("conductor", "test-conductor");
   assert(conductor.avisos.every(a => !a.rolDestinatario));
-  for (const [rol, user] of [["operario", "test-repartidor"], ["repartidor", "test-conductor"], ["repartidor", "test-operario"]]) {
+  const conductorReparto = await listarEquipo("repartidor", "test-conductor");
+  assert(conductorReparto.avisos.some(a => a.contenido === contenido));
+  assert(conductorReparto.avisos.every(a => !a.rolDestinatario || a.rolDestinatario.nombre === "repartidor"));
+  for (const [rol, user] of [["operario", "test-repartidor"], ["operario", "test-conductor"], ["recepcionista", "test-conductor"], ["repartidor", "test-operario"]]) {
     await assert.rejects(listarEquipo(rol, user), undefined, `Acceso indebido: ${rol}/${user}`);
   }
 });
