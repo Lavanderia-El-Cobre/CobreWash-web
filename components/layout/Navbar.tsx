@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { signOut } from "firebase/auth";
 import { Menu, X, LogIn, Package, CheckCircle2, Lock, Mail, User, IdCard, MapPin, AlertCircle, Search, MailCheck, RefreshCw } from "lucide-react";
@@ -94,6 +94,8 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   const [authConfirmPass, setAuthConfirmPass] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
+  const verificandoRef = useRef(false);
+  const forgotTimerRef = useRef<number | null>(null);
   const [autorizaDatos, setAutorizaDatos] = useState(false);
   const avisoPublicado = useAvisoPublicado();
   const [authError, setAuthError] = useState("");
@@ -220,21 +222,43 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
   }
 
   const comprobarVerificacion = useCallback(async (manual: boolean) => {
+    if (verificandoRef.current) return;
     const user = auth.currentUser;
     if (!user) { setAuthView("login"); return; }
-    await user.reload().catch(() => undefined);
-    if (!user.emailVerified) {
-      if (manual) setAuthError("Aún no vemos tu correo verificado. Abre el enlace que te enviamos y vuelve a intentarlo.");
-      return;
+    verificandoRef.current = true;
+    try {
+      await user.reload().catch(() => undefined);
+      if (!user.emailVerified) {
+        if (manual) setAuthError("Aún no vemos tu correo verificado. Abre el enlace que te enviamos y vuelve a intentarlo.");
+        return;
+      }
+      setAuthError("");
+      setAuthLoading(true);
+      try { await continuarIngreso(await resolverIngreso({ auth, dataConnect })); }
+      catch (err) { setAuthError(mapAuthError(err)); }
+      finally { setAuthLoading(false); }
+    } finally {
+      verificandoRef.current = false;
     }
-    setAuthError("");
-    setAuthLoading(true);
-    try { await continuarIngreso(await resolverIngreso({ auth, dataConnect })); }
-    catch (err) { setAuthError(mapAuthError(err)); }
-    finally { setAuthLoading(false); }
     // `continuarIngreso` se recrea en cada render, pero aquí solo se invoca tras verificar correo con setters estables.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cancela el retorno automático desde "forgot" al cerrar el modal, cambiar de vista o desmontar.
+  useEffect(() => {
+    if (!isLoginOpen || authView !== "forgot") {
+      if (forgotTimerRef.current !== null) {
+        window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (forgotTimerRef.current !== null) {
+        window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = null;
+      }
+    };
+  }, [isLoginOpen, authView]);
 
   // Mientras se espera la verificación, se revisa cada pocos segundos.
   useEffect(() => {
@@ -298,6 +322,7 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authLoading) return;
     setAuthError("");
     setAuthInfo("");
 
@@ -403,7 +428,9 @@ export default function Navbar({ paginaInterior = false }: { paginaInterior?: bo
         await requestPasswordReset(auth, authEmail);
         setAuthLoading(false);
         setAuthSuccess(true);
-        setTimeout(() => {
+        if (forgotTimerRef.current !== null) window.clearTimeout(forgotTimerRef.current);
+        forgotTimerRef.current = window.setTimeout(() => {
+          forgotTimerRef.current = null;
           setAuthView("login");
           setAuthSuccess(false);
         }, 3000);

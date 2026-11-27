@@ -35,6 +35,7 @@ function ConteoFisico({ insumos, recargar, avisar }: { insumos: Insumo[]; recarg
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardando) return;
     const valor = leerNumero(cantidad);
     if (!insumo) { avisar("Selecciona el insumo contado.", "error"); return; }
     if (valor === null || valor < 0) { avisar("Ingresa la cantidad contada (0 o más).", "error"); return; }
@@ -77,6 +78,7 @@ function Compra({ insumos, recargar, avisar }: { insumos: Insumo[]; recargar: ()
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardando) return;
     const valor = leerNumero(cantidad);
     if (!insumo) { avisar("Selecciona el insumo comprado.", "error"); return; }
     if (valor === null || valor <= 0) { avisar("La cantidad comprada debe ser mayor que cero.", "error"); return; }

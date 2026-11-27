@@ -1,4 +1,4 @@
-import { limitesFechasConsulta } from "@/lib/reportes/fechas";
+import { instanteChile } from "@/lib/reportes/fechas";
 
 /**
  * Lectura y validación de CSV de conteos físicos o compras antes de guardar.
@@ -71,13 +71,11 @@ export function leerFecha(valor: string, tipo: TipoCsv): string | null {
   const m = valor.trim().match(/^(?:(\d{4})-(\d{2})-(\d{2})|(\d{2})[-/](\d{2})[-/](\d{4}))(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!m) return null;
   const dia = m[1] ? `${m[1]}-${m[2]}-${m[3]}` : `${m[6]}-${m[5]}-${m[4]}`;
-  let inicio: string | undefined;
-  try { inicio = limitesFechasConsulta(dia, dia).fechaDesde; } catch { return null; }
   const [h, min, s] = m[7] !== undefined
     ? [Number(m[7]), Number(m[8]), Number(m[9] ?? 0)]
     : tipo === "conteos" ? [23, 59, 59] : [12, 0, 0];
   if (h > 23 || min > 59 || s > 59) return null;
-  return new Date(Date.parse(inicio!) + ((h * 60 + min) * 60 + s) * 1000).toISOString();
+  try { return instanteChile(dia, h, min, s); } catch { return null; }
 }
 
 /**

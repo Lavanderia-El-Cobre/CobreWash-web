@@ -43,6 +43,7 @@ export default function GraficoLineas({ titulo, etiquetaX, puntos, series, forma
 }) {
   const [activo, setActivo] = useState<number | null>(null);
   if (!puntos.length) return null;
+  const indiceActivo = activo !== null && Number.isInteger(activo) && activo >= 0 && activo < puntos.length ? activo : null;
   const maximo = tope(Math.max(0, ...puntos.flatMap((p) => p.valores.filter((v): v is number => v !== null))));
   const ancho = ANCHO - IZQ - DER, alto = ALTO - ARR - ABA;
   const x = (i: number) => IZQ + (puntos.length === 1 ? ancho / 2 : (i / (puntos.length - 1)) * ancho);
@@ -68,6 +69,7 @@ export default function GraficoLineas({ titulo, etiquetaX, puntos, series, forma
 
   const mover = (e: React.PointerEvent<SVGRectElement>) => {
     const caja = e.currentTarget.getBoundingClientRect();
+    if (caja.width <= 0) return;
     const relativo = ((e.clientX - caja.left) / caja.width) * ancho;
     setActivo(Math.max(0, Math.min(puntos.length - 1, Math.round((relativo / ancho) * (puntos.length - 1)))));
   };
@@ -104,7 +106,7 @@ export default function GraficoLineas({ titulo, etiquetaX, puntos, series, forma
             <text key={p.x} x={x(i)} y={ALTO - ABA + 16} textAnchor="middle" className="fill-stone-400 text-[11px]">{p.x}</text>
           ))}
           <text x={IZQ + ancho / 2} y={ALTO - 2} textAnchor="middle" className="fill-stone-500 text-[11px] font-semibold">{etiquetaX}</text>
-          {activo !== null && <line x1={x(activo)} x2={x(activo)} y1={ARR} y2={ARR + alto} className="stroke-stone-400 dark:stroke-stone-500" strokeWidth="1" />}
+          {indiceActivo !== null && <line x1={x(indiceActivo)} x2={x(indiceActivo)} y1={ARR} y2={ARR + alto} className="stroke-stone-400 dark:stroke-stone-500" strokeWidth="1" />}
           {series.map((s, k) => {
             const u = ultimo(k);
             return (
@@ -116,25 +118,25 @@ export default function GraficoLineas({ titulo, etiquetaX, puntos, series, forma
                     <text x={x(u) + 8} y={y(puntos[u].valores[k]!)} dy="0.32em" className="fill-stone-700 text-[11px] font-bold dark:fill-stone-200">{formato(puntos[u].valores[k]!)}</text>
                   </>
                 )}
-                {activo !== null && puntos[activo].valores[k] !== null && (
-                  <circle cx={x(activo)} cy={y(puntos[activo].valores[k]!)} r="5" fill="currentColor" className="stroke-white dark:stroke-stone-900" strokeWidth="2" />
+                {indiceActivo !== null && puntos[indiceActivo].valores[k] !== null && (
+                  <circle cx={x(indiceActivo)} cy={y(puntos[indiceActivo].valores[k]!)} r="5" fill="currentColor" className="stroke-white dark:stroke-stone-900" strokeWidth="2" />
                 )}
               </g>
             );
           })}
           <rect x={IZQ} y={ARR} width={ancho} height={alto} fill="transparent" onPointerMove={mover} onPointerLeave={() => setActivo(null)} />
         </svg>
-        {activo !== null && (
+        {indiceActivo !== null && (
           <div
             role="status"
             className="pointer-events-none absolute top-1 z-10 min-w-36 -translate-x-1/2 rounded-xl border border-stone-200 bg-white/95 px-3 py-2 text-xs shadow-lg dark:border-white/10 dark:bg-stone-900/95"
-            style={{ left: `${(x(activo) / ANCHO) * 100}%` }}
+            style={{ left: `${(x(indiceActivo) / ANCHO) * 100}%` }}
           >
-            <p className="mb-1 text-[11px] text-stone-400">{etiquetaX}: {puntos[activo].x}</p>
+            <p className="mb-1 text-[11px] text-stone-400">{etiquetaX}: {puntos[indiceActivo].x}</p>
             {series.map((s, k) => (
               <p key={s.nombre} className="flex items-center gap-2">
                 <svg width="12" height="4" aria-hidden className={s.color}><line x1="0" y1="2" x2="12" y2="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                <strong className="text-stone-900 dark:text-white">{puntos[activo].valores[k] === null ? "—" : formato(puntos[activo].valores[k]!)}</strong>
+                <strong className="text-stone-900 dark:text-white">{puntos[indiceActivo].valores[k] === null ? "—" : formato(puntos[indiceActivo].valores[k]!)}</strong>
                 <span className="text-stone-500 dark:text-stone-400">{s.nombre}</span>
               </p>
             ))}

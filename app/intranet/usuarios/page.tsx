@@ -105,6 +105,7 @@ export default function UsuariosPage() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [pageError, setPageError] = useState("");
 
   const rutDigits = cleanRut(form.rut);
   const rutTouched = rutDigits.length > 0;
@@ -227,15 +228,24 @@ export default function UsuariosPage() {
   };
 
   const toggleActivo = async (usuario: Usuario) => {
-    await toggleManagedUserActive(dataConnect, {
-      id: usuario.id,
-      rolId: usuario.rol.id,
-      nombre: usuario.nombre,
-      apellido: usuario.apellido ?? null,
-      telefono: usuario.telefono ?? null,
-      activo: !usuario.activo,
-    });
-    await cargarUsuarios();
+    if (saving) return;
+    setSaving(true);
+    setPageError("");
+    try {
+      await toggleManagedUserActive(dataConnect, {
+        id: usuario.id,
+        rolId: usuario.rol.id,
+        nombre: usuario.nombre,
+        apellido: usuario.apellido ?? null,
+        telefono: usuario.telefono ?? null,
+        activo: usuario.activo,
+      });
+      await cargarUsuarios();
+    } catch (err) {
+      setPageError(mapAuthError(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!permitido) {
@@ -262,6 +272,11 @@ export default function UsuariosPage() {
         {aviso && (
           <p role="status" className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs font-semibold text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">
             {aviso} <button type="button" onClick={() => setAviso("")} className="ml-2 underline">Cerrar</button>
+          </p>
+        )}
+        {pageError && (
+          <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+            {pageError} <button type="button" onClick={() => setPageError("")} className="ml-2 underline">Cerrar</button>
           </p>
         )}
       </EncabezadoSeccion>

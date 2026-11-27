@@ -32,7 +32,13 @@ export default function SolicitudesPage() {
     setCargando(true); setError("");
     try {
       const result = await getSolicitudesContacto(dataConnect, variablesBandeja(estado, pagina),{ fetchPolicy: "SERVER_ONLY" });
-      if (solicitud === version.current) setDatos(result.data);
+      if (solicitud === version.current) {
+        if (result.data.solicitudContactos.length === 0 && pagina > 0) {
+          setPagina((p) => Math.max(0, p - 1));
+          return;
+        }
+        setDatos(result.data);
+      }
     } catch { if (solicitud === version.current) setError("No se pudo cargar la bandeja. Intenta nuevamente."); }
     finally { if (solicitud === version.current) setCargando(false); }
   }, [estado, pagina, permitido]);

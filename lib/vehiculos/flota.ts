@@ -1,3 +1,4 @@
+import { limitesFechasInclusivos } from "@/lib/reportes/fechas";
 import type {
   EstadoOperativoVehiculo,
   ResumenVehiculo,
@@ -153,8 +154,18 @@ export function filtrarSalidasHistorial(
   salidas: SalidaFlota[],
   filtros: FiltrosHistorialVehiculo,
 ): SalidaFlota[] {
-  const desdeMs = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00-03:00`) : null;
-  const hastaMs = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999-03:00`) : null;
+  let desdeMs: number | null = null;
+  let hastaMs: number | null = null;
+  if (filtros.desde || filtros.hasta) {
+    try {
+      const limites = limitesFechasInclusivos(filtros.desde, filtros.hasta);
+      desdeMs = limites.fechaDesde ? Date.parse(limites.fechaDesde) : null;
+      hastaMs = limites.fechaHasta ? Date.parse(limites.fechaHasta) : null;
+    } catch {
+      desdeMs = filtros.desde ? Date.parse(`${filtros.desde}T00:00:00-03:00`) : null;
+      hastaMs = filtros.hasta ? Date.parse(`${filtros.hasta}T23:59:59.999-03:00`) : null;
+    }
+  }
 
   return salidas.filter((salida) => {
     if (filtros.vehiculoId && salida.vehiculo.id !== filtros.vehiculoId) {

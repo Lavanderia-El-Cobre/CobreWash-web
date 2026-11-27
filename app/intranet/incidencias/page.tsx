@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Eye, Loader2, Search, ShieldAlert } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRoleGuard } from "@/components/intranet/useRoleGuard";
@@ -40,21 +40,28 @@ export default function IncidenciasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [errorModal, setErrorModal] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [estado, setEstado] = useState<IncidenciaEstado | "TODAS">("TODAS");
   const [seleccionada, setSeleccionada] = useState<Incidencia | null>(null);
+  // Control de secuencia para descartar respuestas de polling anteriores a una mutación.
+  const consultaRef = useRef(0);
 
   const cargar = useCallback(async (silencioso = false) => {
     if (!permitido) return;
+    const consulta = ++consultaRef.current;
     if (!silencioso) setLoading(true);
     try {
       const result = await getIncidencias(dataConnect, { fetchPolicy: "SERVER_ONLY" });
-      setIncidencias(result.data?.incidenciaComandas ?? []);
+      if (consulta !== consultaRef.current) return;
+      const lista = result.data?.incidenciaComandas ?? [];
+      setIncidencias(lista);
+      setSeleccionada((prev) => (prev ? (lista.find((item) => item.id === prev.id) ?? prev) : null));
       setError("");
     } catch {
-      if (!silencioso) setError("No se pudieron cargar las incidencias.");
+      if (consulta === consultaRef.current && !silencioso) setError("No se pudieron cargar las incidencias.");
     } finally {
-      if (!silencioso) setLoading(false);
+      if (consulta === consultaRef.current && !silencioso) setLoading(false);
     }
   }, [permitido]);
 
@@ -77,13 +84,15 @@ export default function IncidenciasPage() {
 
   const cambiarEstado = async (nuevoEstado: IncidenciaEstado) => {
     if (!seleccionada || saving) return;
+    ++consultaRef.current;
     setSaving(true);
+    setErrorModal("");
     try {
       await actualizarEstadoIncidencia(dataConnect, { id: seleccionada.id, estado: nuevoEstado });
       setSeleccionada({ ...seleccionada, estado: nuevoEstado });
       await cargar(true);
     } catch {
-      setError("No se pudo actualizar la incidencia.");
+      setErrorModal("No se pudo actualizar la incidencia.");
     } finally { setSaving(false); }
   };
 
@@ -132,7 +141,7 @@ export default function IncidenciasPage() {
           <div className="min-w-0"><p className="truncate text-sm font-semibold">{item.comanda?.cliente?.nombre}</p><p className="truncate text-xs text-stone-500">{item.motivo}</p></div>
           <div><p className="text-xs font-semibold">{new Date(item.fecha).toLocaleDateString("es-CL")}</p><p className="text-xs text-stone-500">{new Date(item.fecha).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })} · {[item.reportadaPor?.nombre, item.reportadaPor?.apellido].filter(Boolean).join(" ")}</p></div>
           <div><EstadoBadge estado={item.estado} /></div>
-          <button onClick={() => setSeleccionada(item)} aria-label={`Ver ${item.id}`} className="grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-brand-500 hover:text-white dark:bg-white/5"><Eye className="h-4 w-4" /></button>
+          <button onClick={() => { setErrorModal(""); setSeleccionada(item); }} aria-label={`Ver ${item.id}`} className="grid h-9 w-9 place-items-center rounded-xl bg-stone-100 text-stone-500 transition-colors hover:bg-brand-500 hover:text-white dark:bg-white/5"><Eye className="h-4 w-4" /></button>
         </motion.article>)}
         {!visibles.length && <div className="p-12 text-center"><ShieldAlert className="mx-auto mb-3 h-8 w-8 text-stone-300" /><p className="text-sm font-semibold">No hay incidencias que coincidan con el filtro.</p></div>}
       </div>
@@ -140,7 +149,8 @@ export default function IncidenciasPage() {
 
     <AnimatePresence>
       {seleccionada && <ModalIntranet
-        onCerrar={() => setSeleccionada(null)}
+        onCerrar={() => { setErrorModal(""); setSeleccionada(null); }}
+        bloqueado={saving}
         etiqueta={`INC-${seleccionada.id.slice(0, 8)} · ${seleccionada.comanda?.numeroComanda ?? ""}`}
         titulo={seleccionada.motivo}
         idTitulo="incidencia-titulo"
@@ -148,6 +158,7 @@ export default function IncidenciasPage() {
         icono={ShieldAlert}
         tono="aviso"
       >
+          {errorModal && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">{errorModal}</p>}
           <div className="grid gap-3 rounded-2xl bg-stone-50 p-4 text-sm sm:grid-cols-2 dark:bg-white/5"><div><p className="text-xs text-stone-400">Cliente</p><p className="font-semibold">{seleccionada.comanda?.cliente?.nombre}</p></div><div><p className="text-xs text-stone-400">Reportada por</p><p className="font-semibold">{[seleccionada.reportadaPor?.nombre, seleccionada.reportadaPor?.apellido].filter(Boolean).join(" ")}</p></div></div>
           <div className="mt-4"><p className="text-xs font-bold uppercase tracking-wider text-stone-400">Descripción</p><p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">{seleccionada.descripcion || "Sin descripción adicional."}</p></div>
           <div className="mt-6"><p className="mb-2 text-xs font-bold uppercase tracking-wider text-stone-400">Actualizar seguimiento</p><div className="grid gap-2 sm:grid-cols-3">{Object.values(IncidenciaEstado).map((opcion) => <button key={opcion} disabled={saving} onClick={() => void cambiarEstado(opcion)} className={`min-h-11 rounded-xl border px-3 py-2 text-xs font-bold transition-all disabled:opacity-50 ${seleccionada.estado === opcion ? ESTADO_STYLE[opcion] : "border-stone-200 text-stone-500 hover:border-brand-300 dark:border-white/10"}`}>{ESTADO_LABEL[opcion]}</button>)}</div></div>

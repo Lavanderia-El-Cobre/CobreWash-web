@@ -126,6 +126,21 @@ describe("resumen, filtros y utilidades de flota", () => {
     });
     expect(filtradas).toHaveLength(1);
 
+    // En horario de invierno (UTC-4), las 23:30 de Chile corresponden a las 03:30 UTC del día siguiente.
+    const salidaInvierno: SalidaFlota = {
+      ...salidasFixture[0],
+      id: "s-inv",
+      fechaSalida: "2026-07-16T03:30:00.000Z",
+      creadoEn: "2026-07-16T03:30:00.000Z",
+    };
+    expect(filtrarSalidasHistorial([salidaInvierno], {
+      vehiculoId: "",
+      repartidorId: "",
+      estado: "TODOS",
+      desde: "2026-07-15",
+      hasta: "2026-07-15",
+    })).toHaveLength(1);
+
     const csv = crearCsvHistorialVehiculos(salidasFixture);
     expect(csv).toContain("HLRT-24");
     expect(csv).toContain("Carlos Rojas");

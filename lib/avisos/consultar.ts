@@ -19,8 +19,9 @@ export async function consultarAvisos(rol: string, pagina: number) {
   if (!["admin", "operario", "recepcionista", "repartidor", "conductor"].includes(rol)) {
     throw new Error("Acceso reservado al personal.");
   }
+  const rolConsulta = rol === "conductor" ? "repartidor" : rol;
   const { data } = rol === "admin"
     ? await getAvisosAdministracion(dataConnect, variables, opciones)
-    : await getAvisosParaEquipo(dataConnect, { ...variables, rol }, opciones);
+    : await getAvisosParaEquipo(dataConnect, { ...variables, rol: rolConsulta }, opciones);
   return { avisos: data.avisos, total: data.total[0]?._count ?? 0 };
 }

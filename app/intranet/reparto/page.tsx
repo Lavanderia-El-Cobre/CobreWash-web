@@ -171,7 +171,14 @@ export default function RepartoPage() {
     });
   };
 
-  const cerrarForm = useCallback(() => { if (!guardando) { setForm(null); setFormError(""); } }, [guardando]);
+  const cerrarForm = useCallback(() => {
+    if (guardando) return;
+    const refrescar = movimientoGuardado;
+    setForm(null);
+    setFormError("");
+    setMovimientoGuardado(false);
+    if (refrescar) void cargar(true);
+  }, [cargar, guardando, movimientoGuardado]);
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();

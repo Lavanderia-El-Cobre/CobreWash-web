@@ -37,7 +37,7 @@ query GetMiPerfil @auth(level: USER) {
 # Lista de todas las cuentas del sistema. Solo accesible para administradores
 # (verificado contra la tabla usuario/rol, no contra un claim del token).
 query GetUsuarios @auth(level: USER) {
-  yo: usuario(id_expr: "auth.uid") @redact {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
     activo @check(expr: "this == true", message: "La cuenta está inactiva")
     rol {
       nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden ver la lista de usuarios")
@@ -138,11 +138,11 @@ query GetInventario @auth(level: USER) @refresh(every: { seconds: 10 }) {
 
 # Catálogo de vehículos disponible para administración y repartidores.
 query GetVehiculos @auth(level: USER) {
-  yo: usuario(id_expr: "auth.uid") @redact {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
     activo @check(expr: "this == true", message: "La cuenta está inactiva")
     rol {
       nombre @check(
-        expr: "this in ['admin', 'repartidor']"
+        expr: "this in ['admin', 'repartidor', 'conductor']"
         message: "Acceso reservado a administración y reparto"
       )
     }
@@ -161,11 +161,11 @@ query GetVehiculos @auth(level: USER) {
 
 # Cada repartidor ve únicamente las salidas que tiene asignadas.
 query GetMisSalidasVehiculo @auth(level: USER) {
-  yo: usuario(id_expr: "auth.uid") @redact {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
     activo @check(expr: "this == true", message: "La cuenta está inactiva")
     rol {
       nombre @check(
-        expr: "this == 'repartidor'"
+        expr: "this in ['repartidor', 'conductor']"
         message: "Acceso reservado a repartidores"
       )
     }
@@ -215,7 +215,7 @@ query GetComandas(
   $fechaDesde: Timestamp
   $fechaHasta: Timestamp
 ) @auth(level: USER) @retired(reason: "Usar GetComandasPaginadas") {
-  yo: usuario(id_expr: "auth.uid") @redact {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
     activo @check(expr: "this == true", message: "La cuenta está inactiva")
     rol {
       nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para listar comandas")
@@ -294,9 +294,16 @@ query GetComandasPaginadas(
   }
   comandas(
     where: {
-      estado: { eq: $estado, in: $estados }
-      cliente: { nombre: { contains: $cliente } }
-      fechaRecepcion: { ge: $fechaDesde, le: $fechaHasta, lt: $fechaHastaExclusiva }
+      _and: [
+        { estado: { eq: $estado, in: $estados } }
+        { fechaRecepcion: { ge: $fechaDesde, le: $fechaHasta, lt: $fechaHastaExclusiva } }
+        {
+          _or: [
+            { numeroComanda: { contains: $cliente } }
+            { cliente: { nombre: { contains: $cliente } } }
+          ]
+        }
+      ]
     }
     orderBy: [{ creadoEn: DESC }]
     limit: $limit
@@ -344,9 +351,16 @@ query GetComandasPaginadas(
   }
   total: comandas(
     where: {
-      estado: { eq: $estado, in: $estados }
-      cliente: { nombre: { contains: $cliente } }
-      fechaRecepcion: { ge: $fechaDesde, le: $fechaHasta, lt: $fechaHastaExclusiva }
+      _and: [
+        { estado: { eq: $estado, in: $estados } }
+        { fechaRecepcion: { ge: $fechaDesde, le: $fechaHasta, lt: $fechaHastaExclusiva } }
+        {
+          _or: [
+            { numeroComanda: { contains: $cliente } }
+            { cliente: { nombre: { contains: $cliente } } }
+          ]
+        }
+      ]
     }
   ) {
     _count
@@ -502,7 +516,7 @@ query DiagnosticoComandas @auth(level: NO_ACCESS) {
 # Fichas administrativas de clientes para recepción y administración. Incluye
 # sus comandas para calcular métricas sin depender de datos mock.
 query GetFichasClientes @auth(level: USER) {
-  yo: usuario(id_expr: "auth.uid") @redact {
+  yo: usuario(id_expr: "auth.uid") @redact @check(expr: "this != null", message: "Perfil no encontrado") {
     activo @check(expr: "this == true", message: "La cuenta está inactiva")
     rol {
       nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para listar clientes")

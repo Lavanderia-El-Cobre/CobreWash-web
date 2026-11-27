@@ -89,6 +89,7 @@ export default function InventarioPage() {
   const [etiqueta, setEtiqueta] = useState<Insumo | null>(null);
   const [form, setForm] = useState<InsumoForm | null>(null);
   const [movimiento, setMovimiento] = useState<MovimientoForm | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   // Conjunto de insumos ya alertados: notifica solo cuando un insumo recién cae en stock bajo o crítico.
   const alertasPrevias = useRef<Set<string> | null>(null);
@@ -184,16 +185,17 @@ export default function InventarioPage() {
 
   const guardarInsumo = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form) return;
+    if (saving || !form) return;
+    setModalError(null);
     const stockInicial = numero(form.stockInicial);
     const stockMinimo = numero(form.stockMinimo);
     if (!form.nombre.trim() || !form.unidadMedida.trim()) {
-      setNotice({ text: "Nombre y unidad de medida son obligatorios.", tipo: "error" });
+      setModalError("Nombre y unidad de medida son obligatorios.");
       return;
     }
     if (!Number.isFinite(stockMinimo) || stockMinimo < 0
       || (!form.id && (!Number.isFinite(stockInicial) || stockInicial < 0))) {
-      setNotice({ text: "Los valores de stock deben ser números iguales o mayores que cero.", tipo: "error" });
+      setModalError("Los valores de stock deben ser números iguales o mayores que cero.");
       return;
     }
     setSaving(true);
@@ -213,11 +215,12 @@ export default function InventarioPage() {
       setForm(null);
     } catch (error) {
       registrarError("No se pudo guardar el insumo:", error);
-      setNotice({ text: mensajeError(error), tipo: "error" });
+      setModalError(mensajeError(error));
     } finally { setSaving(false); }
   };
 
   const cambiarEstado = async (item: Insumo) => {
+    if (saving) return;
     setSaving(true);
     try {
       await actualizarInsumo(dataConnect, {
@@ -233,15 +236,16 @@ export default function InventarioPage() {
 
   const registrarMovimiento = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!movimiento) return;
+    if (saving || !movimiento) return;
+    setModalError(null);
     const cantidad = numero(movimiento.cantidad);
     const seleccionado = activos.find((item) => item.id === movimiento.insumoId);
     if (!seleccionado || !Number.isFinite(cantidad) || cantidad <= 0) {
-      setNotice({ text: "Selecciona un insumo e ingresa una cantidad mayor que cero.", tipo: "error" });
+      setModalError("Selecciona un insumo e ingresa una cantidad mayor que cero.");
       return;
     }
     if (movimiento.tipo === TipoMovimiento.SALIDA && cantidad > seleccionado.stockActual) {
-      setNotice({ text: `El stock disponible es ${seleccionado.stockActual} ${seleccionado.unidadMedida}.`, tipo: "error" });
+      setModalError(`El stock disponible es ${seleccionado.stockActual} ${seleccionado.unidadMedida}.`);
       return;
     }
     setSaving(true);
@@ -262,13 +266,14 @@ export default function InventarioPage() {
       setMovimiento(null);
     } catch (error) {
       registrarError("No se pudo registrar el movimiento:", error);
-      setNotice({ text: mensajeError(error), tipo: "error" });
+      setModalError(mensajeError(error));
       await cargarInventario(true);
     } finally { setSaving(false); }
   };
 
   const abrirMovimiento = (tipo: TipoMovimiento) => {
     const opciones = tipo === TipoMovimiento.SALIDA ? conStock : activos;
+    setModalError(null);
     setMovimiento({ tipo, insumoId: opciones[0]?.id ?? "", cantidad: "", motivo: "" });
   };
 
@@ -278,7 +283,7 @@ export default function InventarioPage() {
 
   return (
     <div className="min-h-screen space-y-6 p-4 text-stone-900 sm:p-6 dark:text-stone-100">
-      <AnimatePresence>{notice && <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role={notice.tipo === "error" ? "alert" : "status"} aria-live="polite" className={`fixed right-5 top-5 z-[70] max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${noticeStyle[notice.tipo]}`}>{notice.text}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{notice && <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role={notice.tipo === "error" ? "alert" : "status"} aria-live="polite" className={`fixed right-5 top-5 z-[120] max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${noticeStyle[notice.tipo]}`}>{notice.text}</motion.div>}</AnimatePresence>
 
       <EncabezadoSeccion
         antetitulo="Bodega · Inventario conectado"
@@ -287,7 +292,7 @@ export default function InventarioPage() {
         acciones={<>
           <button onClick={() => abrirMovimiento(TipoMovimiento.SALIDA)} disabled={!conStock.length} className="flex cursor-pointer items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-40 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"><ArrowUpFromLine className="h-4 w-4" />Registrar salida</button>
           <button onClick={() => abrirMovimiento(TipoMovimiento.ENTRADA)} disabled={!activos.length} className={BOTON_ENCABEZADO_SECUNDARIO}><ArrowDownToLine className="h-4 w-4" />Registrar entrada</button>
-          <button onClick={() => setForm(FORM_VACIO)} className={BOTON_ENCABEZADO}><Plus className="h-4 w-4" />Nuevo insumo</button>
+          <button onClick={() => { setModalError(null); setForm(FORM_VACIO); }} className={BOTON_ENCABEZADO}><Plus className="h-4 w-4" />Nuevo insumo</button>
         </>}
       />
 
@@ -303,7 +308,7 @@ export default function InventarioPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><label className="relative max-w-md flex-1"><span className="sr-only">Buscar insumo</span><Search className="absolute left-3 top-3 h-4 w-4 text-stone-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o unidad..." className="glass-panel w-full rounded-xl py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand-500/50" /></label><div className="flex flex-wrap gap-2">{(["Todos", "OK", "Bajo", "Crítico", "Inactivo"] as const).map((opcion) => <button key={opcion} onClick={() => setFiltro(opcion)} className={`rounded-xl px-3 py-2 text-xs font-bold transition ${filtro === opcion ? "bg-brand-500 text-white" : "bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-400"}`}>{opcion}</button>)}</div></div>
 
       <section className="glass-panel overflow-hidden rounded-2xl"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-stone-50/80 text-xs uppercase text-stone-400 dark:bg-white/5"><tr><th className="px-4 py-3">Insumo</th><th className="px-4 py-3">Unidad</th><th className="px-4 py-3">Stock</th><th className="px-4 py-3">Mínimo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Código</th><th className="px-4 py-3 text-right">Acciones</th></tr></thead><tbody>
-        {visibles.map((item) => { const cfg = statusCfg[item.status]; const Icon = cfg.icon; return <tr key={item.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/60 dark:border-white/5 dark:hover:bg-white/3"><td className="px-4 py-3"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><Archive className="h-4 w-4" /></span><span className="font-bold">{item.nombre}</span></div></td><td className="px-4 py-3 text-stone-500">{item.unidadMedida}</td><td className="px-4 py-3 text-base font-extrabold">{item.stockActual.toLocaleString("es-CL")} <span className="text-xs font-normal text-stone-400">{item.unidadMedida}</span></td><td className="px-4 py-3 text-stone-500">{item.stockMinimo.toLocaleString("es-CL")} {item.unidadMedida}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${cfg.style}`}><Icon className="h-3 w-3" />{item.status}</span></td><td className="px-4 py-3"><button onClick={() => setEtiqueta(item)} aria-label={`Ver QR de ${item.nombre}`} className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-500/5 px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-500/10 dark:border-brand-500/20 dark:text-brand-300"><QrIcon className="h-4 w-4" />Ver QR</button></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button title="Editar insumo" onClick={() => setForm({ id: item.id, nombre: item.nombre, unidadMedida: item.unidadMedida, stockInicial: String(item.stockActual), stockMinimo: String(item.stockMinimo), activo: item.activo })} className="rounded-lg p-2 text-stone-400 hover:bg-brand-500/10 hover:text-brand-600"><Pencil className="h-4 w-4" /></button><button disabled={saving} title={item.activo ? "Desactivar" : "Reactivar"} onClick={() => void cambiarEstado(item)} className={`rounded-lg p-2 ${item.activo ? "text-stone-400 hover:bg-red-500/10 hover:text-red-600" : "text-green-600 hover:bg-green-500/10"}`}>{item.activo ? <Power className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button></div></td></tr>; })}
+        {visibles.map((item) => { const cfg = statusCfg[item.status]; const Icon = cfg.icon; return <tr key={item.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50/60 dark:border-white/5 dark:hover:bg-white/3"><td className="px-4 py-3"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><Archive className="h-4 w-4" /></span><span className="font-bold">{item.nombre}</span></div></td><td className="px-4 py-3 text-stone-500">{item.unidadMedida}</td><td className="px-4 py-3 text-base font-extrabold">{item.stockActual.toLocaleString("es-CL")} <span className="text-xs font-normal text-stone-400">{item.unidadMedida}</span></td><td className="px-4 py-3 text-stone-500">{item.stockMinimo.toLocaleString("es-CL")} {item.unidadMedida}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${cfg.style}`}><Icon className="h-3 w-3" />{item.status}</span></td><td className="px-4 py-3"><button onClick={() => setEtiqueta(item)} aria-label={`Ver QR de ${item.nombre}`} className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-500/5 px-3 py-2 text-xs font-bold text-brand-700 hover:bg-brand-500/10 dark:border-brand-500/20 dark:text-brand-300"><QrIcon className="h-4 w-4" />Ver QR</button></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button title="Editar insumo" onClick={() => { setModalError(null); setForm({ id: item.id, nombre: item.nombre, unidadMedida: item.unidadMedida, stockInicial: String(item.stockActual), stockMinimo: String(item.stockMinimo), activo: item.activo }); }} className="rounded-lg p-2 text-stone-400 hover:bg-brand-500/10 hover:text-brand-600"><Pencil className="h-4 w-4" /></button><button disabled={saving} title={item.activo ? "Desactivar" : "Reactivar"} onClick={() => void cambiarEstado(item)} className={`rounded-lg p-2 ${item.activo ? "text-stone-400 hover:bg-red-500/10 hover:text-red-600" : "text-green-600 hover:bg-green-500/10"}`}>{item.activo ? <Power className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button></div></td></tr>; })}
         {!visibles.length && <tr><td colSpan={7} className="px-4 py-12 text-center text-stone-400">No hay insumos que coincidan con los filtros.</td></tr>}
       </tbody></table></div></section>
 
@@ -316,7 +321,7 @@ export default function InventarioPage() {
       <AnimatePresence>
         {form && (
           <ModalIntranet
-            onCerrar={() => setForm(null)}
+            onCerrar={() => { setModalError(null); setForm(null); }}
             bloqueado={saving}
             onSubmit={guardarInsumo}
             icono={Archive}
@@ -326,13 +331,19 @@ export default function InventarioPage() {
             idTitulo="titulo-insumo"
             claseCuerpo="space-y-5"
             pie={<>
-              <button type="button" onClick={() => setForm(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+              <button type="button" onClick={() => { setModalError(null); setForm(null); }} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
               <button disabled={saving} className={BOTON_MODAL_PRIMARIO}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {form.id ? "Guardar cambios" : "Registrar insumo"}
               </button>
             </>}
           >
+              {modalError && (
+                <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{modalError}</span>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Nombre del insumo</label>
                 <input
@@ -411,7 +422,7 @@ export default function InventarioPage() {
       <AnimatePresence>
         {movimiento && (
           <ModalIntranet
-            onCerrar={() => setMovimiento(null)}
+            onCerrar={() => { setModalError(null); setMovimiento(null); }}
             bloqueado={saving}
             onSubmit={registrarMovimiento}
             icono={movimiento.tipo === TipoMovimiento.ENTRADA ? ArrowDownToLine : ArrowUpFromLine}
@@ -422,13 +433,19 @@ export default function InventarioPage() {
             idTitulo="titulo-movimiento"
             claseCuerpo="space-y-5"
             pie={<>
-              <button type="button" onClick={() => setMovimiento(null)} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
+              <button type="button" onClick={() => { setModalError(null); setMovimiento(null); }} disabled={saving} className={BOTON_MODAL_SECUNDARIO}>Cancelar</button>
               <button disabled={saving || !movimiento.insumoId} className={movimiento.tipo === TipoMovimiento.ENTRADA ? BOTON_MODAL_PRIMARIO : BOTON_MODAL_PELIGRO}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 Registrar {movimiento.tipo === TipoMovimiento.ENTRADA ? "entrada" : "salida"}
               </button>
             </>}
           >
+              {modalError && (
+                <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{modalError}</span>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Insumo</span>
                 <GlassSelect

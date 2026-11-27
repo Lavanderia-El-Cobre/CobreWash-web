@@ -16,6 +16,9 @@ describe("valores del CSV", () => {
     expect(leerFecha("25-10-2026", "compras")).toBe("2026-10-25T15:00:00.000Z");
     expect(leerFecha("25/07/2026 08:30", "conteos")).toBe("2026-07-25T12:30:00.000Z");
     expect(leerFecha("2026-07-25T08:30:15", "compras")).toBe("2026-07-25T12:30:15.000Z");
+    // Cambio de hora en Chile (verano UTC-3 a invierno UTC-4 y viceversa).
+    expect(leerFecha("2026-04-04 23:59:59", "conteos")).toBe("2026-04-05T03:59:59.000Z");
+    expect(leerFecha("2026-09-05 23:59:59", "conteos")).toBe("2026-09-06T03:59:59.000Z");
   });
 
   it.each(["2026-02-30", "2026/10/25", "25-10-26", "2026-10-25 25:00", "2026-10-25 10:61", "ayer"])("rechaza la fecha %j", (texto) => {

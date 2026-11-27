@@ -23,7 +23,7 @@ export function AvisoFlotante({ aviso }: { aviso: Aviso | null }) {
         <motion.div
           initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
           role={aviso.tipo === "error" ? "alert" : "status"} aria-live="polite"
-          className={`fixed right-5 top-5 z-[70] max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${estiloAviso[aviso.tipo]}`}
+          className={`fixed right-5 top-5 z-[120] max-w-sm rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${estiloAviso[aviso.tipo]}`}
         >
           {aviso.texto}
         </motion.div>

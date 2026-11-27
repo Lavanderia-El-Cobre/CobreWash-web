@@ -152,8 +152,17 @@ export default function GlassSelect({
                     type="search"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    // Evita que atajos de teclado de contenedores padre intercepten la escritura, dejando pasar Escape para cerrar.
-                    onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }}
+                    // Evita envío accidental del `<form>` padre con Enter, selecciona la primera coincidencia y deja pasar Escape.
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        if (filteredOptions.length > 0) {
+                          onChange(filteredOptions[0].value);
+                          setOpen(false);
+                        }
+                      }
+                      if (event.key !== "Escape") event.stopPropagation();
+                    }}
                     placeholder={searchPlaceholder}
                     aria-label={searchPlaceholder}
                     className="w-full rounded-lg border border-stone-200 bg-stone-50 py-2 pl-8 pr-3 text-sm text-stone-800 outline-none focus:border-brand-500 dark:border-white/10 dark:bg-stone-800 dark:text-stone-200"

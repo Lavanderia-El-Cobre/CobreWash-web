@@ -9,6 +9,7 @@ const STORAGE_KEY = "intranet-theme";
 
 interface ThemeContextValue {
   theme: Theme;
+  resolvedTheme: "light" | "dark";
   setTheme: (theme: Theme) => void;
 }
 
@@ -31,6 +32,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(
     () => (typeof window === "undefined" ? "system" : (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system")
   );
+  const [systemDark, setSystemDark] = useState<boolean>(
+    () => (typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)").matches : false)
+  );
 
   useEffect(() => {
     applyTheme(theme);
@@ -49,6 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemChange = () => {
+      setSystemDark(media.matches);
       const current = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
       if (current === "system") applyTheme("system");
     };
@@ -62,7 +67,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyTheme(next);
   };
 
-  return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
+  const resolvedTheme: "light" | "dark" = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+
+  return <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 /**

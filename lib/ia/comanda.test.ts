@@ -17,6 +17,16 @@ describe("peso de la comanda", () => {
     expect(repartirPeso(0, [2, 3])).toEqual([0, 0]);
     expect(repartirPeso(5, [])).toEqual([]);
   });
+
+  it("nunca asigna pesos en cero o negativos en distribuciones desbalanceadas o pesos pequeños", () => {
+    const desbalanceado = repartirPeso(0.1, [100, 1, 1]);
+    expect(desbalanceado.every((p) => p > 0)).toBe(true);
+    expect(desbalanceado.reduce((s, p) => s + p, 0)).toBeCloseTo(0.1, 10);
+
+    const micro = repartirPeso(0.01, [1, 1, 1]);
+    expect(micro.every((p) => p > 0)).toBe(true);
+    expect(micro.reduce((s, p) => s + p, 0)).toBeCloseTo(0.01, 4);
+  });
 });
 
 const DET = "10000000-0000-4000-8000-000000000001", CLO = "10000000-0000-4000-8000-000000000002";

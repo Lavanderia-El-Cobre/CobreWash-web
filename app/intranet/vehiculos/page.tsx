@@ -152,14 +152,21 @@ const INPUT_CLASS =
 const LABEL_CLASS =
   "block text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400";
 
-function leerArchivoComoDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () =>
-      resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+/** Crea una vista previa temporal revocable para una imagen local. */
+function crearPreviewTemporal(file: File, registro: Set<string>): string {
+  try {
+    const url = URL.createObjectURL(file);
+    registro.add(url);
+    return url;
+  } catch {
+    return "";
+  }
+}
+
+function revocarPreviewTemporal(url: string | undefined, registro: Set<string>) {
+  if (!url || !url.startsWith("blob:")) return;
+  URL.revokeObjectURL(url);
+  registro.delete(url);
 }
 
 /**
@@ -197,9 +204,15 @@ export default function VehiculosPage() {
   const [salidaDetalle, setSalidaDetalle] = useState<SalidaFlota | null>(null);
   const [nuevaFotoDesc, setNuevaFotoDesc] = useState("");
   const [formError, setFormError] = useState("");
-  const [previewsLocales, setPreviewsLocales] = useState<
-    Record<string, string>
-  >({});
+  const previewsBlobRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const registro = previewsBlobRef.current;
+    return () => {
+      for (const url of registro) URL.revokeObjectURL(url);
+      registro.clear();
+    };
+  }, []);
 
   const solicitudActual = useRef(0);
   const operacionSalida = useRef({ salidaId: "", inspeccionId: "" });
@@ -402,13 +415,36 @@ export default function VehiculosPage() {
     });
   };
 
+  const cerrarModalSalida = () => {
+    if (saving) return;
+    formSalida?.fotos.forEach((f) => revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current));
+    const refrescar = salidaConfirmada;
+    setFormSalida(null);
+    setSalidaConfirmada(false);
+    setFormError("");
+    if (refrescar) void cargarFlota(true);
+  };
+
+  const cerrarModalRetorno = () => {
+    if (saving) return;
+    formRetorno?.fotos.forEach((f) => revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current));
+    const refrescar = retornoConfirmado;
+    setFormRetorno(null);
+    setRetornoConfirmado(false);
+    setFormError("");
+    if (refrescar) void cargarFlota(true);
+  };
+
   const agregarEvidenciaSalida = (
     nombreArchivo?: string,
     previewUrl?: string,
     archivo?: File,
   ) => {
     setFormSalida((prev) => {
-      if (!prev || !archivo || prev.fotos.length >= 20) return prev;
+      if (!prev || !archivo || prev.fotos.length >= 20) {
+        revocarPreviewTemporal(previewUrl, previewsBlobRef.current);
+        return prev;
+      }
       const itemVehiculo = resumen.find(
         (r) => r.vehiculo.id === prev.vehiculoId,
       );
@@ -418,9 +454,6 @@ export default function VehiculosPage() {
         ? nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, "_")
         : `evidencia-${idx}.jpg`;
       const ruta = `vehiculos/${patente}/salida-${Date.now()}-${idx}-${base}`;
-      if (previewUrl) {
-        setPreviewsLocales((actual) => ({ ...actual, [ruta]: previewUrl }));
-      }
       return {
         ...prev,
         fotos: [
@@ -449,15 +482,15 @@ export default function VehiculosPage() {
     archivo?: File,
   ) => {
     setFormRetorno((prev) => {
-      if (!prev || !archivo || prev.fotos.length >= 20) return prev;
+      if (!prev || !archivo || prev.fotos.length >= 20) {
+        revocarPreviewTemporal(previewUrl, previewsBlobRef.current);
+        return prev;
+      }
       const idx = prev.fotos.length + 1;
       const base = nombreArchivo
         ? nombreArchivo.replace(/[^a-zA-Z0-9._-]/g, "_")
         : `retorno-${idx}.jpg`;
       const ruta = `vehiculos/${prev.vehiculoPatente}/retorno-${Date.now()}-${idx}-${base}`;
-      if (previewUrl) {
-        setPreviewsLocales((actual) => ({ ...actual, [ruta]: previewUrl }));
-      }
       return {
         ...prev,
         fotos: [
@@ -480,27 +513,27 @@ export default function VehiculosPage() {
     setNuevaFotoDesc("");
   };
 
-  const manejarSeleccionArchivosSalida = async (
+  const manejarSeleccionArchivosSalida = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const archivos = Array.from(e.target.files ?? []);
     e.target.value = "";
     for (const file of archivos) {
       if (!file.type.startsWith("image/")) continue;
-      const dataUrl = await leerArchivoComoDataUrl(file).catch(() => "");
-      agregarEvidenciaSalida(file.name, dataUrl || undefined, file);
+      const previewUrl = crearPreviewTemporal(file, previewsBlobRef.current);
+      agregarEvidenciaSalida(file.name, previewUrl, file);
     }
   };
 
-  const manejarSeleccionArchivosRetorno = async (
+  const manejarSeleccionArchivosRetorno = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const archivos = Array.from(e.target.files ?? []);
     e.target.value = "";
     for (const file of archivos) {
       if (!file.type.startsWith("image/")) continue;
-      const dataUrl = await leerArchivoComoDataUrl(file).catch(() => "");
-      agregarEvidenciaRetorno(file.name, dataUrl || undefined, file);
+      const previewUrl = crearPreviewTemporal(file, previewsBlobRef.current);
+      agregarEvidenciaRetorno(file.name, previewUrl, file);
     }
   };
 
@@ -606,15 +639,15 @@ export default function VehiculosPage() {
 
       movimientoGuardado = true;
       setSalidaConfirmada(true);
-      await subirEvidenciasInspeccion(inspeccionId, formSalida.fotos, (foto, rutaFinal) => {
-        if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      });
+      await subirEvidenciasInspeccion(inspeccionId, formSalida.fotos);
 
       const patente = itemVehiculo?.vehiculo.patente ?? "Vehículo";
       setNotice({
         text: `Salida de ${patente} registrada (${kmNum.toLocaleString("es-CL")} km).`,
         tipo: "success",
       });
+      formSalida.fotos.forEach((f) => revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current));
+      setSalidaConfirmada(false);
       setFormSalida(null);
       await cargarFlota(true);
     } catch (error) {
@@ -657,9 +690,7 @@ export default function VehiculosPage() {
 
       movimientoGuardado = true;
       setRetornoConfirmado(true);
-      await subirEvidenciasInspeccion(inspeccionId, formRetorno.fotos, (foto, rutaFinal) => {
-        if (foto.previewUrl) setPreviewsLocales(actual => ({ ...actual, [rutaFinal]: foto.previewUrl! }));
-      });
+      await subirEvidenciasInspeccion(inspeccionId, formRetorno.fotos);
 
       const recorridos = Math.max(
         0,
@@ -669,6 +700,8 @@ export default function VehiculosPage() {
         text: `Regreso de ${formRetorno.vehiculoPatente} confirmado (+${recorridos.toLocaleString("es-CL")} km recorridos).`,
         tipo: "success",
       });
+      formRetorno.fotos.forEach((f) => revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current));
+      setRetornoConfirmado(false);
       setFormRetorno(null);
       await cargarFlota(true);
     } catch (error) {
@@ -731,7 +764,7 @@ export default function VehiculosPage() {
             exit={{ opacity: 0 }}
             role={notice.tipo === "error" ? "alert" : "status"}
             aria-live="polite"
-            className={`fixed right-5 top-5 z-[70] flex max-w-md items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${noticeStyle[notice.tipo]}`}
+            className={`fixed right-5 top-5 z-[120] flex max-w-md items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl ${noticeStyle[notice.tipo]}`}
           >
             <span>{notice.text}</span>
             <button
@@ -1686,7 +1719,7 @@ export default function VehiculosPage() {
       <AnimatePresence>
         {formSalida && (
           <ModalIntranet
-            onCerrar={() => setFormSalida(null)}
+            onCerrar={cerrarModalSalida}
             bloqueado={saving}
             onSubmit={confirmarSalidaVehiculo}
             tamano="lg"
@@ -1701,7 +1734,7 @@ export default function VehiculosPage() {
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => setFormSalida(null)}
+                  onClick={cerrarModalSalida}
                   className={BOTON_MODAL_SECUNDARIO}
                 >
                   Cancelar
@@ -1920,14 +1953,15 @@ export default function VehiculosPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current);
                             setFormSalida({
                               ...formSalida,
                               fotos: formSalida.fotos.filter(
                                 (item) => item.id !== f.id,
                               ),
-                            })
-                          }
+                            });
+                          }}
                           aria-label="Quitar foto"
                           className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer"
                         >
@@ -1955,7 +1989,7 @@ export default function VehiculosPage() {
       <AnimatePresence>
         {formRetorno && (
           <ModalIntranet
-            onCerrar={() => setFormRetorno(null)}
+            onCerrar={cerrarModalRetorno}
             bloqueado={saving}
             onSubmit={confirmarRetornoVehiculo}
             tamano="lg"
@@ -1973,7 +2007,7 @@ export default function VehiculosPage() {
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => setFormRetorno(null)}
+                  onClick={cerrarModalRetorno}
                   className={BOTON_MODAL_SECUNDARIO}
                 >
                   Cancelar
@@ -2136,14 +2170,15 @@ export default function VehiculosPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            revocarPreviewTemporal(f.previewUrl, previewsBlobRef.current);
                             setFormRetorno({
                               ...formRetorno,
                               fotos: formRetorno.fotos.filter(
                                 (item) => item.id !== f.id,
                               ),
-                            })
-                          }
+                            });
+                          }}
                           aria-label="Quitar foto"
                           className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer"
                         >
@@ -2191,7 +2226,6 @@ export default function VehiculosPage() {
                 // solo se usan vistas previas directas para archivos recién subidos en esta sesión o URLs directas.
                 const resolverPreview = (ruta: string) => {
                   if (ruta.startsWith("vehiculos/inspecciones/")) return null;
-                  if (previewsLocales[ruta]) return previewsLocales[ruta];
                   if (
                     ruta.startsWith("http://") ||
                     ruta.startsWith("https://") ||

@@ -1,6 +1,6 @@
 import { executeMutation, getDataConnect, mutationRef } from "firebase/data-connect";
 import { app, dataConnect } from "@/lib/firebase/client";
-import { connectorConfig, getMiComandaGuardada } from "@/src/dataconnect-generated";
+import { connectorConfig, getMiComandaGuardada, type UnidadCobro } from "@/src/dataconnect-generated";
 
 /** Variables para crear una comanda junto con sus líneas de detalle y flujo de etapas. */
 export interface CrearComandaConFlujoVariables {
@@ -8,9 +8,11 @@ export interface CrearComandaConFlujoVariables {
   id: string;
   numeroComanda: string;
   clienteId: string;
-  empresa?: string;
-  proyecto?: string;
-  observaciones?: string;
+  empresa?: string | null;
+  proyecto?: string | null;
+  observaciones?: string | null;
+  modalidadCobro?: UnidadCobro;
+  precioKg?: number | null;
   detalles: {
     tipoPrendaId: string;
     tipoServicioId: string;
@@ -26,9 +28,10 @@ export interface CrearComandaConFlujoVariables {
 type Resultado = { comanda_insert: { id: string } };
 
 /** Variables para actualizar cabecera y detalles de una comanda existente con control optimista. */
-export type EditarComandaConDetallesVariables = Omit<Pick<CrearComandaConFlujoVariables, "id" | "empresa" | "proyecto" | "observaciones" | "detalles">, "detalles"> & {
+export type EditarComandaConDetallesVariables = Omit<Pick<CrearComandaConFlujoVariables, "id" | "empresa" | "proyecto" | "observaciones" | "modalidadCobro" | "precioKg" | "detalles">, "detalles"> & {
   /** Marca de versión actual de la comanda usada para evitar sobrescrituras concurrentes. */
   version: string;
+  modalidadCobro: UnidadCobro;
   detalles: (CrearComandaConFlujoVariables["detalles"][number] & { comandaId: string })[];
 };
 

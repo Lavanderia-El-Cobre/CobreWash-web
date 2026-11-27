@@ -34,6 +34,7 @@ export const LAMBDA_INICIAL = 1;
  */
 export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIaData; recargar: () => Promise<void>; avisar: Avisar }) {
   const [edicion, setEdicion] = useState<Edicion | null>(null);
+  const [errorModal, setErrorModal] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const config = panel.configuracionIa;
   const [margen, setMargen] = useState(String(Math.round((config?.margenSeguridad ?? MARGEN_INICIAL) * 1000) / 10));
@@ -47,6 +48,7 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
 
   const abrir = (insumo: Insumo, servicio: Servicio) => {
     const tasa = tasas.get(claveTasa(servicio.id, insumo.id));
+    setErrorModal(null);
     setEdicion({
       insumo, servicio, tasa,
       valor: tasa ? String(tasa.tasaInicial).replace(".", ",") : "",
@@ -59,10 +61,11 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
 
   const guardarTasa = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!edicion) return;
+    if (!edicion || guardando) return;
+    setErrorModal(null);
     const tasaInicial = leerNumero(edicion.valor);
-    if (tasaInicial === null || tasaInicial < 0 || tasaInicial > 100_000) { avisar("Ingresa una tasa entre 0 y 100.000.", "error"); return; }
-    if (edicion.fuente.length > 300) { avisar("La fuente admite hasta 300 caracteres.", "error"); return; }
+    if (tasaInicial === null || tasaInicial < 0 || tasaInicial > 100_000) { setErrorModal("Ingresa una tasa entre 0 y 100.000."); return; }
+    if (edicion.fuente.length > 300) { setErrorModal("La fuente admite hasta 300 caracteres."); return; }
     // Una tasa nueva parte igual a la inicial. Si cambia la unidad, la actual se convierte.
     const actual = edicion.tasa && !edicion.reiniciar ? convertirTasa(edicion.tasa.tasaActual, edicion.tasa.unidad, edicion.unidad) : null;
     setGuardando(true);
@@ -76,12 +79,13 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
       avisar(`Tasa de ${edicion.insumo.nombre} para ${edicion.servicio.nombre} guardada.`, "success");
     } catch (error) {
       registrarError("No se pudo guardar la tasa", error);
-      avisar(mensajeErrorIa(error), "error");
+      setErrorModal(mensajeErrorIa(error));
     } finally { setGuardando(false); }
   };
 
   const eliminar = async () => {
-    if (!edicion?.tasa) return;
+    if (!edicion?.tasa || guardando) return;
+    setErrorModal(null);
     // Doble clic de confirmación dentro del mismo modal para prevenir eliminaciones involuntarias.
     if (!edicion.confirmarBorrado) { setEdicion({ ...edicion, confirmarBorrado: true }); return; }
     setGuardando(true);
@@ -92,12 +96,13 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
       avisar("Tasa eliminada. Ese servicio ya no consume este insumo en el modelo.", "success");
     } catch (error) {
       registrarError("No se pudo eliminar la tasa", error);
-      avisar(mensajeErrorIa(error), "error");
+      setErrorModal(mensajeErrorIa(error));
     } finally { setGuardando(false); }
   };
 
   const guardarParametros = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardandoConfig) return;
     const m = leerNumero(margen), l = leerNumero(lambda);
     if (m === null || m < 0 || m > 100) { avisar("El margen debe estar entre 0% y 100%.", "error"); return; }
     if (l === null || l < 0 || l > 10_000) { avisar("λ debe estar entre 0 y 10.000.", "error"); return; }
@@ -200,12 +205,17 @@ export default function TasasIa({ panel, recargar, avisar }: { panel: GetPanelIa
       </Tarjeta>
 
       <Modal
-        abierto={!!edicion} alCerrar={() => setEdicion(null)} bloqueado={guardando} icono={Table2}
+        abierto={!!edicion} alCerrar={() => { setErrorModal(null); setEdicion(null); }} bloqueado={guardando} icono={Table2}
         titulo={edicion?.tasa ? "Editar tasa" : "Definir tasa"}
         subtitulo={edicion ? `${edicion.insumo.nombre} · ${edicion.servicio.nombre}` : undefined}
       >
         {edicion && (
           <form onSubmit={guardarTasa} className="space-y-4">
+            {errorModal && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                {errorModal}
+              </p>
+            )}
             <div className="grid grid-cols-[1fr_auto] gap-3">
               <label className="space-y-1.5">
                 <span className={claseEtiqueta}>Tasa inicial por kg</span>

@@ -123,9 +123,9 @@ mutation EditarComandaConDetalles(
       estado @check(expr: "this == 'PENDIENTE'", message: "Solo puedes editar comandas pendientes")
       actualizadoEn @check(expr: "this == vars.version", message: "La comanda cambió. Actualiza antes de editar")
     }
-    tiposPrenda: tipoPrendas
+    tiposPrenda: tipoPrendas(limit: 500)
       @check(expr: "vars.detalles.all(d, this.exists(p, p.id == d.tipoPrendaId))", message: "Una prenda ya no existe") { id }
-    tiposServicio: tipoServicios
+    tiposServicio: tipoServicios(limit: 500)
       @check(expr: "vars.detalles.all(d, this.exists(s, s.id == d.tipoServicioId))", message: "Un servicio ya no existe") { id }
   }
   bloqueo: comanda_update(

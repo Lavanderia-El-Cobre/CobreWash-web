@@ -113,6 +113,42 @@ export function limitesFechasInclusivos(desde: string, hasta: string) {
     ? new Date(Date.parse(limites.fechaHastaExclusiva) - 1).toISOString() : undefined };
 }
 
+const formatoFechaHora = new Intl.DateTimeFormat("en-CA", {
+  timeZone: zona,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function fechaHoraChile(value: Date) {
+  const partes = formatoFechaHora.formatToParts(value);
+  const get = (tipo: string) => partes.find((p) => p.type === tipo)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+/**
+ * Convierte una fecha y hora local de Chile (`YYYY-MM-DD`, `h`, `min`, `s`) a ISO UTC
+ * respetando cambios de horario de verano/invierno (jornadas de 23 h y 25 h).
+ */
+export function instanteChile(fecha: string, h: number, min: number, s: number) {
+  if (!validarFecha(fecha) || h < 0 || h > 23 || min < 0 || min > 59 || s < 0 || s > 59) {
+    throw new Error("Fecha u hora inválida.");
+  }
+  const objetivo = `${fecha}T${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  let inferior = Date.parse(fecha) - 86400000;
+  let superior = Date.parse(fecha) + 2 * 86400000;
+  while (inferior < superior) {
+    const medio = Math.floor((inferior + superior) / 2);
+    if (fechaHoraChile(new Date(medio)) < objetivo) inferior = medio + 1;
+    else superior = medio;
+  }
+  return new Date(inferior).toISOString();
+}
+
 /** Devuelve el rango inicial por defecto: desde el día 1 del mes en curso hasta hoy en Chile. */
 export function periodoInicial() {
   const hasta = fechaChile();

@@ -243,8 +243,8 @@ mutation ActualizarUsuario(
   $telefono: String
   $activo: Boolean!
 ) @auth(level: USER) @transaction {
-  query @redact {
-    usuario(id_expr: "auth.uid") {
+  query @redact @check(expr: "vars.id != auth.uid", message: "No puedes modificar ni desactivar tu propia cuenta") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden editar usuarios")
@@ -273,7 +273,7 @@ mutation CrearVehiculo(
   $descripcion: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden crear vehículos")
@@ -299,7 +299,7 @@ mutation ActualizarVehiculo(
   $activo: Boolean!
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden editar vehículos")
@@ -332,7 +332,7 @@ mutation CrearSalidaVehiculo(
   $observaciones: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin'", message: "Solo administradores pueden asignar salidas")
@@ -342,7 +342,7 @@ mutation CrearSalidaVehiculo(
       @check(expr: "this != null", message: "Repartidor no encontrado") {
       activo @check(expr: "this == true", message: "El repartidor está inactivo")
       rol {
-        nombre @check(expr: "this == 'repartidor'", message: "El usuario asignado no es repartidor")
+        nombre @check(expr: "this in ['repartidor', 'conductor']", message: "El usuario asignado no es repartidor")
       }
     }
     vehiculo(id: $vehiculoId)
@@ -372,10 +372,10 @@ mutation RegistrarInspeccionAntes(
   $observaciones: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'repartidor'", message: "Solo repartidores pueden inspeccionar vehículos")
+        nombre @check(expr: "this in ['repartidor', 'conductor']", message: "Solo repartidores pueden inspeccionar vehículos")
       }
     }
     salidaVehiculo(
@@ -404,10 +404,10 @@ mutation RegistrarInspeccionAntes(
 
 mutation IniciarSalidaVehiculo($salidaId: UUID!) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'repartidor'", message: "Solo repartidores pueden iniciar salidas")
+        nombre @check(expr: "this in ['repartidor', 'conductor']", message: "Solo repartidores pueden iniciar salidas")
       }
     }
     inspeccionVehiculo(first: { where: {
@@ -454,10 +454,10 @@ mutation RegistrarInspeccionDespues(
   $observaciones: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'repartidor'", message: "Solo repartidores pueden inspeccionar vehículos")
+        nombre @check(expr: "this in ['repartidor', 'conductor']", message: "Solo repartidores pueden inspeccionar vehículos")
       }
     }
     salidaVehiculo(first: { where: {
@@ -500,10 +500,10 @@ mutation AgregarFotoInspeccionVehiculo(
   $orden: Int!
 ) @auth(level: NO_ACCESS) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
-        nombre @check(expr: "this == 'repartidor'", message: "Solo repartidores pueden adjuntar fotografías")
+        nombre @check(expr: "this in ['repartidor', 'conductor']", message: "Solo repartidores pueden adjuntar fotografías")
       }
     }
     inspeccionVehiculo(id: $inspeccionId)
@@ -532,7 +532,7 @@ mutation CrearClienteComanda(
   $direccion: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para crear clientes")
@@ -559,7 +559,7 @@ mutation EditarFichaCliente(
   $direccion: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para editar clientes")
@@ -679,7 +679,7 @@ mutation AgregarComandaDetalle(
   $subtotal: Float!
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol {
         nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para modificar comandas")
@@ -706,7 +706,7 @@ mutation AnularComanda(
   $motivoAnulacion: String!
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para anular comandas") }
     }
@@ -834,7 +834,7 @@ mutation EditarComanda(
   $observaciones: String
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para editar comandas") }
     }
@@ -859,7 +859,7 @@ mutation EliminarDetallesComanda(
   $comandaId: UUID!
 ) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para editar comandas") }
     }
@@ -874,7 +874,7 @@ mutation EliminarDetallesComanda(
 # Las prendas escritas a mano quedan en mayúsculas, igual que el catálogo base.
 mutation CrearTipoPrenda($nombre: String!) @auth(level: USER) @transaction {
   query @redact @check(expr: "vars.nombre.size() >= 2 && vars.nombre.size() <= 60", message: "El nombre de la prenda debe tener entre 2 y 60 caracteres") {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para crear prendas") }
     }
@@ -884,7 +884,7 @@ mutation CrearTipoPrenda($nombre: String!) @auth(level: USER) @transaction {
 
 mutation CrearTipoServicio($nombre: String!, $precioBase: Float!) @auth(level: USER) @transaction {
   query @redact {
-    usuario(id_expr: "auth.uid") {
+    usuario(id_expr: "auth.uid") @check(expr: "this != null", message: "Perfil no encontrado") {
       activo @check(expr: "this == true", message: "La cuenta está inactiva")
       rol { nombre @check(expr: "this == 'admin' || this == 'recepcionista'", message: "No autorizado para crear servicios") }
     }

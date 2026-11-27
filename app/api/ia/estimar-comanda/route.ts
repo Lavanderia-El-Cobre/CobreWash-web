@@ -51,7 +51,11 @@ export async function POST(request: Request) {
     let modelo: ModeloComanda;
     try {
       modelo = (await admin.db.executeQuery<GetModeloComandaIaData, Record<string, never>>("GetModeloComandaIa", {}, como)).data;
-    } catch {
+    } catch (error) {
+      const texto = String(error);
+      if (/ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ECONNRESET|UNAVAILABLE|DEADLINE_EXCEEDED|INTERNAL|pq:|fetch failed|network|timeout/i.test(texto)) {
+        throw new ErrorIa(503, "No se pudo consultar el modelo de estimación. Intenta nuevamente.");
+      }
       throw new ErrorIa(403, "Solo administración y recepción con cuenta activa pueden ver la estimación.");
     }
     const { data: perfil } = await admin.db.executeQuery<GetMiPerfilData, Record<string, never>>("GetMiPerfil", {}, como);

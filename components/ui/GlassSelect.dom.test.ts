@@ -33,3 +33,18 @@ it("si lo escrito ya existe elige esa opción en vez de duplicarla", () => {
   fireEvent.submit(campo.closest("form")!);
   expect(onChange).toHaveBeenCalledWith("PANTALÓN");
 });
+
+it("Enter en el buscador selecciona la primera coincidencia sin enviar el formulario padre", () => {
+  const onSubmit = vi.fn((e: Event) => e.preventDefault());
+  const onChange = vi.fn();
+  render(createElement("form", { onSubmit }, createElement(GlassSelect, {
+    value: "", onChange, ariaLabel: "Insumo", searchable: true, searchPlaceholder: "Buscar insumo…",
+    options: [{ value: "det", label: "Detergente" }, { value: "clo", label: "Cloro" }],
+  })));
+  fireEvent.click(screen.getByRole("button", { name: "Insumo" }));
+  const buscador = screen.getByPlaceholderText("Buscar insumo…");
+  fireEvent.change(buscador, { target: { value: "clo" } });
+  fireEvent.keyDown(buscador, { key: "Enter" });
+  expect(onChange).toHaveBeenCalledWith("clo");
+  expect(onSubmit).not.toHaveBeenCalled();
+});

@@ -34,7 +34,13 @@ export default function GestionPrivacidadPage() {
       if (!user) throw new Error("Inicia sesión.");
       const r = await fetch(`/api/privacidad/gestion?pagina=${pagina}&respondidas=${respondidas ? 1 : 0}`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
       const d = await r.json(); if (!r.ok) throw new Error(d.error);
-      if (g === generacion.current && auth.currentUser?.uid === user.uid) setDatos(d);
+      if (g === generacion.current && auth.currentUser?.uid === user.uid) {
+        if (d.solicitudDerechos.length === 0 && pagina > 0) {
+          setPagina((p) => Math.max(0, p - 1));
+          return;
+        }
+        setDatos(d);
+      }
     } catch (e) { if (g === generacion.current) setError((e as Error).message); }
     finally { if (g === generacion.current) setOcupado(false); }
   }, [pagina, permitido, usuarioId, respondidas]);

@@ -25,10 +25,32 @@ export function repartirPeso(totalKg: number, cantidades: number[]): number[] {
   if (!(totalKg > 0) || !cantidades.length) return cantidades.map(() => 0);
   const unidades = cantidades.map((c) => Math.max(1, c));
   const suma = unidades.reduce((s, c) => s + c, 0);
-  const partes = unidades.map((c) => Math.round((totalKg * c / suma) * 100) / 100);
-  const resto = Math.round((totalKg - partes.reduce((s, p) => s + p, 0)) * 100) / 100;
-  partes[partes.length - 1] = Math.round((partes[partes.length - 1] + resto) * 100) / 100;
-  return partes;
+  const totalCent = Math.round(totalKg * 100);
+  // Si el peso total no alcanza a 0,01 kg por línea, repartir en diezmilésimas positivas (> 0).
+  if (totalCent < unidades.length) {
+    const partes = unidades.map((u) => Math.max(0.0001, Number(((totalKg * u) / suma).toFixed(4))));
+    const diff = Number((totalKg - partes.reduce((a, b) => a + b, 0)).toFixed(4));
+    const idxMax = partes.reduce((best, p, i) => (p > partes[best] ? i : best), 0);
+    if (partes[idxMax] + diff > 0) partes[idxMax] = Number((partes[idxMax] + diff).toFixed(4));
+    return partes;
+  }
+  // Método del resto mayor en centésimas con piso de 0,01 kg por línea (evita ceros y negativos).
+  const exactos = unidades.map((u) => (totalCent * u) / suma);
+  const base = exactos.map((e) => Math.max(1, Math.floor(e)));
+  let resto = totalCent - base.reduce((a, b) => a + b, 0);
+  if (resto > 0) {
+    const orden = exactos.map((e, i) => ({ i, frac: e - base[i] })).sort((a, b) => (b.frac - a.frac) || (b.i - a.i));
+    for (let k = 0; k < resto; k++) base[orden[k % orden.length].i] += 1;
+  } else if (resto < 0) {
+    const orden = base.map((b, i) => ({ i, exc: b - exactos[i] })).sort((a, b) => (b.exc - a.exc) || (a.i - b.i));
+    for (const { i } of orden) {
+      while (resto < 0 && base[i] > 1) {
+        base[i] -= 1;
+        resto += 1;
+      }
+    }
+  }
+  return base.map((c) => c / 100);
 }
 
 /** Datos de GetModeloComandaIa. */

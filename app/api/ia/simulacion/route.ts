@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { db } = await autorizarAdminIa(request);
-    const cuerpo = (await leerJson(request, 500)) as { id?: unknown } | null;
+    const cuerpo = request.body ? ((await leerJson(request, 500)) as { id?: unknown } | null) : null;
     if (cuerpo?.id === undefined) {
       await db.executeMutation("BorrarSimulacionesIa");
       return responder({ borrado: "todos" });

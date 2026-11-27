@@ -35,6 +35,8 @@ it("exige sesión vigente y verifica rol y cuenta activa en el servidor", async 
   expect((await POST(pedir({ tipoServicioId: LAVADO, pesoKg: 10 }))).status).toBe(401);
   m.query.mockRejectedValueOnce(new Error("operario"));
   expect((await POST(pedir({ tipoServicioId: LAVADO, pesoKg: 10 }))).status).toBe(403);
+  m.query.mockRejectedValueOnce(new Error("UNAVAILABLE: Data Connect timeout"));
+  expect((await POST(pedir({ tipoServicioId: LAVADO, pesoKg: 10 }))).status).toBe(503);
   expect(m.verify).toHaveBeenCalledWith("token", true);
   expect(m.query).toHaveBeenCalledWith("GetModeloComandaIa", {}, { impersonate: { authClaims: { uid: "recep", sub: "recep" } } });
 });
